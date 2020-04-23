@@ -15,7 +15,7 @@ fn func2() -> String {
     for _ in 0..50 {
         s.push_str(&format!("{:#?}\n", std::time::SystemTime::now()));
     }
-    
+
     s
 }
 
