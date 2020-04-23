@@ -1,7 +1,13 @@
+#![feature(proc_macro_diagnostic)]
+#![recursion_limit = "256"]
+
+extern crate proc_macro;
+
 use syn::spanned::Spanned;
+use proc_macro::TokenStream;
 
 #[proc_macro_attribute]
-pub fn instrument(_args: proc_macro::TokenStream, item: proc_macro::TokenStream) -> proc_macro::TokenStream {
+pub fn instrument(_args: TokenStream, item: TokenStream) -> TokenStream {
     let input = syn::parse_macro_input!(item as syn::ItemFn);
 
     let syn::ItemFn {

@@ -1,6 +1,6 @@
 use tracer::future::Instrument;
 
-#[tracer_attribute::instrument]
+#[tracer::tracer_attribute::instrument]
 async fn parallel() {
     for i in 0..4 {
         tokio::spawn(iter_work(i).in_current_span());
@@ -15,7 +15,7 @@ async fn iter_work(_iter: i32) {
     other_work().await;
 }
 
-#[tracer_attribute::instrument]
+#[tracer::tracer_attribute::instrument]
 async fn other_work() {
     for i in 0..20 {
         if i == 10 {

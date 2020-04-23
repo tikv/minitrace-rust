@@ -4,6 +4,7 @@ extern crate lazy_static;
 pub mod future;
 pub mod util;
 pub type ID = usize;
+pub use tracer_attribute;
 
 #[derive(Debug)]
 pub struct Span {

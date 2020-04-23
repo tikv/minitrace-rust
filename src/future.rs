@@ -29,10 +29,7 @@ pub trait Instrument: Sized {
 impl<T: std::future::Future> std::future::Future for Instrumented<T> {
     type Output = T::Output;
 
-    fn poll(
-        self: Pin<&mut Self>,
-        cx: &mut Context<'_>,
-    ) -> std::task::Poll<Self::Output> {
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> std::task::Poll<Self::Output> {
         let this = self.project();
         let _enter = this.span.enter();
         this.inner.poll(cx)

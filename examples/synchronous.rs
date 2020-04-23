@@ -9,7 +9,7 @@ fn func1(i: i32) {
     let _ = func2();
 }
 
-#[tracer_attribute::instrument]
+#[tracer::tracer_attribute::instrument]
 fn func2() -> String {
     let mut s = String::new();
     for _ in 0..50 {

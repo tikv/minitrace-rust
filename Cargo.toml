@@ -9,6 +9,7 @@ crossbeam = "0.7"
 sharded-slab = "0.0.9"
 lazy_static = "1.4"
 pin-project = "0.4"
+tracer-attribute = { path = "./tracer-attribute" }
 
 [dependencies.futures_01]
 version = "0.1"
@@ -19,6 +20,4 @@ version = "0.3.1"
 package = "futures"
 
 [dev-dependencies]
-crossbeam = "0.7"
 tokio = { version = "0.2", features = ["full"] }
-tracer-attribute = { path = "./tracer-attribute" }
