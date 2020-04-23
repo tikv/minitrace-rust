@@ -23,7 +23,10 @@ pub fn draw_stdout(spans: Vec<crate::Span>) {
         );
 
         if let Some(parent) = span.parent {
-            children.entry(parent).or_insert_with(|| vec![]).push(span.id);
+            children
+                .entry(parent)
+                .or_insert_with(|| vec![])
+                .push(span.id);
         } else {
             root = Some(span.id);
         }

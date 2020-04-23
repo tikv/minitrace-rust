@@ -1,15 +1,18 @@
 #[pin_project::pin_project]
 pub struct Instrumented<T> {
     #[pin]
-    inner: T,
-    span: crate::SpanGuard,
+    pub inner: T,
+    pub span: crate::OSpanGuard,
 }
 
 impl<T: std::future::Future + Sized> Instrument for T {}
 
 pub trait Instrument: std::future::Future + Sized {
     fn instrument(self, span: crate::SpanGuard) -> Instrumented<Self> {
-        Instrumented { inner: self, span }
+        Instrumented {
+            inner: self,
+            span: crate::OSpanGuard(Some(span)),
+        }
     }
 
     fn in_current_span(self) -> Instrumented<Self> {

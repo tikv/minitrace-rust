@@ -48,7 +48,7 @@ impl Drop for SpanInner {
 }
 
 thread_local! {
-    static CURRENT_SPANS: std::cell::RefCell<Vec<usize>> = std::cell::RefCell::new(vec![]);
+    static SPAN_STACK: std::cell::RefCell<Vec<usize>> = std::cell::RefCell::new(vec![]);
 }
 
 pub struct Registry {
@@ -73,40 +73,39 @@ pub fn new_span_root(sender: crossbeam::channel::Sender<Span>) -> SpanGuard {
         })
         .expect("full");
 
-
     SpanGuard { id }
 }
 
-pub fn new_span() -> SpanGuard {
-    let parent_id = CURRENT_SPANS
-        .with(|spans| {
-            let spans = spans.borrow();
-            spans.last().cloned()
-        })
-        .expect("can't get parent id");
+pub fn new_span() -> OSpanGuard {
+    if let Some(parent_id) = SPAN_STACK.with(|spans| {
+        let spans = spans.borrow();
+        spans.last().cloned()
+    }) {
+        let span = REGISTRY
+            .spans
+            .get(parent_id)
+            .expect("can not get parent span");
 
-    let span = REGISTRY
-        .spans
-        .get(parent_id)
-        .expect("can not get parent span");
+        span.ref_count
+            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
 
-    span.ref_count
-        .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        let sender = span.sender.clone();
 
-    let sender = span.sender.clone();
+        let id = REGISTRY
+            .spans
+            .insert(SpanInner {
+                sender,
+                id: None,
+                parent: Some(parent_id),
+                start_time: std::time::SystemTime::now(),
+                ref_count: std::sync::atomic::AtomicUsize::new(1),
+            })
+            .expect("full");
 
-    let id = REGISTRY
-        .spans
-        .insert(SpanInner {
-            sender,
-            id: None,
-            parent: Some(parent_id),
-            start_time: std::time::SystemTime::now(),
-            ref_count: std::sync::atomic::AtomicUsize::new(1),
-        })
-        .expect("full");
-
-    SpanGuard { id }
+        OSpanGuard(Some(SpanGuard { id }))
+    } else {
+        OSpanGuard(None)
+    }
 }
 
 pub struct SpanGuard {
@@ -115,11 +114,19 @@ pub struct SpanGuard {
 
 impl SpanGuard {
     pub fn enter(&self) -> Entered<'_> {
-        CURRENT_SPANS.with(|spans| {
+        SPAN_STACK.with(|spans| {
             spans.borrow_mut().push(self.id);
         });
 
         Entered { guard: &self }
+    }
+}
+
+pub struct OSpanGuard(Option<SpanGuard>);
+
+impl OSpanGuard {
+    pub fn enter(&self) -> Option<Entered<'_>> {
+        self.0.as_ref().map(|s| s.enter())
     }
 }
 
@@ -146,10 +153,8 @@ pub struct Entered<'a> {
 
 impl Drop for Entered<'_> {
     fn drop(&mut self) {
-        let id = CURRENT_SPANS
-            .with(|spans| {
-                spans.borrow_mut().pop()
-            })
+        let id = SPAN_STACK
+            .with(|spans| spans.borrow_mut().pop())
             .expect("corrupted stack");
 
         assert_eq!(id, self.guard.id, "corrupted stack");

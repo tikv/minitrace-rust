@@ -33,10 +33,10 @@ pub fn instrument(_args: proc_macro::TokenStream, item: proc_macro::TokenStream)
         let async_kwd = syn::token::Async { span: block.span() };
         let await_kwd = syn::Ident::new("await", block.span());
         quote::quote_spanned! {block.span()=>
-            tracer::future::Instrument::instrument(
-                #async_kwd move { #block },
-                __tracer_span
-            )
+            tracer::future::Instrumented {
+                inner: #async_kwd move { #block },
+                span: __tracer_span,
+            }
                 .#await_kwd
         }
     } else {

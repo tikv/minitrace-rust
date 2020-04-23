@@ -20,7 +20,7 @@ async fn other_work() {
     for i in 0..20 {
         if i == 10 {
             tokio::task::yield_now().await;
-        } 
+        }
         println!("a");
     }
 }
@@ -29,10 +29,13 @@ async fn other_work() {
 async fn main() {
     let (tx, rx) = crossbeam::channel::unbounded();
 
-    tokio::spawn(async {
-        parallel().await;
-        other_work().await;
-    }.instrument(tracer::new_span_root(tx)));
+    tokio::spawn(
+        async {
+            parallel().await;
+            other_work().await;
+        }
+        .instrument(tracer::new_span_root(tx)),
+    );
 
     tracer::util::draw_stdout(rx.iter().collect());
 }
