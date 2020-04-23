@@ -1,0 +1,16 @@
+[package]
+name = "tracer"
+version = "0.1.0"
+authors = ["zhongzc <zhongzc_arch@outlook.com>"]
+edition = "2018"
+
+[dependencies]
+crossbeam = "0.7"
+sharded-slab = "0.0.9"
+lazy_static = "1.4"
+pin-project = "0.4"
+
+[dev-dependencies]
+crossbeam = "0.7"
+tokio = { version = "0.2", features = ["full"] }
+tracer-attribute = { path = "./tracer-attribute" }
