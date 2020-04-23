@@ -1,6 +1,7 @@
 const BAR_LEN: usize = 70;
 
 fn time_nanos(t: std::time::SystemTime) -> u128 {
+    #[allow(clippy::match_wild_err_arm)]
     match t.duration_since(std::time::SystemTime::UNIX_EPOCH) {
         Ok(n) => n.as_nanos(),
         Err(_) => panic!(),
@@ -22,7 +23,7 @@ pub fn draw_stdout(spans: Vec<crate::Span>) {
         );
 
         if let Some(parent) = span.parent {
-            children.entry(parent).or_insert(vec![]).push(span.id);
+            children.entry(parent).or_insert_with(|| vec![]).push(span.id);
         } else {
             root = Some(span.id);
         }
@@ -56,7 +57,7 @@ fn draw_rec(
     let tailing_space_len = BAR_LEN - bar_len - leading_space_len + 1;
     print!("{: <1$}", "", tailing_space_len);
 
-    println!("{:6.2} ms", duration as f64 / 1000000f64);
+    println!("{:6.2} ms", duration as f64 / 1_000_000_f64);
 
     if let Some(children) = children_map.get(&cur_id) {
         for child in children {
