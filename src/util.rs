@@ -16,7 +16,7 @@ pub fn draw_stdout(spans: Vec<crate::Span>) {
         let start = time_nanos(span.start_time);
         let end = time_nanos(span.end_time);
         assert_eq!(
-            spans_map.insert(span.id, (start, end - start)),
+            spans_map.insert(span.id, (span.tag, start, end - start)),
             None,
             "duplicated id {}",
             span.id
@@ -33,8 +33,8 @@ pub fn draw_stdout(spans: Vec<crate::Span>) {
     }
 
     let root = root.expect("can not find root");
-    let pivot = spans_map.get(&root).unwrap().0;
-    let factor = BAR_LEN as f64 / spans_map.get(&root).unwrap().1 as f64;
+    let pivot = spans_map.get(&root).unwrap().1;
+    let factor = BAR_LEN as f64 / spans_map.get(&root).unwrap().2 as f64;
 
     draw_rec(root, pivot, factor, &children, &spans_map);
 }
@@ -44,9 +44,9 @@ fn draw_rec(
     pivot: u128,
     factor: f64,
     children_map: &std::collections::HashMap<usize, Vec<usize>>,
-    spans_map: &std::collections::HashMap<usize, (u128, u128)>,
+    spans_map: &std::collections::HashMap<usize, (&'static str, u128, u128)>,
 ) {
-    let (start, duration) = *spans_map.get(&cur_id).expect("can not get span");
+    let (tag, start, duration) = *spans_map.get(&cur_id).expect("can not get span");
 
     // draw leading space
     let leading_space_len = ((start - pivot) as f64 * factor) as usize;
@@ -60,7 +60,7 @@ fn draw_rec(
     let tailing_space_len = BAR_LEN - bar_len - leading_space_len + 1;
     print!("{: <1$}", "", tailing_space_len);
 
-    println!("{:6.2} ms", duration as f64 / 1_000_000_f64);
+    println!("{:6.2} ms {}", duration as f64 / 1_000_000_f64, tag);
 
     if let Some(children) = children_map.get(&cur_id) {
         for child in children {

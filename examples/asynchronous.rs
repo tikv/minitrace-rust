@@ -1,22 +1,22 @@
 use tracer::future::Instrument;
 
 #[tracer::tracer_attribute::instrument]
-async fn parallel() {
+async fn parallel_job() {
     for i in 0..4 {
-        tokio::spawn(iter_work(i).in_current_span());
+        tokio::spawn(iter_job(i).in_current_span("parallel_iter_job"));
     }
 }
 
-async fn iter_work(_iter: i32) {
+async fn iter_job(_iter: i32) {
     for _ in 0..20 {
         println!("b");
     }
     tokio::task::yield_now().await;
-    other_work().await;
+    other_job().await;
 }
 
-#[tracer::tracer_attribute::instrument]
-async fn other_work() {
+#[tracer::tracer_attribute::instrument("other_job 💯")]
+async fn other_job() {
     for i in 0..20 {
         if i == 10 {
             tokio::task::yield_now().await;
@@ -31,10 +31,10 @@ async fn main() {
 
     tokio::spawn(
         async {
-            parallel().await;
-            other_work().await;
+            parallel_job().await;
+            other_job().await;
         }
-        .instrument(tracer::new_span_root(tx)),
+        .instrument(tracer::new_span_root("root", tx)),
     );
 
     tracer::util::draw_stdout(rx.iter().collect());

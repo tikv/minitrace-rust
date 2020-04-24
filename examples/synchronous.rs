@@ -1,5 +1,5 @@
 fn func1(i: i32) {
-    let span = tracer::new_span();
+    let span = tracer::new_span("func1");
     let _g = span.enter();
 
     for j in 0..(i * 10) {
@@ -9,7 +9,7 @@ fn func1(i: i32) {
     let _ = func2();
 }
 
-#[tracer::tracer_attribute::instrument]
+#[tracer::tracer_attribute::instrument("func2 😻")]
 fn func2() -> String {
     let mut s = String::new();
     for _ in 0..50 {
@@ -22,7 +22,7 @@ fn func2() -> String {
 fn main() {
     let (tx, rx) = crossbeam::channel::unbounded();
     {
-        let span = tracer::new_span_root(tx);
+        let span = tracer::new_span_root("root", tx);
         let _g = span.enter();
 
         for i in 0..10 {

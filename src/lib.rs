@@ -6,8 +6,10 @@ pub mod util;
 pub type ID = usize;
 pub use tracer_attribute;
 
+
 #[derive(Debug)]
 pub struct Span {
+    pub tag: &'static str,
     pub id: ID,
     pub parent: Option<ID>,
     pub start_time: std::time::SystemTime,
@@ -15,6 +17,7 @@ pub struct Span {
 }
 
 pub struct SpanInner {
+    tag: &'static str,
     sender: crossbeam::channel::Sender<Span>,
     id: Option<ID>,
     parent: Option<ID>,
@@ -25,6 +28,7 @@ pub struct SpanInner {
 impl Drop for SpanInner {
     fn drop(&mut self) {
         let _ = self.sender.try_send(Span {
+            tag: self.tag,
             id: self.id.unwrap(),
             parent: self.parent,
             start_time: self.start_time,
@@ -62,10 +66,11 @@ lazy_static! {
     };
 }
 
-pub fn new_span_root(sender: crossbeam::channel::Sender<Span>) -> SpanGuard {
+pub fn new_span_root(tag: &'static str, sender: crossbeam::channel::Sender<Span>) -> SpanGuard {
     let id = REGISTRY
         .spans
         .insert(SpanInner {
+            tag,
             sender,
             id: None,
             parent: None,
@@ -77,7 +82,7 @@ pub fn new_span_root(sender: crossbeam::channel::Sender<Span>) -> SpanGuard {
     SpanGuard { id }
 }
 
-pub fn new_span() -> OSpanGuard {
+pub fn new_span(tag: &'static str) -> OSpanGuard {
     if let Some(parent_id) = SPAN_STACK.with(|spans| {
         let spans = spans.borrow();
         spans.last().cloned()
@@ -95,6 +100,7 @@ pub fn new_span() -> OSpanGuard {
         let id = REGISTRY
             .spans
             .insert(SpanInner {
+                tag,
                 sender,
                 id: None,
                 parent: Some(parent_id),

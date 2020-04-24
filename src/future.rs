@@ -18,10 +18,10 @@ pub trait Instrument: Sized {
         }
     }
 
-    fn in_current_span(self) -> Instrumented<Self> {
+    fn in_current_span(self, tag: &'static str) -> Instrumented<Self> {
         Instrumented {
             inner: self,
-            span: crate::new_span(),
+            span: crate::new_span(tag),
         }
     }
 }
@@ -32,15 +32,7 @@ impl<T: std::future::Future> std::future::Future for Instrumented<T> {
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> std::task::Poll<Self::Output> {
         let this = self.project();
         let _enter = this.span.enter();
-
-        match this.inner.poll(cx) {
-            std::task::Poll::Pending => std::task::Poll::Pending,
-            std::task::Poll::Ready(val) => {
-                drop(_enter);
-                let _ = this.span.0.take();
-                std::task::Poll::Ready(val)
-            }
-        }
+        this.inner.poll(cx)
     }
 }
 
@@ -50,19 +42,7 @@ impl<T: futures_01::Future> futures_01::Future for Instrumented<T> {
 
     fn poll(&mut self) -> futures_01::Poll<Self::Item, Self::Error> {
         let _enter = self.span.enter();
-        match self.inner.poll() {
-            Ok(futures_01::Async::Ready(t)) => {
-                drop(_enter);
-                let _ = self.span.0.take();
-                Ok(futures_01::Async::Ready(t))
-            }
-            Err(e) => {
-                drop(_enter);
-                let _ = self.span.0.take();
-                Err(From::from(e))
-            }
-            Ok(futures_01::Async::NotReady) => Ok(futures_01::Async::NotReady),
-        }
+        self.inner.poll()
     }
 }
 
