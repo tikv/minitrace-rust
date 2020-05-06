@@ -1,24 +1,22 @@
 const BAR_LEN: usize = 70;
 
-fn time_nanos(t: std::time::SystemTime) -> u128 {
-    #[allow(clippy::match_wild_err_arm)]
-    match t.duration_since(std::time::SystemTime::UNIX_EPOCH) {
-        Ok(n) => n.as_nanos(),
-        Err(_) => panic!(),
-    }
-}
-
 pub fn draw_stdout(spans: Vec<crate::Span>) {
     let mut children = std::collections::HashMap::new();
     let mut spans_map = std::collections::HashMap::new();
     let mut root = None;
+    let mut max_end = 0;
     for span in spans {
-        let start = time_nanos(span.start_time);
-        let end = time_nanos(span.end_time);
+        let start = span.elapsed_start.as_nanos();
+        let end = span.elapsed_end.as_nanos();
+
+        if end > max_end {
+            max_end = end;
+        }
+
         assert_eq!(
             spans_map.insert(span.id, (span.tag, start, end - start)),
             None,
-            "duplicated id {}",
+            "duplicated id {:#?}",
             span.id
         );
 
@@ -34,17 +32,17 @@ pub fn draw_stdout(spans: Vec<crate::Span>) {
 
     let root = root.expect("can not find root");
     let pivot = spans_map.get(&root).unwrap().1;
-    let factor = BAR_LEN as f64 / spans_map.get(&root).unwrap().2 as f64;
+    let factor = BAR_LEN as f64 / max_end as f64;
 
     draw_rec(root, pivot, factor, &children, &spans_map);
 }
 
 fn draw_rec(
-    cur_id: usize,
+    cur_id: crate::SpanID,
     pivot: u128,
     factor: f64,
-    children_map: &std::collections::HashMap<usize, Vec<usize>>,
-    spans_map: &std::collections::HashMap<usize, (&'static str, u128, u128)>,
+    children_map: &std::collections::HashMap<crate::SpanID, Vec<crate::SpanID>>,
+    spans_map: &std::collections::HashMap<crate::SpanID, (&'static str, u128, u128)>,
 ) {
     let (tag, start, duration) = *spans_map.get(&cur_id).expect("can not get span");
 
@@ -53,7 +51,7 @@ fn draw_rec(
     print!("{: <1$}", "", leading_space_len);
 
     // draw bar
-    let bar_len = (duration as f64 * factor) as usize;
+    let bar_len = std::cmp::max((duration as f64 * factor) as usize, 1);
     print!("{:=<1$}", "", bar_len);
 
     // draw tailing space

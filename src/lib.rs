@@ -3,129 +3,122 @@ extern crate lazy_static;
 
 pub mod future;
 pub mod util;
-pub type ID = usize;
+
 pub use tracer_attribute;
 
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
+pub struct SpanID {
+    slab_index: usize,
+    elapsed_start: std::time::Duration,
+}
 
 #[derive(Debug)]
 pub struct Span {
     pub tag: &'static str,
-    pub id: ID,
-    pub parent: Option<ID>,
-    pub start_time: std::time::SystemTime,
-    pub end_time: std::time::SystemTime,
+    pub id: SpanID,
+    pub parent: Option<SpanID>,
+    pub elapsed_start: std::time::Duration,
+    pub elapsed_end: std::time::Duration,
 }
 
 pub struct SpanInner {
     tag: &'static str,
-    sender: crossbeam::channel::Sender<Span>,
-    id: Option<ID>,
-    parent: Option<ID>,
-    start_time: std::time::SystemTime,
-    ref_count: std::sync::atomic::AtomicUsize,
-}
-
-impl Drop for SpanInner {
-    fn drop(&mut self) {
-        let _ = self.sender.try_send(Span {
-            tag: self.tag,
-            id: self.id.unwrap(),
-            parent: self.parent,
-            start_time: self.start_time,
-            end_time: std::time::SystemTime::now(),
-        });
-
-        if let Some(parent_id) = self.parent {
-            let span = REGISTRY.spans.get(parent_id).expect("can not get parent");
-
-            if span
-                .ref_count
-                .fetch_sub(1, std::sync::atomic::Ordering::Release)
-                == 1
-            {
-                drop(span);
-                std::sync::atomic::fence(std::sync::atomic::Ordering::Acquire);
-                let mut span = REGISTRY.spans.take(parent_id).expect("can not get span");
-                span.id = Some(parent_id);
-            }
-        }
-    }
+    parent: Option<SpanID>,
+    root_time: std::time::Instant,
+    elapsed_start: std::time::Duration,
 }
 
 thread_local! {
-    static SPAN_STACK: std::cell::RefCell<Vec<usize>> = std::cell::RefCell::new(vec![]);
-}
-
-pub struct Registry {
-    spans: sharded_slab::Slab<SpanInner>,
+    static SPAN_STACK: std::cell::RefCell<Vec<&'static SpanGuard>> = std::cell::RefCell::new(Vec::with_capacity(1024));
 }
 
 lazy_static! {
-    static ref REGISTRY: Registry = Registry {
-        spans: sharded_slab::Slab::new()
-    };
+    static ref REGISTRY: sharded_slab::Slab<SpanInner> = sharded_slab::Slab::new();
 }
 
 pub fn new_span_root(tag: &'static str, sender: crossbeam::channel::Sender<Span>) -> SpanGuard {
-    let id = REGISTRY
-        .spans
-        .insert(SpanInner {
+        let root_time = std::time::Instant::now();
+        let elapsed_start = std::time::Duration::new(0, 0);
+        let span = SpanInner {
             tag,
-            sender,
-            id: None,
             parent: None,
-            start_time: std::time::SystemTime::now(),
-            ref_count: std::sync::atomic::AtomicUsize::new(1),
-        })
-        .expect("full");
+            root_time,
+            elapsed_start,
+        };
+        let slab_index = REGISTRY.insert(span).expect("full");
 
-    SpanGuard { id }
+        let id = SpanID {
+            slab_index,
+            elapsed_start,
+        };
+
+        SpanGuard {
+            id,
+            root_time,
+            sender,
+        }
 }
 
 pub fn new_span(tag: &'static str) -> OSpanGuard {
-    if let Some(parent_id) = SPAN_STACK.with(|spans| {
-        let spans = spans.borrow();
-        spans.last().cloned()
+    if let Some(parent) = SPAN_STACK.with(|span_idx| {
+        let span_idx = span_idx.borrow();
+        span_idx.last().cloned()
     }) {
-        let span = REGISTRY
-            .spans
-            .get(parent_id)
-            .expect("can not get parent span");
+        let root_time = parent.root_time;
+        let elapsed_start = root_time.elapsed();
+        let sender = parent.sender.clone();
 
-        span.ref_count
-            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        let slab_index = REGISTRY.insert(SpanInner {
+            tag,
+            parent: Some(parent.id),
+            root_time,
+            elapsed_start,
+        }).expect("full");
 
-        let sender = span.sender.clone();
+        let id = SpanID {
+            slab_index,
+            elapsed_start,
+        };
 
-        let id = REGISTRY
-            .spans
-            .insert(SpanInner {
-                tag,
-                sender,
-                id: None,
-                parent: Some(parent_id),
-                start_time: std::time::SystemTime::now(),
-                ref_count: std::sync::atomic::AtomicUsize::new(1),
-            })
-            .expect("full");
-
-        OSpanGuard(Some(SpanGuard { id }))
+        OSpanGuard(Some(SpanGuard {
+            id,
+            root_time,
+            sender,
+        }))
     } else {
         OSpanGuard(None)
     }
 }
 
 pub struct SpanGuard {
-    id: ID,
+    id: SpanID,
+    root_time: std::time::Instant,
+    sender: crossbeam::channel::Sender<Span>,
 }
 
 impl SpanGuard {
     pub fn enter(&self) -> Entered<'_> {
         SPAN_STACK.with(|spans| {
-            spans.borrow_mut().push(self.id);
+            spans
+                .borrow_mut()
+                .push(unsafe { std::mem::transmute(self) });
         });
 
-        Entered { guard: &self }
+        Entered { guard: self }
+    }
+}
+
+impl Drop for SpanGuard {
+    fn drop(&mut self) {
+        let span = REGISTRY.take(self.id.slab_index).expect("can not get span");
+
+        let _ = self.sender.try_send(Span {
+            tag: span.tag,
+            id: self.id,
+            parent: span.parent,
+            elapsed_start: span.elapsed_start,
+            elapsed_end: span.root_time.elapsed(),
+        });
     }
 }
 
@@ -137,33 +130,16 @@ impl OSpanGuard {
     }
 }
 
-impl Drop for SpanGuard {
-    fn drop(&mut self) {
-        let span = REGISTRY.spans.get(self.id).expect("can not get span");
-
-        if span
-            .ref_count
-            .fetch_sub(1, std::sync::atomic::Ordering::Release)
-            == 1
-        {
-            drop(span);
-            std::sync::atomic::fence(std::sync::atomic::Ordering::Acquire);
-            let mut span = REGISTRY.spans.take(self.id).expect("can not get span");
-            span.id = Some(self.id);
-        }
-    }
-}
-
 pub struct Entered<'a> {
     guard: &'a SpanGuard,
 }
 
 impl Drop for Entered<'_> {
     fn drop(&mut self) {
-        let id = SPAN_STACK
+        let guard = SPAN_STACK
             .with(|spans| spans.borrow_mut().pop())
             .expect("corrupted stack");
 
-        assert_eq!(id, self.guard.id, "corrupted stack");
+        assert_eq!(guard.id, self.guard.id, "corrupted stack");
     }
 }

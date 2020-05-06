@@ -27,6 +27,12 @@ async fn other_job() {
 
 #[tokio::main]
 async fn main() {
+    {
+        // Warm up
+        let (tx, _rx) = crossbeam::channel::unbounded();
+        tracer::new_span_root("", tx);
+    }
+
     let (tx, rx) = crossbeam::channel::unbounded();
 
     tokio::spawn(

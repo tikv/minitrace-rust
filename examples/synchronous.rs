@@ -20,11 +20,16 @@ fn func2() -> String {
 }
 
 fn main() {
+    {
+        // Warm up
+        let (tx, _rx) = crossbeam::channel::unbounded();
+        tracer::new_span_root("", tx);
+    }
+
     let (tx, rx) = crossbeam::channel::unbounded();
     {
         let span = tracer::new_span_root("root", tx);
         let _g = span.enter();
-
         for i in 0..10 {
             func1(i);
         }

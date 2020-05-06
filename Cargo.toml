@@ -21,3 +21,10 @@ package = "futures"
 
 [dev-dependencies]
 tokio = { version = "0.2", features = ["full"] }
+criterion = "0.3"
+crossbeam = "0.7"
+sharded-slab = "0.0.9"
+
+[[bench]]
+name = "benches"
+harness = false
