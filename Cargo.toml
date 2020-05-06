@@ -10,6 +10,7 @@ sharded-slab = "0.0.9"
 lazy_static = "1.4"
 pin-project = "0.4"
 tracer-attribute = { path = "./tracer-attribute" }
+snowflake = "1.2"
 
 [dependencies.futures_01]
 version = "0.1"

@@ -1,16 +1,17 @@
-#[macro_use]
-extern crate lazy_static;
-
+pub mod collector;
 pub mod future;
+pub mod time_measure;
 pub mod util;
 
 pub use tracer_attribute;
 
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
-pub struct SpanID {
-    slab_index: usize,
-    elapsed_start: std::time::Duration,
-}
+use collector::*;
+pub use collector::{Collector, CollectorType};
+use time_measure::*;
+pub type SpanID = snowflake::ProcessUniqueId;
+
+pub const TIME_MEASURE_TYPE: TimeMeasureType = TimeMeasureType::Instant;
+pub const COLLECTOR_TYPE: CollectorType = CollectorType::Channel;
 
 #[derive(Debug)]
 pub struct Span {
@@ -21,69 +22,56 @@ pub struct Span {
     pub elapsed_end: std::time::Duration,
 }
 
-pub struct SpanInner {
+pub struct SpanInfo {
     tag: &'static str,
     parent: Option<SpanID>,
-    root_time: std::time::Instant,
-    elapsed_start: std::time::Duration,
 }
 
 thread_local! {
     static SPAN_STACK: std::cell::RefCell<Vec<&'static SpanGuard>> = std::cell::RefCell::new(Vec::with_capacity(1024));
 }
 
-lazy_static! {
-    static ref REGISTRY: sharded_slab::Slab<SpanInner> = sharded_slab::Slab::new();
+#[inline]
+pub fn new_span_root(
+    tag: &'static str,
+    tx: CollectorTx,
+    time_measure_type: TimeMeasureType,
+) -> SpanGuard {
+    let root_time = TimeMeasure::root(time_measure_type);
+    let time_handle = TimeMeasureHandle {
+        root: root_time,
+        start: std::time::Duration::new(0, 0),
+    };
+    let info = SpanInfo { tag, parent: None };
+
+    SpanGuard {
+        id: SpanID::new(),
+        time_handle,
+        tx,
+        info,
+    }
 }
 
-pub fn new_span_root(tag: &'static str, sender: crossbeam::channel::Sender<Span>) -> SpanGuard {
-        let root_time = std::time::Instant::now();
-        let elapsed_start = std::time::Duration::new(0, 0);
-        let span = SpanInner {
-            tag,
-            parent: None,
-            root_time,
-            elapsed_start,
-        };
-        let slab_index = REGISTRY.insert(span).expect("full");
-
-        let id = SpanID {
-            slab_index,
-            elapsed_start,
-        };
-
-        SpanGuard {
-            id,
-            root_time,
-            sender,
-        }
-}
-
+#[inline]
 pub fn new_span(tag: &'static str) -> OSpanGuard {
-    if let Some(parent) = SPAN_STACK.with(|span_idx| {
-        let span_idx = span_idx.borrow();
-        span_idx.last().cloned()
+    if let Some(parent) = SPAN_STACK.with(|spans| {
+        let spans = spans.borrow();
+        spans.last().cloned()
     }) {
-        let root_time = parent.root_time;
-        let elapsed_start = root_time.elapsed();
-        let sender = parent.sender.clone();
+        let root_time = parent.time_handle.root;
+        let time_handle = root_time.start();
+        let tx = parent.tx.clone();
 
-        let slab_index = REGISTRY.insert(SpanInner {
+        let info = SpanInfo {
             tag,
             parent: Some(parent.id),
-            root_time,
-            elapsed_start,
-        }).expect("full");
-
-        let id = SpanID {
-            slab_index,
-            elapsed_start,
         };
 
         OSpanGuard(Some(SpanGuard {
-            id,
-            root_time,
-            sender,
+            id: SpanID::new(),
+            time_handle,
+            tx,
+            info,
         }))
     } else {
         OSpanGuard(None)
@@ -92,11 +80,13 @@ pub fn new_span(tag: &'static str) -> OSpanGuard {
 
 pub struct SpanGuard {
     id: SpanID,
-    root_time: std::time::Instant,
-    sender: crossbeam::channel::Sender<Span>,
+    time_handle: TimeMeasureHandle,
+    tx: CollectorTx,
+    info: SpanInfo,
 }
 
 impl SpanGuard {
+    #[inline]
     pub fn enter(&self) -> Entered<'_> {
         SPAN_STACK.with(|spans| {
             spans
@@ -104,20 +94,20 @@ impl SpanGuard {
                 .push(unsafe { std::mem::transmute(self) });
         });
 
-        Entered { guard: self }
+        Entered { guard: &self }
     }
 }
 
 impl Drop for SpanGuard {
     fn drop(&mut self) {
-        let span = REGISTRY.take(self.id.slab_index).expect("can not get span");
+        let (elapsed_start, elapsed_end) = self.time_handle.end();
 
-        let _ = self.sender.try_send(Span {
-            tag: span.tag,
+        let _ = self.tx.push(Span {
+            tag: self.info.tag,
             id: self.id,
-            parent: span.parent,
-            elapsed_start: span.elapsed_start,
-            elapsed_end: span.root_time.elapsed(),
+            parent: self.info.parent,
+            elapsed_start,
+            elapsed_end,
         });
     }
 }
@@ -125,6 +115,7 @@ impl Drop for SpanGuard {
 pub struct OSpanGuard(Option<SpanGuard>);
 
 impl OSpanGuard {
+    #[inline]
     pub fn enter(&self) -> Option<Entered<'_>> {
         self.0.as_ref().map(|s| s.enter())
     }

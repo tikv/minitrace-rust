@@ -20,19 +20,13 @@ fn func2() -> String {
 }
 
 fn main() {
+    let tracer::Collector { tx, rx } = tracer::Collector::new(tracer::COLLECTOR_TYPE);
     {
-        // Warm up
-        let (tx, _rx) = crossbeam::channel::unbounded();
-        tracer::new_span_root("", tx);
-    }
-
-    let (tx, rx) = crossbeam::channel::unbounded();
-    {
-        let span = tracer::new_span_root("root", tx);
+        let span = tracer::new_span_root("root", tx, tracer::TIME_MEASURE_TYPE);
         let _g = span.enter();
         for i in 0..10 {
             func1(i);
         }
     }
-    tracer::util::draw_stdout(rx.iter().collect());
+    tracer::util::draw_stdout(rx.collect_all());
 }

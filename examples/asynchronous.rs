@@ -27,21 +27,15 @@ async fn other_job() {
 
 #[tokio::main]
 async fn main() {
-    {
-        // Warm up
-        let (tx, _rx) = crossbeam::channel::unbounded();
-        tracer::new_span_root("", tx);
-    }
-
-    let (tx, rx) = crossbeam::channel::unbounded();
+    let tracer::Collector { tx, rx } = tracer::Collector::new(tracer::COLLECTOR_TYPE);
 
     tokio::spawn(
         async {
             parallel_job().await;
             other_job().await;
         }
-        .instrument(tracer::new_span_root("root", tx)),
+        .instrument(tracer::new_span_root("root", tx, tracer::TIME_MEASURE_TYPE)),
     );
 
-    tracer::util::draw_stdout(rx.iter().collect());
+    tracer::util::draw_stdout(rx.collect_all());
 }
