@@ -14,8 +14,5 @@ fn root_span_new_drop_bench(c: &mut Criterion) {
     });
 }
 
-criterion_group!(
-    benches,
-    root_span_new_drop_bench,
-);
+criterion_group!(benches, root_span_new_drop_bench);
 criterion_main!(benches);

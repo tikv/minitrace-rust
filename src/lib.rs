@@ -102,7 +102,7 @@ impl Drop for SpanGuard {
     fn drop(&mut self) {
         let (elapsed_start, elapsed_end) = self.time_handle.end();
 
-        let _ = self.tx.push(Span {
+        self.tx.push(Span {
             tag: self.info.tag,
             id: self.id,
             parent: self.info.parent,
