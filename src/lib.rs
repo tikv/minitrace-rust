@@ -88,13 +88,7 @@ pub struct SpanGuard {
 impl SpanGuard {
     #[inline]
     pub fn enter(&self) -> Entered<'_> {
-        SPAN_STACK.with(|spans| {
-            spans
-                .borrow_mut()
-                .push(unsafe { std::mem::transmute(self) });
-        });
-
-        Entered { guard: &self }
+        Entered::new(self)
     }
 }
 
@@ -123,6 +117,18 @@ impl OSpanGuard {
 
 pub struct Entered<'a> {
     guard: &'a SpanGuard,
+}
+
+impl<'a> Entered<'a> {
+    fn new(span_guard: &'a SpanGuard) -> Self {
+        SPAN_STACK.with(|spans| {
+            spans
+                .borrow_mut()
+                .push(unsafe { std::mem::transmute(span_guard) });
+        });
+
+        Entered { guard: span_guard }
+    }
 }
 
 impl Drop for Entered<'_> {
