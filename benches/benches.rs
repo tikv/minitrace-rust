@@ -2,7 +2,7 @@ use criterion::{black_box, criterion_group, criterion_main, Criterion};
 
 fn root_span_new_drop_bench(c: &mut Criterion) {
     c.bench_function("span_root channel instant", |b| {
-        let tracer::Collector { tx, _rx } = tracer::Collector::new(tracer::COLLECTOR_TYPE);
+        let tracer::Collector { tx, rx: _ } = tracer::Collector::new(tracer::COLLECTOR_TYPE);
 
         b.iter(|| {
             tracer::new_span_root(

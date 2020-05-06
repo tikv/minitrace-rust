@@ -849,7 +849,6 @@ dependencies = [
  "crossbeam",
  "futures 0.1.29",
  "futures 0.3.4",
- "lazy_static",
  "pin-project",
  "sharded-slab",
  "snowflake",
