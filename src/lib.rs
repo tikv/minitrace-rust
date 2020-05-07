@@ -2,6 +2,7 @@ mod collector;
 pub mod future;
 mod span_id;
 pub mod util;
+pub mod time;
 pub use minitrace_attribute::trace;
 
 pub use collector::*;
@@ -23,7 +24,7 @@ thread_local! {
 
 #[inline]
 pub fn new_span_root<T: Into<u32>>(tx: CollectorTx, tag: T) -> SpanGuard {
-    let root_time = std::time::Instant::now();
+    let root_time = time::Instant::now_coarse();
     let info = SpanInfo {
         id: SpanID::new(),
         parent: None,
@@ -55,18 +56,17 @@ pub fn new_span<T: Into<u32>>(tag: T) -> OSpanGuard {
 
         OSpanGuard(Some(SpanGuard {
             root_time,
-            elapsed_start: root_time.elapsed().as_millis() as u32,
+            elapsed_start: time::duration_to_ms(root_time.elapsed()),
             tx,
             info,
         }))
     } else {
-        println!("no parent");
         OSpanGuard(None)
     }
 }
 
 pub struct SpanGuard {
-    root_time: std::time::Instant,
+    root_time: time::Instant,
     info: SpanInfo,
     elapsed_start: u32,
     tx: CollectorTx,
@@ -91,7 +91,7 @@ impl Drop for SpanGuard {
             id: self.info.id,
             parent: self.info.parent,
             elapsed_start: self.elapsed_start,
-            elapsed_end: self.root_time.elapsed().as_millis() as u32,
+            elapsed_end: time::duration_to_ms(self.root_time.elapsed()),
             tag: self.info.tag,
         });
     }

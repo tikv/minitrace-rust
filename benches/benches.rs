@@ -19,5 +19,22 @@ fn root_span_new_drop_bench(c: &mut Criterion) {
     });
 }
 
-criterion_group!(benches, root_span_new_drop_bench);
+fn instant_bench(c: &mut Criterion) {
+    c.bench_function("instant", |b| {
+        b.iter(|| minitrace::time::Instant::now());
+    });
+}
+
+fn instant_coarse_bench(c: &mut Criterion) {
+    c.bench_function("instant coarse", |b| {
+        b.iter(|| minitrace::time::Instant::now_coarse());
+    });
+}
+
+criterion_group!(
+    benches,
+    root_span_new_drop_bench,
+    instant_bench,
+    instant_coarse_bench
+);
 criterion_main!(benches);

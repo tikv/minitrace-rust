@@ -8,6 +8,8 @@ edition = "2018"
 crossbeam = "0.7"
 pin-project = "0.4"
 minitrace-attribute = { path = "./attribute" }
+time = "0.1"
+libc = "0.2"
 
 [dependencies.futures_01]
 version = "0.1"

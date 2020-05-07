@@ -440,8 +440,10 @@ dependencies = [
  "crossbeam",
  "futures 0.1.29",
  "futures 0.3.4",
+ "libc",
  "minitrace-attribute",
  "pin-project",
+ "time",
  "tokio",
 ]
 
@@ -800,6 +802,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d326610f408c7a4eb6f51c37c330e496b08506c9457c9d34287ecc38809fb060"
 dependencies = [
  "unicode-width",
+]
+
+[[package]]
+name = "time"
+version = "0.1.43"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ca8a50ef2360fbd1eeb0ecd46795a87a19024eb4b53c5dc916ca1fd95fe62438"
+dependencies = [
+ "libc",
+ "winapi 0.3.8",
 ]
 
 [[package]]
