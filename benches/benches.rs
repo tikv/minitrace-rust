@@ -5,7 +5,7 @@ fn root_span_new_drop_bench(c: &mut Criterion) {
         let mut txs = Vec::with_capacity(100);
         let mut rxs = Vec::with_capacity(100);
         for _ in 0..100 {
-            let (tx, rx) = tracer::Collector::new(tracer::COLLECTOR_TYPE);
+            let (tx, rx) = tracer::Collector::new(tracer::DEFAULT_COLLECTOR);
             txs.push(tx);
             rxs.push(rx);
         }

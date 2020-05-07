@@ -37,7 +37,7 @@ async fn other_job() {
 
 #[tokio::main]
 async fn main() {
-    let (tx, rx) = tracer::Collector::new(tracer::COLLECTOR_TYPE);
+    let (tx, rx) = tracer::Collector::new(tracer::DEFAULT_COLLECTOR);
 
     tokio::spawn(
         async {

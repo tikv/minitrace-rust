@@ -17,7 +17,7 @@ fn func2() {
 }
 
 fn main() {
-    let (tx, rx) = tracer::Collector::new(tracer::COLLECTOR_TYPE);
+    let (tx, rx) = tracer::Collector::new(tracer::DEFAULT_COLLECTOR);
     {
         let span = tracer::new_span_root(tx, 0u32);
         let _g = span.enter();

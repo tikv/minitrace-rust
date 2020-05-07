@@ -7,21 +7,14 @@ pub use tracer_attribute::trace;
 pub use collector::*;
 pub use span_id::SpanID;
 
-pub const COLLECTOR_TYPE: CollectorType = CollectorType::Channel;
+pub const DEFAULT_COLLECTOR: CollectorType = CollectorType::Channel;
 
-#[derive(Debug)]
 pub struct Span {
     pub id: SpanID,
     pub parent: Option<SpanID>,
     pub elapsed_start: u32,
     pub elapsed_end: u32,
     pub tag: u32,
-}
-
-pub struct SpanInfo {
-    id: SpanID,
-    parent: Option<SpanID>,
-    tag: u32,
 }
 
 thread_local! {
@@ -76,6 +69,12 @@ pub struct SpanGuard {
     info: SpanInfo,
     elapsed_start: u32,
     tx: CollectorTx,
+}
+
+struct SpanInfo {
+    id: SpanID,
+    parent: Option<SpanID>,
+    tag: u32,
 }
 
 impl SpanGuard {
