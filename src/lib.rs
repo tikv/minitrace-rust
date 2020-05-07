@@ -60,6 +60,7 @@ pub fn new_span<T: Into<u32>>(tag: T) -> OSpanGuard {
             info,
         }))
     } else {
+        println!("no parent");
         OSpanGuard(None)
     }
 }
