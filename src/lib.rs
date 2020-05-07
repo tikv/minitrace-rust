@@ -1,75 +1,68 @@
-pub mod collector;
+mod collector;
 pub mod future;
-pub mod time_measure;
+mod span_id;
 pub mod util;
+pub use tracer_attribute::trace;
 
-pub use tracer_attribute;
+pub use collector::*;
+pub use span_id::SpanID;
 
-use collector::*;
-pub use collector::{Collector, CollectorType};
-use time_measure::*;
-pub type SpanID = snowflake::ProcessUniqueId;
-
-pub const TIME_MEASURE_TYPE: TimeMeasureType = TimeMeasureType::Instant;
 pub const COLLECTOR_TYPE: CollectorType = CollectorType::Channel;
 
 #[derive(Debug)]
 pub struct Span {
-    pub tag: &'static str,
     pub id: SpanID,
     pub parent: Option<SpanID>,
-    pub elapsed_start: std::time::Duration,
-    pub elapsed_end: std::time::Duration,
+    pub elapsed_start: u32,
+    pub elapsed_end: u32,
+    pub tag: u32,
 }
 
 pub struct SpanInfo {
-    tag: &'static str,
+    id: SpanID,
     parent: Option<SpanID>,
+    tag: u32,
 }
 
 thread_local! {
-    static SPAN_STACK: std::cell::RefCell<Vec<&'static SpanGuard>> = std::cell::RefCell::new(Vec::with_capacity(1024));
+    static SPAN_STACK: std::cell::UnsafeCell<Vec<&'static SpanGuard>> = std::cell::UnsafeCell::new(Vec::with_capacity(1024));
 }
 
 #[inline]
-pub fn new_span_root(
-    tag: &'static str,
-    tx: CollectorTx,
-    time_measure_type: TimeMeasureType,
-) -> SpanGuard {
-    let root_time = TimeMeasure::root(time_measure_type);
-    let time_handle = TimeMeasureHandle {
-        root: root_time,
-        start: std::time::Duration::new(0, 0),
+pub fn new_span_root<T: Into<u32>>(tx: CollectorTx, tag: T) -> SpanGuard {
+    let root_time = std::time::Instant::now();
+    let info = SpanInfo {
+        id: SpanID::new(),
+        parent: None,
+        tag: tag.into(),
     };
-    let info = SpanInfo { tag, parent: None };
 
     SpanGuard {
-        id: SpanID::new(),
-        time_handle,
+        root_time,
+        elapsed_start: 0u32,
         tx,
         info,
     }
 }
 
 #[inline]
-pub fn new_span(tag: &'static str) -> OSpanGuard {
-    if let Some(parent) = SPAN_STACK.with(|spans| {
-        let spans = spans.borrow();
-        spans.last().cloned()
+pub fn new_span<T: Into<u32>>(tag: T) -> OSpanGuard {
+    if let Some(parent) = SPAN_STACK.with(|spans| unsafe {
+        let spans = &*spans.get();
+        spans.last()
     }) {
-        let root_time = parent.time_handle.root;
-        let time_handle = root_time.start();
+        let root_time = parent.root_time;
         let tx = parent.tx.clone();
 
         let info = SpanInfo {
-            tag,
-            parent: Some(parent.id),
+            id: SpanID::new(),
+            parent: Some(parent.info.id),
+            tag: tag.into(),
         };
 
         OSpanGuard(Some(SpanGuard {
-            id: SpanID::new(),
-            time_handle,
+            root_time,
+            elapsed_start: root_time.elapsed().as_millis() as u32,
             tx,
             info,
         }))
@@ -79,10 +72,10 @@ pub fn new_span(tag: &'static str) -> OSpanGuard {
 }
 
 pub struct SpanGuard {
-    id: SpanID,
-    time_handle: TimeMeasureHandle,
-    tx: CollectorTx,
+    root_time: std::time::Instant,
     info: SpanInfo,
+    elapsed_start: u32,
+    tx: CollectorTx,
 }
 
 impl SpanGuard {
@@ -94,14 +87,12 @@ impl SpanGuard {
 
 impl Drop for SpanGuard {
     fn drop(&mut self) {
-        let (elapsed_start, elapsed_end) = self.time_handle.end();
-
         self.tx.push(Span {
-            tag: self.info.tag,
-            id: self.id,
+            id: self.info.id,
             parent: self.info.parent,
-            elapsed_start,
-            elapsed_end,
+            elapsed_start: self.elapsed_start,
+            elapsed_end: self.root_time.elapsed().as_millis() as u32,
+            tag: self.info.tag,
         });
     }
 }
@@ -121,12 +112,8 @@ pub struct Entered<'a> {
 
 impl<'a> Entered<'a> {
     fn new(span_guard: &'a SpanGuard) -> Self {
-        SPAN_STACK.with(|spans| {
-            spans
-                .borrow_mut()
-                .push(unsafe { std::mem::transmute(span_guard) });
-        });
-
+        SPAN_STACK
+            .with(|spans| unsafe { (&mut *spans.get()).push(std::mem::transmute(span_guard)) });
         Entered { guard: span_guard }
     }
 }
@@ -134,9 +121,9 @@ impl<'a> Entered<'a> {
 impl Drop for Entered<'_> {
     fn drop(&mut self) {
         let guard = SPAN_STACK
-            .with(|spans| spans.borrow_mut().pop())
+            .with(|spans| unsafe { (&mut *spans.get()).pop() })
             .expect("corrupted stack");
 
-        assert_eq!(guard.id, self.guard.id, "corrupted stack");
+        assert_eq!(guard.info.id, self.guard.info.id, "corrupted stack");
     }
 }

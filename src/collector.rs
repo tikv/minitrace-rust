@@ -35,23 +35,15 @@ impl CollectorRx {
     }
 }
 
-pub struct Collector {
-    pub tx: CollectorTx,
-    pub rx: CollectorRx,
-}
+pub struct Collector;
 impl Collector {
-    pub fn new(tp: CollectorType) -> Self {
+    #[allow(clippy::new_ret_no_self)]
+    pub fn new(tp: CollectorType) -> (CollectorTx, CollectorRx) {
         match tp {
-            CollectorType::Void => Collector {
-                tx: CollectorTx::Void,
-                rx: CollectorRx::Void,
-            },
+            CollectorType::Void => (CollectorTx::Void, CollectorRx::Void),
             CollectorType::Channel => {
                 let (tx, rx) = crossbeam::channel::unbounded();
-                Collector {
-                    tx: CollectorTx::Channel(tx),
-                    rx: CollectorRx::Channel(rx),
-                }
+                (CollectorTx::Channel(tx), CollectorRx::Channel(rx))
             }
         }
     }

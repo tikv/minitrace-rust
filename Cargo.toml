@@ -8,7 +8,6 @@ edition = "2018"
 crossbeam = "0.7"
 pin-project = "0.4"
 tracer-attribute = { path = "./tracer-attribute" }
-snowflake = "1.2"
 
 [dependencies.futures_01]
 version = "0.1"
@@ -22,7 +21,6 @@ package = "futures"
 tokio = { version = "0.2", features = ["full"] }
 criterion = "0.3"
 crossbeam = "0.7"
-sharded-slab = "0.0.9"
 
 [[bench]]
 name = "benches"

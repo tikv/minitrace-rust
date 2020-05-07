@@ -1,28 +1,25 @@
-fn func1(i: i32) {
-    let span = tracer::new_span("func1");
+fn func1(i: u64) {
+    let span = tracer::new_span(0u32);
     let _g = span.enter();
 
     for j in 0..(i * 10) {
-        println!("get {}", j);
+        std::thread::sleep(std::time::Duration::from_micros(j));
     }
 
-    let _ = func2();
+    func2();
 }
 
-#[tracer::tracer_attribute::instrument("func2 😻")]
-fn func2() -> String {
-    let mut s = String::new();
-    for _ in 0..50 {
-        s.push_str(&format!("{:#?}\n", std::time::SystemTime::now()));
+#[tracer::trace(0u32)]
+fn func2() {
+    for i in 0..50 {
+        std::thread::sleep(std::time::Duration::from_micros(i));
     }
-
-    s
 }
 
 fn main() {
-    let tracer::Collector { tx, rx } = tracer::Collector::new(tracer::COLLECTOR_TYPE);
+    let (tx, rx) = tracer::Collector::new(tracer::COLLECTOR_TYPE);
     {
-        let span = tracer::new_span_root("root", tx, tracer::TIME_MEASURE_TYPE);
+        let span = tracer::new_span_root(tx, 0u32);
         let _g = span.enter();
         for i in 0..10 {
             func1(i);

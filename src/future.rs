@@ -18,7 +18,7 @@ pub trait Instrument: Sized {
         }
     }
 
-    fn in_current_span(self, tag: &'static str) -> Instrumented<Self> {
+    fn in_current_span<T: Into<u32>>(self, tag: T) -> Instrumented<Self> {
         Instrumented {
             inner: self,
             span: crate::new_span(tag),

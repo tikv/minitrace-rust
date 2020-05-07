@@ -7,16 +7,15 @@ use proc_macro::TokenStream;
 use syn::spanned::Spanned;
 
 #[proc_macro_attribute]
-pub fn instrument(args: TokenStream, item: TokenStream) -> TokenStream {
+pub fn trace(args: TokenStream, item: TokenStream) -> TokenStream {
     let input = syn::parse_macro_input!(item as syn::ItemFn);
-    let args = syn::parse_macro_input!(args as syn::AttributeArgs);
+    let tag = syn::parse_macro_input!(args as syn::Expr);
 
     let syn::ItemFn {
         attrs,
         vis,
         block,
         sig,
-        ..
     } = input;
 
     let syn::Signature {
@@ -53,18 +52,12 @@ pub fn instrument(args: TokenStream, item: TokenStream) -> TokenStream {
         )
     };
 
-    let tag = if let Some(syn::NestedMeta::Lit(syn::Lit::Str(s))) = args.get(0) {
-        s.clone()
-    } else {
-        syn::LitStr::new(&ident.to_string(), ident.span())
-    };
-
     quote::quote!(
         #(#attrs) *
         #vis #constness #unsafety #asyncness #abi fn #ident<#gen_params>(#params) #return_type
         #where_clause
         {
-            let __tracer_span = tracer::new_span(#tag);
+            let __tracer_span = tracer::new_span(#tag as u32);
             #body
         }
     )
