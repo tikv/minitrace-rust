@@ -39,7 +39,7 @@ pub fn trace(args: TokenStream, item: TokenStream) -> TokenStream {
         let async_kwd = syn::token::Async { span: block.span() };
         let await_kwd = syn::Ident::new("await", block.span());
         quote::quote_spanned! {block.span()=>
-            tracer::future::Instrumented {
+            minitrace::future::Instrumented {
                 inner: #async_kwd move { #block },
                 span: __tracer_span,
             }
@@ -57,7 +57,7 @@ pub fn trace(args: TokenStream, item: TokenStream) -> TokenStream {
         #vis #constness #unsafety #asyncness #abi fn #ident<#gen_params>(#params) #return_type
         #where_clause
         {
-            let __tracer_span = tracer::new_span(#tag as u32);
+            let __tracer_span = minitrace::new_span(#tag as u32);
             #body
         }
     )

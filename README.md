@@ -1,4 +1,4 @@
-# TRACER
+# MINITRACE
 
 ```sh
 $ cargo run --example synchronous

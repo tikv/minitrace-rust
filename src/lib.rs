@@ -2,7 +2,7 @@ mod collector;
 pub mod future;
 mod span_id;
 pub mod util;
-pub use tracer_attribute::trace;
+pub use minitrace_attribute::trace;
 
 pub use collector::*;
 pub use span_id::SpanID;

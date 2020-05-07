@@ -1,4 +1,4 @@
-use tracer::future::Instrument;
+use minitrace::future::Instrument;
 
 #[repr(u32)]
 enum AsyncJob {
@@ -10,7 +10,7 @@ enum AsyncJob {
     OtherJob,
 }
 
-#[tracer::trace(AsyncJob::ParallelJob)]
+#[minitrace::trace(AsyncJob::ParallelJob)]
 async fn parallel_job() {
     for i in 0..4 {
         tokio::spawn(iter_job(i).in_current_span(AsyncJob::IterJob as u32));
@@ -25,7 +25,7 @@ async fn iter_job(_iter: i32) {
     other_job().await;
 }
 
-#[tracer::trace(AsyncJob::OtherJob)]
+#[minitrace::trace(AsyncJob::OtherJob)]
 async fn other_job() {
     for i in 0..20 {
         if i == 10 {
@@ -37,15 +37,15 @@ async fn other_job() {
 
 #[tokio::main]
 async fn main() {
-    let (tx, rx) = tracer::Collector::new(tracer::DEFAULT_COLLECTOR);
+    let (tx, rx) = minitrace::Collector::new(minitrace::DEFAULT_COLLECTOR);
 
     tokio::spawn(
         async {
             parallel_job().await;
             other_job().await;
         }
-        .instrument(tracer::new_span_root(tx, AsyncJob::Root as u32)),
+        .instrument(minitrace::new_span_root(tx, AsyncJob::Root as u32)),
     );
 
-    tracer::util::draw_stdout(rx.collect_all());
+    minitrace::util::draw_stdout(rx.collect_all());
 }

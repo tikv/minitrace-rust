@@ -1,6 +1,6 @@
 [package]
-name = "tracer-attribute"
-version = "0.1.0"
+name = "minitrace-attribute"
+version = "0.0.1"
 authors = ["zhongzc <zhongzc_arch@outlook.com>"]
 edition = "2018"
 

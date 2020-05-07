@@ -433,6 +433,27 @@ dependencies = [
 ]
 
 [[package]]
+name = "minitrace"
+version = "0.0.1"
+dependencies = [
+ "criterion",
+ "crossbeam",
+ "futures 0.1.29",
+ "futures 0.3.4",
+ "minitrace-attribute",
+ "pin-project",
+ "tokio",
+]
+
+[[package]]
+name = "minitrace-attribute"
+version = "0.0.1"
+dependencies = [
+ "quote",
+ "syn",
+]
+
+[[package]]
 name = "mio"
 version = "0.6.21"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -822,27 +843,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f0c3acc6aa564495a0f2e1d59fab677cd7f81a19994cfc7f3ad0e64301560389"
 dependencies = [
  "proc-macro2",
- "quote",
- "syn",
-]
-
-[[package]]
-name = "tracer"
-version = "0.1.0"
-dependencies = [
- "criterion",
- "crossbeam",
- "futures 0.1.29",
- "futures 0.3.4",
- "pin-project",
- "tokio",
- "tracer-attribute",
-]
-
-[[package]]
-name = "tracer-attribute"
-version = "0.1.0"
-dependencies = [
  "quote",
  "syn",
 ]

@@ -1,13 +1,13 @@
 [package]
-name = "tracer"
-version = "0.1.0"
+name = "minitrace"
+version = "0.0.1"
 authors = ["zhongzc <zhongzc_arch@outlook.com>"]
 edition = "2018"
 
 [dependencies]
 crossbeam = "0.7"
 pin-project = "0.4"
-tracer-attribute = { path = "./tracer-attribute" }
+minitrace-attribute = { path = "./attribute" }
 
 [dependencies.futures_01]
 version = "0.1"
@@ -20,7 +20,6 @@ package = "futures"
 [dev-dependencies]
 tokio = { version = "0.2", features = ["full"] }
 criterion = "0.3"
-crossbeam = "0.7"
 
 [[bench]]
 name = "benches"
