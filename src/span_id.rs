@@ -8,19 +8,7 @@ thread_local! {
 }
 
 fn next_global() -> u16 {
-    let mut prev = GLOBAL_COUNTER.load(std::sync::atomic::Ordering::Relaxed);
-    loop {
-        let next = if prev == std::u16::MAX { 0 } else { prev + 1 };
-
-        let old_value =
-            GLOBAL_COUNTER.compare_and_swap(prev, next, std::sync::atomic::Ordering::Relaxed);
-
-        if old_value == prev {
-            return prev;
-        } else {
-            prev = old_value;
-        }
-    }
+    GLOBAL_COUNTER.fetch_add(1, std::sync::atomic::Ordering::SeqCst)
 }
 
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
