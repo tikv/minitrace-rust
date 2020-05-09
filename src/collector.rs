@@ -30,7 +30,7 @@ impl CollectorRx {
     pub fn collect_all(self) -> Vec<crate::Span> {
         match self {
             CollectorRx::Void => vec![],
-            CollectorRx::Channel(c) => c.iter().collect(),
+            CollectorRx::Channel(c) => c.try_iter().collect(),
         }
     }
 }
