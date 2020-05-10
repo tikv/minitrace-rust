@@ -37,7 +37,7 @@ async fn other_job() {
 
 #[tokio::main]
 async fn main() {
-    let (tx, rx) = minitrace::Collector::new(minitrace::DEFAULT_COLLECTOR);
+    let (tx, rx) = minitrace::Collector::new_default();
 
     tokio::spawn(
         async {

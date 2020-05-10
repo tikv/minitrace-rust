@@ -1,5 +1,5 @@
-use time::Timespec;
 pub use std::time::Duration;
+use time::Timespec;
 
 use self::inner::monotonic_coarse_now;
 pub use self::inner::monotonic_now;

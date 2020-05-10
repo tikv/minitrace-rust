@@ -9,6 +9,7 @@ pub enum CollectorTx {
     Void,
     Channel(crossbeam::channel::Sender<crate::Span>),
 }
+
 impl CollectorTx {
     #[inline]
     pub fn push(&self, span: crate::Span) {
@@ -25,6 +26,7 @@ pub enum CollectorRx {
     Void,
     Channel(crossbeam::channel::Receiver<crate::Span>),
 }
+
 impl CollectorRx {
     #[inline]
     pub fn collect_all(self) -> Vec<crate::Span> {
@@ -36,6 +38,7 @@ impl CollectorRx {
 }
 
 pub struct Collector;
+
 impl Collector {
     #[allow(clippy::new_ret_no_self)]
     pub fn new(tp: CollectorType) -> (CollectorTx, CollectorRx) {
@@ -46,5 +49,10 @@ impl Collector {
                 (CollectorTx::Channel(tx), CollectorRx::Channel(rx))
             }
         }
+    }
+
+    #[inline]
+    pub fn new_default() -> (CollectorTx, CollectorRx) {
+        Self::new(crate::DEFAULT_COLLECTOR)
     }
 }

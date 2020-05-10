@@ -1,8 +1,8 @@
 mod collector;
 pub mod future;
 mod span_id;
-pub mod util;
 pub mod time;
+pub mod util;
 pub use minitrace_attribute::trace;
 
 pub use collector::*;
