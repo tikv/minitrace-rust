@@ -47,5 +47,5 @@ async fn main() {
         .instrument(minitrace::new_span_root(tx, AsyncJob::Root as u32)),
     );
 
-    minitrace::util::draw_stdout(rx.collect_all());
+    minitrace::util::draw_stdout(rx.collect());
 }

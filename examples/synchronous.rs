@@ -25,5 +25,5 @@ fn main() {
             func1(i);
         }
     }
-    minitrace::util::draw_stdout(rx.collect_all());
+    minitrace::util::draw_stdout(rx.collect());
 }
