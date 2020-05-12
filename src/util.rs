@@ -20,7 +20,7 @@ pub fn draw_stdout(spans: Vec<crate::Span>) {
             span.id
         );
 
-        if let Some(parent) = span.parent {
+        if let Some(parent) = span.parent_id {
             children
                 .entry(parent)
                 .or_insert_with(|| vec![])
@@ -38,11 +38,11 @@ pub fn draw_stdout(spans: Vec<crate::Span>) {
 }
 
 fn draw_rec(
-    cur_id: crate::SpanID,
+    cur_id: u32,
     pivot: u32,
     factor: f64,
-    children_map: &std::collections::HashMap<crate::SpanID, Vec<crate::SpanID>>,
-    spans_map: &std::collections::HashMap<crate::SpanID, (u32, u32)>,
+    children_map: &std::collections::HashMap<u32, Vec<u32>>,
+    spans_map: &std::collections::HashMap<u32, (u32, u32)>,
 ) {
     let (start, duration) = *spans_map.get(&cur_id).expect("can not get span");
 

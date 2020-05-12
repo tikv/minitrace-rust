@@ -12,8 +12,8 @@ pub use span_id::SpanID;
 pub const DEFAULT_COLLECTOR: CollectorType = CollectorType::Channel;
 
 pub struct Span {
-    pub id: SpanID,
-    pub parent: Option<SpanID>,
+    pub id: u32,
+    pub parent_id: Option<u32>,
     pub elapsed_start: u32,
     pub elapsed_end: u32,
     pub tag: u32,
@@ -92,8 +92,8 @@ impl GuardInner {
 impl Drop for GuardInner {
     fn drop(&mut self) {
         self.tx.push(Span {
-            id: self.info.id,
-            parent: self.info.parent,
+            id: self.info.id.into(),
+            parent_id: self.info.parent.map(Into::into),
             elapsed_start: self.elapsed_start,
             elapsed_end: time::duration_to_ms(self.root_time.elapsed()),
             tag: self.info.tag,

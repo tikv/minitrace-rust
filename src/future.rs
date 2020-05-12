@@ -12,10 +12,7 @@ impl<T: Sized> Instrument for T {}
 
 pub trait Instrument: Sized {
     fn instrument(self, span: crate::SpanGuard) -> Instrumented<Self> {
-        Instrumented {
-            inner: self,
-            span,
-        }
+        Instrumented { inner: self, span }
     }
 
     fn in_current_span<T: Into<u32>>(self, tag: T) -> Instrumented<Self> {

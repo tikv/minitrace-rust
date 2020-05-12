@@ -11,7 +11,7 @@ enum Job {
 }
 
 trait ToJob {
-    fn u32_job(tag: u32) -> Job;
+    fn u32_to_job(tag: u32) -> Job;
     fn to_u32(self) -> u32;
 }
 
@@ -26,7 +26,7 @@ fn new_span<T: ToJob>(tag: T) -> minitrace::SpanGuard {
 fn collect<T: ToJob>(rx: minitrace::CollectorRx) -> Vec<Job> {
     rx.collect()
         .into_iter()
-        .map(|span| T::u32_job(span.tag))
+        .map(|span| T::u32_to_job(span.tag))
         .collect()
 }
 
@@ -39,7 +39,7 @@ mod jobx {
     }
 
     impl super::ToJob for JobX {
-        fn u32_job(tag: u32) -> super::Job {
+        fn u32_to_job(tag: u32) -> super::Job {
             match tag {
                 tag if tag == JobX::Parent as u32 => super::Job::JobXParent,
                 tag if tag == JobX::ChildA as u32 => super::Job::JobXChildA,
@@ -82,7 +82,7 @@ mod joby {
     }
 
     impl super::ToJob for JobY {
-        fn u32_job(tag: u32) -> super::Job {
+        fn u32_to_job(tag: u32) -> super::Job {
             match tag {
                 tag if tag == JobY::Parent as u32 => super::Job::JobYParent,
                 tag if tag == JobY::ChildA as u32 => super::Job::JobYChildA,
