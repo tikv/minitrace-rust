@@ -5,16 +5,16 @@ use std::task::Context;
 pub struct Instrumented<T> {
     #[pin]
     pub inner: T,
-    pub span: crate::OSpanGuard,
+    pub span: crate::SpanGuard,
 }
 
 impl<T: Sized> Instrument for T {}
 
 pub trait Instrument: Sized {
-    fn instrument(self, span: crate::SpanGuard) -> Instrumented<Self> {
+    fn instrument(self, span: crate::GuardInner) -> Instrumented<Self> {
         Instrumented {
             inner: self,
-            span: crate::OSpanGuard(Some(span)),
+            span: crate::SpanGuard(Some(span)),
         }
     }
 
