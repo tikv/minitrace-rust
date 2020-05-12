@@ -12,8 +12,8 @@ pub use span_id::SpanID;
 pub const DEFAULT_COLLECTOR: CollectorType = CollectorType::Channel;
 
 pub struct Span {
-    pub id: u32,
-    pub parent_id: Option<u32>,
+    pub id: std::num::NonZeroU32,
+    pub parent_id: Option<std::num::NonZeroU32>,
     pub elapsed_start: u32,
     pub elapsed_end: u32,
     pub tag: u32,

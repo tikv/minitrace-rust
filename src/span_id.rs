@@ -44,6 +44,12 @@ impl Into<u32> for SpanID {
     }
 }
 
+impl Into<std::num::NonZeroU32> for SpanID {
+    fn into(self) -> std::num::NonZeroU32 {
+        unsafe { std::mem::transmute(self) }
+    }
+}
+
 impl std::default::Default for SpanID {
     #[inline]
     fn default() -> Self {

@@ -14,7 +14,7 @@ pub fn draw_stdout(spans: Vec<crate::Span>) {
         }
 
         assert_eq!(
-            spans_map.insert(span.id, (start, end - start)),
+            spans_map.insert(span.id.into(), (start, end - start)),
             None,
             "duplicated id {:#?}",
             span.id
@@ -22,11 +22,11 @@ pub fn draw_stdout(spans: Vec<crate::Span>) {
 
         if let Some(parent) = span.parent_id {
             children
-                .entry(parent)
+                .entry(parent.into())
                 .or_insert_with(|| vec![])
-                .push(span.id);
+                .push(span.id.into());
         } else {
-            root = Some(span.id);
+            root = Some(span.id.into());
         }
     }
 
