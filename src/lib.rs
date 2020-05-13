@@ -131,3 +131,139 @@ impl Drop for Entered<'_> {
         assert_eq!(guard.info.id, self.guard.info.id, "corrupted stack");
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // An auxiliary function for checking relations of spans.
+    // Note that the tags of each spans cannot be the same.
+    //
+    // Return: [(tag, Option<parent_tag>)], sorted by tag
+    fn rebuild_relation_by_tag(spans: Vec<Span>) -> Vec<(u32, Option<u32>)> {
+        let infos: std::collections::HashMap<u32, (Option<u32>, u32)> = spans
+            .into_iter()
+            .map(|s| (s.id.into(), (s.parent_id.map(Into::into), s.tag)))
+            .collect();
+
+        let mut res = Vec::with_capacity(infos.len());
+
+        for (_id, (parent_id, tag)) in infos.iter() {
+            if let Some(p) = parent_id {
+                res.push((*tag, Some(infos[&p].1)));
+            } else {
+                res.push((*tag, None));
+            }
+        }
+
+        res.sort();
+        res
+    }
+
+    fn root(tag: u32) -> (SpanGuard, CollectorRx) {
+        let (tx, rx) = Collector::new_default();
+        let root = new_span_root(tx, tag);
+        (root, rx)
+    }
+
+    fn sync_spanned(tag: u32) {
+        let span = new_span(tag);
+        let _g = span.enter();
+    }
+
+    #[test]
+    fn span_basic() {
+        let (root, rx) = root(0);
+        {
+            let root = root;
+            let _g = root.enter();
+
+            sync_spanned(1);
+        }
+
+        let spans = rx.collect();
+        let spans = rebuild_relation_by_tag(spans);
+
+        assert_eq!(spans.len(), 2);
+        assert_eq!(&spans, &[(0, None), (1, Some(0))]);
+        assert_eq!(SPAN_STACK.with(|stack| unsafe { (&*stack.get()).len() }), 0);
+    }
+
+    #[test]
+    fn span_wide_function() {
+        let (root, rx) = root(0);
+        {
+            let root = root;
+            let _g = root.enter();
+
+            for i in 1..11 {
+                sync_spanned(i);
+            }
+        }
+
+        let spans = rx.collect();
+        let spans = rebuild_relation_by_tag(spans);
+
+        assert_eq!(spans.len(), 11);
+        assert_eq!(
+            &spans,
+            &[
+                (0, None),
+                (1, Some(0)),
+                (2, Some(0)),
+                (3, Some(0)),
+                (4, Some(0)),
+                (5, Some(0)),
+                (6, Some(0)),
+                (7, Some(0)),
+                (8, Some(0)),
+                (9, Some(0)),
+                (10, Some(0))
+            ]
+        );
+        assert_eq!(SPAN_STACK.with(|stack| unsafe { (&*stack.get()).len() }), 0);
+    }
+
+    #[test]
+    fn span_deep_function() {
+        fn sync_spanned_rec_tag_step_to_1(step: u32) {
+            if step == 0 {
+                return;
+            } else {
+                let span = new_span(step);
+                let _g = span.enter();
+                sync_spanned_rec_tag_step_to_1(step - 1);
+            }
+        }
+
+        let (root, rx) = root(0);
+        {
+            let root = root;
+            let _g = root.enter();
+
+            sync_spanned_rec_tag_step_to_1(10);
+        }
+
+        let spans = rx.collect();
+        let spans = rebuild_relation_by_tag(spans);
+
+        assert_eq!(spans.len(), 11);
+        assert_eq!(
+            &spans,
+            &[
+                (0, None),
+                (1, Some(2)),
+                (2, Some(3)),
+                (3, Some(4)),
+                (4, Some(5)),
+                (5, Some(6)),
+                (6, Some(7)),
+                (7, Some(8)),
+                (8, Some(9)),
+                (9, Some(10)),
+                (10, Some(0))
+            ]
+        );
+        assert_eq!(SPAN_STACK.with(|stack| unsafe { (&*stack.get()).len() }), 0);
+    }
+}
