@@ -137,5 +137,5 @@ impl Instant {
 
 #[inline]
 pub fn duration_to_ms(d: Duration) -> u32 {
-    d.as_secs() as u32 * 1_000 + (d.subsec_nanos() / 1_000_000)
+    d.as_secs() as u32 * 1_000 + d.subsec_millis()
 }

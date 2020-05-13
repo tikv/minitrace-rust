@@ -1,4 +1,5 @@
 # MINITRACE
+[![Build Status](https://travis-ci.com/zhongzc/minitrace.svg?branch=master)](https://travis-ci.com/zhongzc/minitrace)
 
 ```sh
 $ cargo run --example synchronous

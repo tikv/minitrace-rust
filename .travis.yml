@@ -1,0 +1,14 @@
+language: rust
+
+rust:
+  - nightly
+
+cache: cargo
+
+script:
+  - rustup component add rustfmt --toolchain nightly-x86_64-unknown-linux-gnu
+  - cargo fmt -- --check
+  - rustup component add clippy
+  - cargo clippy --
+  - cargo build --verbose --all
+  - cargo test --verbose --all
