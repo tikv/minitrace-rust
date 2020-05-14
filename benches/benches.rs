@@ -1,7 +1,7 @@
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 
 fn root_span_new_drop_bench(c: &mut Criterion) {
-    c.bench_function("span_root channel instant", |b| {
+    c.bench_function("span_root", |b| {
         let mut txs = Vec::with_capacity(100);
         let mut rxs = Vec::with_capacity(100);
         for _ in 0..100 {
@@ -21,20 +21,9 @@ fn root_span_new_drop_bench(c: &mut Criterion) {
 
 fn instant_bench(c: &mut Criterion) {
     c.bench_function("instant", |b| {
-        b.iter(|| minitrace::time::Instant::now());
+        b.iter(|| minitrace::time::InstantMillis::now());
     });
 }
 
-fn instant_coarse_bench(c: &mut Criterion) {
-    c.bench_function("instant coarse", |b| {
-        b.iter(|| minitrace::time::Instant::now_coarse());
-    });
-}
-
-criterion_group!(
-    benches,
-    root_span_new_drop_bench,
-    instant_bench,
-    instant_coarse_bench
-);
+criterion_group!(benches, root_span_new_drop_bench, instant_bench,);
 criterion_main!(benches);

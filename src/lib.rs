@@ -25,7 +25,7 @@ thread_local! {
 
 #[inline]
 pub fn new_span_root<T: Into<u32>>(tx: CollectorTx, tag: T) -> SpanGuard {
-    let root_time = time::Instant::now_coarse();
+    let root_time = time::InstantMillis::now();
     let info = SpanInfo {
         id: SpanID::new(),
         parent: None,
@@ -60,7 +60,7 @@ pub fn new_span<T: Into<u32>>(tag: T) -> SpanGuard {
 
         SpanGuard(Some(GuardInner {
             root_time,
-            elapsed_start: time::duration_to_ms(root_time.elapsed()),
+            elapsed_start: root_time.elapsed(),
             tx,
             info,
         }))
@@ -70,7 +70,7 @@ pub fn new_span<T: Into<u32>>(tag: T) -> SpanGuard {
 }
 
 pub struct GuardInner {
-    root_time: time::Instant,
+    root_time: time::InstantMillis,
     info: SpanInfo,
     elapsed_start: u32,
     tx: CollectorTx,
@@ -95,7 +95,7 @@ impl Drop for GuardInner {
             id: self.info.id.into(),
             parent_id: self.info.parent.map(Into::into),
             elapsed_start: self.elapsed_start,
-            elapsed_end: time::duration_to_ms(self.root_time.elapsed()),
+            elapsed_end: self.root_time.elapsed(),
             tag: self.info.tag,
         });
     }
