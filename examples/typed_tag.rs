@@ -1,5 +1,6 @@
 // Enum type user cases
 #[derive(Debug)]
+#[allow(clippy::enum_variant_names)]
 enum Job {
     JobXParent,
     JobXChildA,
@@ -23,8 +24,9 @@ fn new_span<T: ToJob>(tag: T) -> minitrace::SpanGuard {
     minitrace::new_span(T::to_u32(tag))
 }
 
-fn collect<T: ToJob>(rx: minitrace::CollectorRx) -> Vec<Job> {
+fn collect<T: ToJob>(mut rx: minitrace::CollectorRx) -> Vec<Job> {
     rx.collect()
+        .unwrap()
         .into_iter()
         .map(|span| T::u32_to_job(span.tag))
         .collect()
@@ -54,7 +56,7 @@ mod jobx {
     }
 
     pub(crate) fn jobx() -> Vec<super::Job> {
-        let (tx, rx) = minitrace::Collector::new_default();
+        let (tx, rx) = minitrace::Collector::bounded(256);
         let span = super::new_span_root(tx, JobX::Parent);
         let _g = span.enter();
 
@@ -97,7 +99,7 @@ mod joby {
     }
 
     pub(crate) fn joby() -> Vec<super::Job> {
-        let (tx, rx) = minitrace::Collector::new_default();
+        let (tx, rx) = minitrace::Collector::bounded(256);
         let span = super::new_span_root(tx, JobY::Parent);
         let _g = span.enter();
 

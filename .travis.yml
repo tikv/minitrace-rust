@@ -5,10 +5,12 @@ rust:
 
 cache: cargo
 
+before_script:
+  - rustup component add rustfmt --toolchain=nightly
+  - rustup component add clippy --toolchain=nightly || cargo install --git https://github.com/rust-lang/rust-clippy/ --force clippy
+
 script:
-  - rustup component add rustfmt --toolchain nightly-x86_64-unknown-linux-gnu
   - cargo fmt -- --check
-  - rustup component add clippy
-  - cargo clippy --
+  - cargo clippy --all-targets --all-features -- --deny warnings
   - cargo build --verbose --all
   - cargo test --verbose --all

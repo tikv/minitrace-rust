@@ -17,7 +17,7 @@ fn func2() {
 }
 
 fn main() {
-    let (tx, rx) = minitrace::Collector::new(minitrace::DEFAULT_COLLECTOR);
+    let (tx, mut rx) = minitrace::Collector::bounded(256);
     {
         let span = minitrace::new_span_root(tx, 0u32);
         let _g = span.enter();
@@ -25,5 +25,5 @@ fn main() {
             func1(i);
         }
     }
-    minitrace::util::draw_stdout(rx.collect());
+    minitrace::util::draw_stdout(rx.collect().unwrap());
 }

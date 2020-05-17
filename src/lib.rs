@@ -1,3 +1,5 @@
+#![feature(no_more_cas)]
+
 mod collector;
 pub mod future;
 mod span_id;
@@ -9,8 +11,7 @@ pub use minitrace_attribute::trace;
 pub use collector::*;
 pub use span_id::SpanID;
 
-pub const DEFAULT_COLLECTOR: CollectorType = CollectorType::Channel;
-
+#[derive(Debug, Copy, Clone)]
 pub struct Span {
     pub id: std::num::NonZeroU32,
     pub parent_id: Option<std::num::NonZeroU32>,
@@ -34,7 +35,7 @@ pub fn new_span_root<T: Into<u32>>(tx: CollectorTx, tag: T) -> SpanGuard {
     SpanGuard(Some(GuardInner {
         root_time,
         elapsed_start: 0u32,
-        tx,
+        tx: Some(tx),
         info,
     }))
 }
@@ -50,7 +51,11 @@ pub fn new_span<T: Into<u32>>(tag: T) -> SpanGuard {
         spans.last()
     }) {
         let root_time = parent.root_time;
-        let tx = parent.tx.clone();
+        let tx = parent.tx.as_ref().unwrap().try_clone();
+
+        if tx.is_err() {
+            return SpanGuard(None);
+        }
 
         let info = SpanInfo {
             id: SpanID::new(),
@@ -61,7 +66,7 @@ pub fn new_span<T: Into<u32>>(tag: T) -> SpanGuard {
         SpanGuard(Some(GuardInner {
             root_time,
             elapsed_start: root_time.elapsed(),
-            tx,
+            tx: Some(tx.unwrap()),
             info,
         }))
     } else {
@@ -73,7 +78,7 @@ pub struct GuardInner {
     root_time: time::InstantMillis,
     info: SpanInfo,
     elapsed_start: u32,
-    tx: CollectorTx,
+    tx: Option<CollectorTx>,
 }
 
 struct SpanInfo {
@@ -91,7 +96,7 @@ impl GuardInner {
 
 impl Drop for GuardInner {
     fn drop(&mut self) {
-        self.tx.push(Span {
+        self.tx.take().unwrap().put(Span {
             id: self.info.id.into(),
             parent_id: self.info.parent.map(Into::into),
             elapsed_start: self.elapsed_start,
@@ -136,6 +141,12 @@ impl Drop for Entered<'_> {
 mod tests {
     use super::*;
 
+    #[derive(Copy, Clone)]
+    enum CollectorType {
+        Bounded,
+        Unbounded,
+    }
+
     // An auxiliary function for checking relations of spans.
     // Note that the tags of each spans cannot be the same.
     //
@@ -160,8 +171,11 @@ mod tests {
         res
     }
 
-    fn root(tag: u32) -> (SpanGuard, CollectorRx) {
-        let (tx, rx) = Collector::new_default();
+    fn root(tag: u32, collector_type: CollectorType) -> (SpanGuard, CollectorRx) {
+        let (tx, rx) = match collector_type {
+            CollectorType::Bounded => Collector::bounded(1024),
+            CollectorType::Unbounded => Collector::unbounded(),
+        };
         let root = new_span_root(tx, tag);
         (root, rx)
     }
@@ -173,97 +187,143 @@ mod tests {
 
     #[test]
     fn span_basic() {
-        let (root, rx) = root(0);
-        {
-            let root = root;
-            let _g = root.enter();
+        for clt_type in &[CollectorType::Bounded, CollectorType::Unbounded] {
+            let (root, mut rx) = root(0, *clt_type);
+            {
+                let root = root;
+                let _g = root.enter();
 
-            sync_spanned(1);
+                sync_spanned(1);
+            }
+
+            let spans = rx.collect().unwrap();
+            let spans = rebuild_relation_by_tag(spans);
+
+            assert_eq!(spans.len(), 2);
+            assert_eq!(&spans, &[(0, None), (1, Some(0))]);
+            assert_eq!(SPAN_STACK.with(|stack| unsafe { (&*stack.get()).len() }), 0);
         }
-
-        let spans = rx.collect();
-        let spans = rebuild_relation_by_tag(spans);
-
-        assert_eq!(spans.len(), 2);
-        assert_eq!(&spans, &[(0, None), (1, Some(0))]);
-        assert_eq!(SPAN_STACK.with(|stack| unsafe { (&*stack.get()).len() }), 0);
     }
 
     #[test]
     fn span_wide_function() {
-        let (root, rx) = root(0);
-        {
-            let root = root;
-            let _g = root.enter();
+        for clt_type in &[CollectorType::Bounded, CollectorType::Unbounded] {
+            let (root, mut rx) = root(0, *clt_type);
+            {
+                let root = root;
+                let _g = root.enter();
 
-            for i in 1..11 {
-                sync_spanned(i);
+                for i in 1..=10 {
+                    sync_spanned(i);
+                }
             }
+
+            let spans = rx.collect().unwrap();
+            let spans = rebuild_relation_by_tag(spans);
+
+            assert_eq!(spans.len(), 11);
+            assert_eq!(
+                &spans,
+                &[
+                    (0, None),
+                    (1, Some(0)),
+                    (2, Some(0)),
+                    (3, Some(0)),
+                    (4, Some(0)),
+                    (5, Some(0)),
+                    (6, Some(0)),
+                    (7, Some(0)),
+                    (8, Some(0)),
+                    (9, Some(0)),
+                    (10, Some(0))
+                ]
+            );
+            assert_eq!(SPAN_STACK.with(|stack| unsafe { (&*stack.get()).len() }), 0);
         }
-
-        let spans = rx.collect();
-        let spans = rebuild_relation_by_tag(spans);
-
-        assert_eq!(spans.len(), 11);
-        assert_eq!(
-            &spans,
-            &[
-                (0, None),
-                (1, Some(0)),
-                (2, Some(0)),
-                (3, Some(0)),
-                (4, Some(0)),
-                (5, Some(0)),
-                (6, Some(0)),
-                (7, Some(0)),
-                (8, Some(0)),
-                (9, Some(0)),
-                (10, Some(0))
-            ]
-        );
-        assert_eq!(SPAN_STACK.with(|stack| unsafe { (&*stack.get()).len() }), 0);
     }
 
     #[test]
     fn span_deep_function() {
         fn sync_spanned_rec_tag_step_to_1(step: u32) {
-            if step == 0 {
-                return;
-            } else {
-                let span = new_span(step);
-                let _g = span.enter();
+            let span = new_span(step);
+            let _g = span.enter();
+
+            if step > 1 {
                 sync_spanned_rec_tag_step_to_1(step - 1);
             }
         }
 
-        let (root, rx) = root(0);
-        {
-            let root = root;
-            let _g = root.enter();
+        for clt_type in &[CollectorType::Bounded, CollectorType::Unbounded] {
+            let (root, mut rx) = root(0, *clt_type);
+            {
+                let root = root;
+                let _g = root.enter();
 
-            sync_spanned_rec_tag_step_to_1(10);
+                sync_spanned_rec_tag_step_to_1(10);
+            }
+
+            let spans = rx.collect().unwrap();
+            let spans = rebuild_relation_by_tag(spans);
+
+            assert_eq!(spans.len(), 11);
+            assert_eq!(
+                &spans,
+                &[
+                    (0, None),
+                    (1, Some(2)),
+                    (2, Some(3)),
+                    (3, Some(4)),
+                    (4, Some(5)),
+                    (5, Some(6)),
+                    (6, Some(7)),
+                    (7, Some(8)),
+                    (8, Some(9)),
+                    (9, Some(10)),
+                    (10, Some(0))
+                ]
+            );
+            assert_eq!(SPAN_STACK.with(|stack| unsafe { (&*stack.get()).len() }), 0);
+        }
+    }
+
+    #[test]
+    fn test_bounded() {
+        let (tx, mut rx) = Collector::bounded(2);
+
+        {
+            let s = new_span_root(tx, 0u32);
+            let _g = s.enter();
+
+            {
+                // new span successfully
+                let s = new_span(1u32);
+                let _g = s.enter();
+            }
+
+            {
+                // collector is full, failed
+                let s = new_span(2u32);
+                let _g = s.enter();
+            }
+
+            {
+                // collector is full, failed
+                let s = new_span(3u32);
+                let _g = s.enter();
+            }
+
+            {
+                // collector is full, failed
+                let s = new_span(4u32);
+                let _g = s.enter();
+            }
         }
 
-        let spans = rx.collect();
+        let spans = rx.collect().unwrap();
         let spans = rebuild_relation_by_tag(spans);
 
-        assert_eq!(spans.len(), 11);
-        assert_eq!(
-            &spans,
-            &[
-                (0, None),
-                (1, Some(2)),
-                (2, Some(3)),
-                (3, Some(4)),
-                (4, Some(5)),
-                (5, Some(6)),
-                (6, Some(7)),
-                (7, Some(8)),
-                (8, Some(9)),
-                (9, Some(10)),
-                (10, Some(0))
-            ]
-        );
+        assert_eq!(spans.len(), 2);
+        assert_eq!(&spans, &[(0, None), (1, Some(0))]);
         assert_eq!(SPAN_STACK.with(|stack| unsafe { (&*stack.get()).len() }), 0);
     }
 }

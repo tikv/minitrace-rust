@@ -37,15 +37,21 @@ async fn other_job() {
 
 #[tokio::main]
 async fn main() {
-    let (tx, rx) = minitrace::Collector::new_default();
+    let (tx, mut rx) = minitrace::Collector::bounded(256);
 
-    tokio::spawn(
-        async {
-            parallel_job().await;
-            other_job().await;
-        }
-        .instrument(minitrace::new_span_root(tx, AsyncJob::Root as u32)),
-    );
+    {
+        tokio::spawn(
+            async {
+                parallel_job().await;
+                other_job().await;
+            }
+            .instrument(minitrace::new_span_root(tx, AsyncJob::Root as u32)),
+        );
+    }
 
-    minitrace::util::draw_stdout(rx.collect());
+    // You should guarentee _ALL_ spans are finished, otherwise
+    // the memory will be corrupted.
+    std::thread::sleep(std::time::Duration::from_secs(2));
+
+    minitrace::util::draw_stdout(rx.collect().unwrap());
 }

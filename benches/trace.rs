@@ -1,34 +1,55 @@
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 
-fn dummy_iter(i: u32) {
+#[derive(Debug, Copy, Clone)]
+enum CollectorType {
+    Void,
+    Bounded,
+    Unbounded,
+}
+
+fn dummy_iter(i: u16) {
     #[minitrace::trace(0u32)]
     fn dummy() {}
 
-    for _ in 0..i {
+    for _ in 0..i - 1 {
         dummy();
     }
 }
 
 #[minitrace::trace(0u32)]
-fn dummy_rec(i: u32) {
-    if i == 1 {
-        return;
-    } else {
+fn dummy_rec(i: u16) {
+    if i > 1 {
         dummy_rec(i - 1);
+    }
+}
+
+fn trace_options() -> Vec<(u16, CollectorType)> {
+    let factors = &[1, 10, 100, 1000, 10000];
+    let types = &[
+        CollectorType::Void,
+        CollectorType::Bounded,
+        CollectorType::Unbounded,
+    ];
+    factors
+        .iter()
+        .flat_map(|factor| types.iter().map(move |tp| (*factor, *tp)))
+        .collect()
+}
+
+fn build_collect(cap: u16, tp: CollectorType) -> (minitrace::CollectorTx, minitrace::CollectorRx) {
+    match tp {
+        CollectorType::Void => minitrace::Collector::void(),
+        CollectorType::Bounded => minitrace::Collector::bounded(cap),
+        CollectorType::Unbounded => minitrace::Collector::unbounded(),
     }
 }
 
 fn trace_wide_bench(c: &mut Criterion) {
     c.bench_function_over_inputs(
         "trace_wide",
-        |b, (factor, to_collect)| {
+        |b, (factor, collect_type)| {
             b.iter(|| {
-                let (tx, rx) = black_box(minitrace::Collector::new(black_box(if *to_collect {
-                    black_box(minitrace::CollectorType::Channel)
-                } else {
-                    black_box(minitrace::CollectorType::Void)
-                })));
-
+                let (tx, mut rx) = black_box(build_collect(*factor, *collect_type));
                 {
                     let span = minitrace::new_span_root(black_box(tx), black_box(0u32));
                     let _g = black_box(span.enter());
@@ -38,32 +59,19 @@ fn trace_wide_bench(c: &mut Criterion) {
                     }
                 }
 
-                let _r = black_box(rx.collect());
+                let _r = black_box(rx.collect().unwrap());
             });
         },
-        &[
-            (1, false),
-            (1, true),
-            (10, false),
-            (10, true),
-            (100, false),
-            (100, true),
-            (1000, false),
-            (1000, true),
-        ],
+        trace_options(),
     );
 }
 
 fn trace_deep_bench(c: &mut Criterion) {
     c.bench_function_over_inputs(
         "trace_deep",
-        |b, (factor, to_collect)| {
+        |b, (factor, collect_type)| {
             b.iter(|| {
-                let (tx, rx) = black_box(minitrace::Collector::new(black_box(if *to_collect {
-                    black_box(minitrace::CollectorType::Channel)
-                } else {
-                    black_box(minitrace::CollectorType::Void)
-                })));
+                let (tx, mut rx) = black_box(build_collect(*factor, *collect_type));
 
                 {
                     let span = minitrace::new_span_root(black_box(tx), black_box(0u32));
@@ -74,25 +82,16 @@ fn trace_deep_bench(c: &mut Criterion) {
                     }
                 }
 
-                let _r = black_box(rx.collect());
+                let _r = black_box(rx.collect().unwrap());
             });
         },
-        &[
-            (1, false),
-            (1, true),
-            (10, false),
-            (10, true),
-            (100, false),
-            (100, true),
-            (1000, false),
-            (1000, true),
-        ],
+        trace_options(),
     );
 }
 
 fn instant_bench(c: &mut Criterion) {
     c.bench_function("instant", |b| {
-        b.iter(|| minitrace::time::InstantMillis::now());
+        b.iter(minitrace::time::InstantMillis::now);
     });
 }
 
