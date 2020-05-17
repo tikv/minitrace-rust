@@ -4,6 +4,10 @@ version = "0.0.1"
 authors = ["zhongzc <zhongzc_arch@outlook.com>"]
 edition = "2018"
 
+[features]
+default = []
+fine-async = []
+
 [dependencies]
 crossbeam = "0.7"
 pin-project = "0.4"
@@ -26,3 +30,7 @@ criterion = "0.3"
 [[bench]]
 name = "trace"
 harness = false
+
+[[example]]
+name = "asynchronous"
+required-features = ["fine-async"]

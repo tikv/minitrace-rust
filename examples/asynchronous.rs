@@ -10,7 +10,7 @@ enum AsyncJob {
     OtherJob,
 }
 
-#[minitrace::trace(AsyncJob::ParallelJob)]
+#[minitrace::trace_async(AsyncJob::ParallelJob)]
 async fn parallel_job() {
     for i in 0..4 {
         tokio::spawn(iter_job(i).in_current_span(AsyncJob::IterJob as u32));
@@ -25,7 +25,7 @@ async fn iter_job(_iter: i32) {
     other_job().await;
 }
 
-#[minitrace::trace(AsyncJob::OtherJob)]
+#[minitrace::trace_async_fine(AsyncJob::OtherJob)]
 async fn other_job() {
     for i in 0..20 {
         if i == 10 {
@@ -49,9 +49,9 @@ async fn main() {
         );
     }
 
-    // You should guarentee _ALL_ spans are finished, otherwise
-    // the memory will be corrupted.
-    std::thread::sleep(std::time::Duration::from_secs(2));
+    // waiting for all spans are finished
+    std::thread::sleep(std::time::Duration::from_secs(1));
 
-    minitrace::util::draw_stdout(rx.collect().unwrap());
+    let r = rx.collect().unwrap();
+    minitrace::util::draw_stdout(r);
 }

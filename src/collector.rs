@@ -128,7 +128,7 @@ impl Drop for ArrayCollector {
             panic!("exists spans alive");
         }
 
-        // deallocate the `Slot`s
+        // deallocate the array
         unsafe {
             Vec::from_raw_parts(self.buffer, 0, self.capacity as usize);
         }
@@ -236,8 +236,8 @@ impl ArrayCollectorRx {
                 std::alloc::Layout::new::<ArrayCollector>(),
             );
 
-            // If we want to reuse the `Slot`s to return `Vec` and reduce memory allocation,
-            // we have to provent `collector` from deallocating the `Slot`s.
+            // If we want to reuse the array to return `Vec` and reduce memory allocation,
+            // we have to provent `collector` from deallocating the array.
             std::mem::forget(collector);
             Ok(Vec::from_raw_parts(buffer, len as usize, capacity as usize))
         }
