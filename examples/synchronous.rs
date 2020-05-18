@@ -1,10 +1,9 @@
 fn func1(i: u64) {
-    let span = minitrace::new_span(0u32);
-    let _g = span.enter();
-
-    for j in 0..(i * 10) {
-        std::thread::sleep(std::time::Duration::from_micros(j));
-    }
+    minitrace::block!(0u32, {
+        for j in 0..(i * 10) {
+            std::thread::sleep(std::time::Duration::from_micros(j));
+        }
+    });
 
     func2();
 }
@@ -20,7 +19,7 @@ fn main() {
     let (tx, mut rx) = minitrace::Collector::bounded(256);
     {
         let span = minitrace::new_span_root(tx, 0u32);
-        let _g = span.enter();
+        let _enter = span.enter();
         for i in 0..10 {
             func1(i);
         }

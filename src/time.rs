@@ -2,8 +2,9 @@ pub use std::time::Duration;
 
 use self::inner::monotonic_ms;
 
-const MILLISECOND_PER_SECOND: i64 = 1_000;
-const NANOSECONDS_PER_MILLISECOND: i64 = 1_000_000;
+#[allow(dead_code)]
+const MILLISECOND_PER_SECOND: u64 = 1_000;
+const NANOSECONDS_PER_MILLISECOND: u64 = 1_000_000;
 
 #[derive(Debug, Copy, Clone)]
 pub struct InstantMillis {
@@ -50,8 +51,8 @@ mod inner {
         }
 
         InstantMillis {
-            ms: (t.tv_sec * MILLISECOND_PER_SECOND + t.tv_nsec / NANOSECONDS_PER_MILLISECOND)
-                as u64,
+            ms: (t.tv_sec as u64 * MILLISECOND_PER_SECOND
+                + t.tv_nsec as u64 / NANOSECONDS_PER_MILLISECOND),
         }
     }
 }

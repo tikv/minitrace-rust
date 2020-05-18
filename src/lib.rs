@@ -2,9 +2,10 @@
 
 mod collector;
 pub mod future;
+pub mod prelude;
 mod span;
 mod span_id;
-pub mod time;
+mod time;
 pub mod util;
 
 #[cfg(feature = "fine-async")]
@@ -13,7 +14,7 @@ pub use minitrace_attribute::{trace, trace_async};
 
 pub use collector::*;
 pub use span::*;
-pub use span_id::SpanID;
+pub(crate) use span_id::SpanID;
 
 #[derive(Debug, Copy, Clone)]
 pub struct Span {
@@ -34,4 +35,13 @@ pub enum Link {
     Continue {
         id: u32,
     },
+}
+
+#[macro_export]
+macro_rules! block {
+    ($tag:expr, $blk:block) => {{
+        let span = minitrace::new_span($tag);
+        let _enter = span.enter();
+        $blk
+    }};
 }

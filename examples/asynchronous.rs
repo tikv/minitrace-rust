@@ -1,4 +1,4 @@
-use minitrace::future::Instrument;
+use minitrace::prelude::*;
 
 #[repr(u32)]
 enum AsyncJob {

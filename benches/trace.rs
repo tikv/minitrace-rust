@@ -89,11 +89,5 @@ fn trace_deep_bench(c: &mut Criterion) {
     );
 }
 
-fn instant_bench(c: &mut Criterion) {
-    c.bench_function("instant", |b| {
-        b.iter(minitrace::time::InstantMillis::now);
-    });
-}
-
-criterion_group!(benches, trace_wide_bench, trace_deep_bench, instant_bench,);
+criterion_group!(benches, trace_wide_bench, trace_deep_bench);
 criterion_main!(benches);

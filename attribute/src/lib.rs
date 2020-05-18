@@ -40,7 +40,10 @@ pub fn trace(args: TokenStream, item: TokenStream) -> TokenStream {
     } = sig;
 
     let body = if asyncness.is_some() {
-        abort!(asyncness, "Unexpected async\nIf want to trace async function, consider `minitrace::trace_async`");
+        abort!(
+            asyncness,
+            "Unexpected async\nIf want to trace async function, consider `minitrace::trace_async`"
+        );
     } else {
         quote::quote_spanned!(block.span()=>
             let __tracing_attr_guard = __tracer_span.enter();
@@ -99,7 +102,10 @@ pub fn trace_async(args: TokenStream, item: TokenStream) -> TokenStream {
                 .#await_kwd
         }
     } else {
-        abort!(asyncness, "Expected async\nIf want to trace normal function, consider `minitrace::trace`");
+        abort!(
+            asyncness,
+            "Expected async\nIf want to trace normal function, consider `minitrace::trace`"
+        );
     };
 
     quote::quote!(
@@ -153,7 +159,10 @@ pub fn trace_async_fine(args: TokenStream, item: TokenStream) -> TokenStream {
                 .#await_kwd
         }
     } else {
-        abort!(asyncness, "Expected async\nIf want to trace normal function, consider `minitrace::trace`");
+        abort!(
+            asyncness,
+            "Expected async\nIf want to trace normal function, consider `minitrace::trace`"
+        );
     };
 
     quote::quote!(
