@@ -86,6 +86,7 @@ pub(crate) struct GuardInner {
     elapsed_start: u32,
     pub(crate) tx: Option<crate::CollectorTx>,
 }
+impl !Sync for GuardInner {}
 
 pub(crate) struct SpanInfo {
     pub(crate) id: crate::SpanID,

@@ -228,7 +228,7 @@ impl ArrayCollectorRx {
         let len = record as u16;
 
         let mut collector = self.collector.take().unwrap();
-        let buffer = collector.buffer as *mut crate::Span;
+        let buffer = collector.buffer;
         let capacity = collector.capacity;
         unsafe {
             std::alloc::dealloc(

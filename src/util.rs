@@ -48,6 +48,7 @@ pub fn draw_stdout(spans: Vec<crate::Span>) {
 
     if max_end == 0 {
         println!("Insufficient precision: total cost time < 1 ms");
+        return;
     }
 
     let factor = BAR_LEN as f64 / max_end as f64;

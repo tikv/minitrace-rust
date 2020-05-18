@@ -1,4 +1,5 @@
 #![feature(no_more_cas)]
+#![feature(negative_impls)]
 
 mod collector;
 pub mod future;

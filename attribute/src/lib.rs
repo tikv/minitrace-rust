@@ -102,10 +102,11 @@ pub fn trace_async(args: TokenStream, item: TokenStream) -> TokenStream {
                 .#await_kwd
         }
     } else {
-        abort!(
-            asyncness,
-            "Expected async\nIf want to trace normal function, consider `minitrace::trace`"
-        );
+        // hack for `async_trait`
+        // https://docs.rs/async-trait/0.1.31/async_trait/
+        quote::quote_spanned! {block.span()=>
+            std::boxed::Box::pin(#block.instrument(__tracer_span))
+        }
     };
 
     quote::quote!(
@@ -159,10 +160,11 @@ pub fn trace_async_fine(args: TokenStream, item: TokenStream) -> TokenStream {
                 .#await_kwd
         }
     } else {
-        abort!(
-            asyncness,
-            "Expected async\nIf want to trace normal function, consider `minitrace::trace`"
-        );
+        // hack for `async_trait`
+        // See https://docs.rs/async-trait/0.1.31/async_trait/
+        quote::quote_spanned! {block.span()=>
+            std::boxed::Box::pin(#block.instrument(__tracer_span))
+        }
     };
 
     quote::quote!(
