@@ -27,7 +27,7 @@ pub fn draw_stdout(spans: Vec<crate::Span>) {
         follower_to_header.insert(span.id, span.id);
 
         match span.link {
-            crate::Link::Root => root = Some(span.id),
+            crate::Link::Root { .. } => root = Some(span.id),
             crate::Link::Parent { id } => {
                 children.entry(id).or_insert_with(Vec::new).push(span.id);
             }

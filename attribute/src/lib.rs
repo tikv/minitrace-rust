@@ -103,7 +103,7 @@ pub fn trace_async(args: TokenStream, item: TokenStream) -> TokenStream {
         }
     } else {
         // hack for `async_trait`
-        // https://docs.rs/async-trait/0.1.31/async_trait/
+        // See https://docs.rs/async-trait/0.1.31/async_trait/
         quote::quote_spanned! {block.span()=>
             std::boxed::Box::pin(#block.instrument(__tracer_span))
         }

@@ -28,7 +28,9 @@ pub struct Span {
 
 #[derive(Debug, Copy, Clone)]
 pub enum Link {
-    Root,
+    Root {
+        start_time_ms: u64,
+    },
     Parent {
         id: u32,
     },

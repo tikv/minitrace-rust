@@ -7,7 +7,7 @@ pub fn new_span_root<T: Into<u32>>(tx: crate::CollectorTx, tag: T) -> SpanGuard 
     let root_time = crate::time::InstantMillis::now();
     let info = SpanInfo {
         id: crate::SpanID::new(),
-        link: Link::Root,
+        link: Link::Root(crate::time::real_time_ms()),
         tag: tag.into(),
     };
     SpanGuard(Some(GuardInner {
@@ -95,8 +95,12 @@ pub(crate) struct SpanInfo {
 }
 
 enum Link {
-    Root,
+    /// real time ms
+    Root(u64),
+
+    /// parent id
     Parent(crate::SpanID),
+
     #[cfg(feature = "fine-async")]
     Continue(crate::SpanID),
 }
@@ -113,7 +117,7 @@ impl Drop for GuardInner {
         let span = crate::Span {
             id: self.info.id.into(),
             link: match self.info.link {
-                Link::Root => crate::Link::Root,
+                Link::Root(ms) => crate::Link::Root { start_time_ms: ms },
                 Link::Parent(id) => crate::Link::Parent { id: id.into() },
                 #[cfg(feature = "fine-async")]
                 Link::Continue(id) => crate::Link::Continue { id: id.into() },
@@ -180,7 +184,7 @@ mod tests {
                     s.id,
                     (
                         match s.link {
-                            crate::Link::Root => None,
+                            crate::Link::Root { .. } => None,
                             crate::Link::Parent { id } => Some(id),
                             #[cfg(feature = "fine-async")]
                             crate::Link::Continue { .. } => unreachable!(),
