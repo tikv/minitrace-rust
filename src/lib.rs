@@ -9,6 +9,9 @@ mod span_id;
 mod time;
 pub mod util;
 
+#[cfg(test)]
+mod tests;
+
 #[cfg(feature = "fine-async")]
 pub use minitrace_attribute::trace_async_fine;
 pub use minitrace_attribute::{trace, trace_async};
