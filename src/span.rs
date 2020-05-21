@@ -18,6 +18,7 @@ pub fn new_span_root<T: Into<u32>>(tx: crate::CollectorTx, tag: T) -> SpanGuard 
     }))
 }
 
+#[inline]
 pub fn none() -> SpanGuard {
     SpanGuard(None)
 }
@@ -154,10 +155,17 @@ impl<'a> Entered<'a> {
 
 impl Drop for Entered<'_> {
     fn drop(&mut self) {
-        let guard = SPAN_STACK
-            .with(|spans| unsafe { (&mut *spans.get()).pop() })
-            .expect("corrupted stack");
+        let id = self.guard.info.id;
+        SPAN_STACK.with(|spans| unsafe {
+            let stack = &mut *spans.get();
+            let (idx, _) = stack
+                .iter()
+                .enumerate()
+                .rev()
+                .find(|(_, span)| span.info.id == id)
+                .expect("corrupted stack");
 
-        assert_eq!(guard.info.id, self.guard.info.id, "corrupted stack");
+            stack.remove(idx);
+        })
     }
 }

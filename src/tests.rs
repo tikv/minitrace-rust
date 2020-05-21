@@ -241,3 +241,35 @@ fn test_bounded() {
     assert_eq!(spans.len(), 2);
     assert_eq!(&spans, &[(0, None), (1, Some(0))]);
 }
+
+#[test]
+fn test_out_of_order_drop_enter() {
+    let (tx, _rx) = crate::Collector::bounded(512);
+    {
+        let s = crate::new_span_root(tx, 0u32);
+        let _g = s.enter();
+
+        let s1 = crate::new_span(1u32);
+        let s2 = crate::new_span(2u32);
+        let s3 = crate::new_span(3u32);
+        let s4 = crate::new_span(4u32);
+        let e1 = s1.enter();
+        let e2 = s2.enter();
+        let e3 = s3.enter();
+        let e4 = s4.enter();
+
+        drop(e3);
+        drop(e1);
+        drop(e2);
+        drop(e4);
+
+        let mut spans = vec![];
+        let mut enters = vec![];
+        for i in 0..100 {
+            spans.push(crate::new_span(i as u32));
+        }
+        for span in spans.iter() {
+            enters.push(span.enter());
+        }
+    }
+}
