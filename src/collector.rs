@@ -1,6 +1,7 @@
 pub struct Collector;
 
 impl Collector {
+    #[inline]
     pub fn bounded(capacity: u16) -> (CollectorTx, CollectorRx) {
         assert!(capacity > 0);
 
@@ -8,11 +9,13 @@ impl Collector {
         (CollectorTx::Array(tx), CollectorRx::Array(rx))
     }
 
+    #[inline]
     pub fn unbounded() -> (CollectorTx, CollectorRx) {
         let (tx, rx) = crossbeam::channel::unbounded();
         (CollectorTx::Channel(tx), CollectorRx::Channel(rx))
     }
 
+    #[inline]
     pub fn void() -> (CollectorTx, CollectorRx) {
         (CollectorTx::Void, CollectorRx::Void)
     }
@@ -36,6 +39,7 @@ impl CollectorTx {
         }
     }
 
+    #[inline]
     pub fn try_clone(&self) -> Result<Self, Box<dyn std::error::Error>> {
         match self {
             CollectorTx::Void => Ok(CollectorTx::Void),
@@ -91,6 +95,7 @@ struct ArrayCollector {
 }
 
 impl ArrayCollector {
+    #[inline]
     fn bounded(capacity: u16) -> (ArrayCollectorTx, ArrayCollectorRx) {
         let buffer = {
             let mut v = Vec::<crate::Span>::with_capacity(capacity as usize);
@@ -148,6 +153,7 @@ pub struct ArrayCollectorTx {
 }
 
 impl ArrayCollectorTx {
+    #[inline]
     fn put(self, span: crate::Span) {
         unsafe {
             let c = &*self.collector;
@@ -156,6 +162,7 @@ impl ArrayCollectorTx {
         }
     }
 
+    #[inline]
     fn try_clone(&self) -> Result<Self, Box<dyn std::error::Error>> {
         let collect = unsafe { &*self.collector };
 

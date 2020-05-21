@@ -4,9 +4,10 @@ thread_local! {
     static NEXT_LOCAL_UNIQUE_ID: std::cell::UnsafeCell<SpanID> = std::cell::UnsafeCell::new(SpanID {
         prefix: next_global(),
         offset: unsafe { std::num::NonZeroU16::new_unchecked(1) }
-    })
+    });
 }
 
+#[inline]
 fn next_global() -> u16 {
     GLOBAL_COUNTER.fetch_add(1, std::sync::atomic::Ordering::SeqCst)
 }

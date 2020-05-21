@@ -43,7 +43,7 @@ pub fn new_span<T: Into<u32>>(tag: T) -> SpanGuard {
 
         SpanGuard(Some(GuardInner {
             root_time,
-            elapsed_start: root_time.elapsed(),
+            elapsed_start: root_time.elapsed_ms(),
             tx: Some(tx.unwrap()),
             info,
         }))
@@ -71,7 +71,7 @@ pub(crate) fn new_span_continue(
 
         SpanGuard(Some(GuardInner {
             root_time,
-            elapsed_start: root_time.elapsed(),
+            elapsed_start: root_time.elapsed_ms(),
             tx: Some(tx),
             info,
         }))
@@ -123,7 +123,7 @@ impl Drop for GuardInner {
                 Link::Continue(id) => crate::Link::Continue { id: id.into() },
             },
             elapsed_start: self.elapsed_start,
-            elapsed_end: self.root_time.elapsed(),
+            elapsed_end: self.root_time.elapsed_ms(),
             tag: self.info.tag,
         };
         self.tx.take().unwrap().put(span);
