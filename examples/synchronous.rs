@@ -1,28 +1,22 @@
 fn func1(i: u64) {
-    minitrace::block!(0u32, {
-        for j in 0..(i * 10) {
-            std::thread::sleep(std::time::Duration::from_micros(j));
-        }
-    });
-
-    func2();
+    let _guard = minitrace::new_span(0);
+    std::thread::sleep(std::time::Duration::from_millis(i));
+    func2(i);
 }
 
 #[minitrace::trace(0u32)]
-fn func2() {
-    for i in 0..50 {
-        std::thread::sleep(std::time::Duration::from_micros(i));
-    }
+fn func2(i: u64) {
+    std::thread::sleep(std::time::Duration::from_millis(i));
 }
 
 fn main() {
-    let (tx, mut rx) = minitrace::Collector::bounded(256);
+    let (root, collector) = minitrace::trace_enable(0);
     {
-        let span = minitrace::new_span_root(tx, 0u32);
-        let _enter = span.enter();
-        for i in 0..10 {
+        let _guard = root;
+        for i in 1..=10 {
             func1(i);
         }
     }
-    minitrace::util::draw_stdout(rx.collect().unwrap());
+
+    minitrace::util::draw_stdout(collector.collect());
 }

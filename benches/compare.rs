@@ -50,20 +50,18 @@ fn minitrace_harness() {
 
     fn dummy_minitrace() {
         for _ in 0..99 {
-            let child = minitrace::new_span(CHILD);
-            let _enter = child.enter();
+            let _guard = minitrace::new_span(CHILD);
         }
     }
 
-    let (span_tx, mut span_rx) = minitrace::Collector::bounded(100);
+    let (root, collector) = minitrace::trace_enable(PARENT);
 
     {
-        let root = minitrace::new_span_root(span_tx, PARENT);
-        let _enter = root.enter();
+        let _guard = root;
         dummy_minitrace();
     }
 
-    let _r = span_rx.collect().unwrap();
+    let _r = collector.collect();
 }
 
 #[derive(Debug)]

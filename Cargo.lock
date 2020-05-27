@@ -517,19 +517,18 @@ dependencies = [
 
 [[package]]
 name = "minitrace"
-version = "0.0.1"
+version = "0.1.0"
 dependencies = [
  "criterion",
  "crossbeam",
  "futures 0.1.29",
  "futures 0.3.4",
- "libc",
+ "lazy_static",
  "minitrace-attribute",
  "opentelemetry",
  "opentelemetry-jaeger",
  "pin-project",
  "rustracing",
- "time",
  "tokio",
  "tracing",
  "tracing-core",

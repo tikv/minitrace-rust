@@ -1,53 +1,45 @@
-#![feature(no_more_cas)]
 #![feature(negative_impls)]
 
-mod collector;
+pub(crate) mod collector;
 pub mod future;
 pub mod prelude;
-mod span;
-mod span_id;
-mod time;
+pub(crate) mod time;
+pub(crate) mod trace;
+pub(crate) mod trace_crossthread;
+pub(crate) mod trace_local;
 pub mod util;
+
+pub use collector::*;
+pub use time::*;
+pub use trace::*;
+pub use trace_crossthread::*;
+pub use trace_local::*;
 
 #[cfg(test)]
 mod tests;
 
-#[cfg(feature = "fine-async")]
-pub use minitrace_attribute::trace_async_fine;
 pub use minitrace_attribute::{trace, trace_async};
-
-pub use collector::*;
-pub use span::*;
-pub(crate) use span_id::SpanID;
 
 #[derive(Debug, Copy, Clone)]
 pub struct Span {
-    pub id: u32,
+    pub id: u64,
     pub link: Link,
-    pub elapsed_start: u32,
-    pub elapsed_end: u32,
-    pub tag: u32,
+    // TODO: add cargo feature to allow altering to ns
+    pub begin_cycles: u64,
+    pub end_cycles: u64,
+    pub event: u32,
 }
 
 #[derive(Debug, Copy, Clone)]
 pub enum Link {
-    Root {
-        start_time_ms: u64,
-    },
-    Parent {
-        id: u32,
-    },
-    #[cfg(feature = "fine-async")]
-    Continue {
-        id: u32,
-    },
+    Root,
+    Parent { id: u64 },
+    Continue { id: u64 },
 }
 
-#[macro_export]
-macro_rules! block {
-    ($tag:expr, $blk:block) => {{
-        let span = minitrace::new_span($tag);
-        let _enter = span.enter();
-        $blk
-    }};
+#[derive(Debug, Clone)]
+pub struct SpanSet {
+    pub start_time_ns: u64,
+    pub cycles_per_sec: u64,
+    pub spans: Vec<Span>,
 }

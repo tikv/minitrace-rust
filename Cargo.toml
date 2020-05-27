@@ -1,19 +1,17 @@
 [package]
 name = "minitrace"
-version = "0.0.1"
+version = "0.1.0"
 authors = ["zhongzc <zhongzc_arch@outlook.com>"]
 edition = "2018"
 
 [features]
 default = []
-fine-async = []
 
 [dependencies]
-crossbeam = "0.7"
 pin-project = "0.4"
 minitrace-attribute = { path = "./attribute" }
-time = "0.1"
-libc = "0.2"
+lazy_static = "1.4.0"
+crossbeam = "0.7"
 
 [dependencies.futures_01]
 version = "0.1"
@@ -41,7 +39,3 @@ harness = false
 [[bench]]
 name = "compare"
 harness = false
-
-[[example]]
-name = "asynchronous"
-required-features = ["fine-async"]

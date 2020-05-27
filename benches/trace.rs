@@ -1,13 +1,6 @@
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 
-#[derive(Debug, Copy, Clone)]
-enum CollectorType {
-    Void,
-    Bounded,
-    Unbounded,
-}
-
-fn dummy_iter(i: u16) {
+fn dummy_iter(i: usize) {
     #[minitrace::trace(0u32)]
     fn dummy() {}
 
@@ -17,75 +10,52 @@ fn dummy_iter(i: u16) {
 }
 
 #[minitrace::trace(0u32)]
-fn dummy_rec(i: u16) {
+fn dummy_rec(i: usize) {
     if i > 1 {
         dummy_rec(i - 1);
-    }
-}
-
-fn trace_options() -> Vec<(u16, CollectorType)> {
-    let factors = &[1, 10, 100, 1000, 10000];
-    let types = &[
-        CollectorType::Void,
-        CollectorType::Bounded,
-        CollectorType::Unbounded,
-    ];
-    factors
-        .iter()
-        .flat_map(|factor| types.iter().map(move |tp| (*factor, *tp)))
-        .collect()
-}
-
-fn build_collect(cap: u16, tp: CollectorType) -> (minitrace::CollectorTx, minitrace::CollectorRx) {
-    match tp {
-        CollectorType::Void => minitrace::Collector::void(),
-        CollectorType::Bounded => minitrace::Collector::bounded(cap),
-        CollectorType::Unbounded => minitrace::Collector::unbounded(),
     }
 }
 
 fn trace_wide_bench(c: &mut Criterion) {
     c.bench_function_over_inputs(
         "trace_wide",
-        |b, (factor, collect_type)| {
+        |b, len| {
             b.iter(|| {
-                let (tx, mut rx) = black_box(build_collect(*factor, *collect_type));
+                let (root, collector) = minitrace::trace_enable(0);
                 {
-                    let span = minitrace::new_span_root(black_box(tx), black_box(0u32));
-                    let _g = black_box(span.enter());
+                    let _guard = root;
 
-                    if *factor > 1 {
-                        dummy_iter(black_box(*factor));
+                    if *len > 1 {
+                        dummy_iter(*len);
                     }
                 }
 
-                let _r = black_box(rx.collect().unwrap());
+                let _r = black_box(collector.collect());
             });
         },
-        trace_options(),
+        vec![1, 10, 100, 1000, 10000],
     );
 }
 
 fn trace_deep_bench(c: &mut Criterion) {
     c.bench_function_over_inputs(
         "trace_deep",
-        |b, (factor, collect_type)| {
+        |b, len| {
             b.iter(|| {
-                let (tx, mut rx) = black_box(build_collect(*factor, *collect_type));
+                let (root, collector) = minitrace::trace_enable(0);
 
                 {
-                    let span = minitrace::new_span_root(black_box(tx), black_box(0u32));
-                    let _g = black_box(span.enter());
+                    let _guard = root;
 
-                    if *factor > 1 {
-                        dummy_rec(black_box(*factor));
+                    if *len > 1 {
+                        dummy_rec(*len);
                     }
                 }
 
-                let _r = black_box(rx.collect().unwrap());
+                let _r = black_box(collector.collect());
             });
         },
-        trace_options(),
+        vec![1, 10, 100, 1000, 10000],
     );
 }
 

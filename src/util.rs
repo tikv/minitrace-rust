@@ -1,17 +1,24 @@
 const BAR_LEN: usize = 70;
 
-pub fn draw_stdout(spans: Vec<crate::Span>) {
+pub fn draw_stdout(spans: Vec<crate::SpanSet>) {
     let mut children = std::collections::HashMap::new();
-    #[allow(unused_mut)]
     let mut following = std::collections::HashMap::new();
     let mut follower_to_header = std::collections::HashMap::new();
     let mut spans_map = std::collections::HashMap::new();
 
     let mut root = None;
+    let mut root_cycles = None;
     let mut max_end = 0;
+
+    let spans = spans
+        .into_iter()
+        .map(|s| s.spans.into_iter())
+        .flatten()
+        .collect::<Vec<_>>();
+
     for span in spans {
-        let start = span.elapsed_start;
-        let end = span.elapsed_end;
+        let start = span.begin_cycles;
+        let end = span.end_cycles;
 
         if end > max_end {
             max_end = end;
@@ -27,11 +34,13 @@ pub fn draw_stdout(spans: Vec<crate::Span>) {
         follower_to_header.insert(span.id, span.id);
 
         match span.link {
-            crate::Link::Root { .. } => root = Some(span.id),
+            crate::Link::Root => {
+                root = Some(span.id);
+                root_cycles = Some(span.begin_cycles);
+            }
             crate::Link::Parent { id } => {
                 children.entry(id).or_insert_with(Vec::new).push(span.id);
             }
-            #[cfg(feature = "fine-async")]
             crate::Link::Continue { id } => {
                 let header = follower_to_header[&id];
                 follower_to_header.insert(span.id, header);
@@ -45,6 +54,11 @@ pub fn draw_stdout(spans: Vec<crate::Span>) {
     }
 
     let root = root.expect("can not find root");
+    let root_cycles = root_cycles.unwrap();
+    for (_, (start, _)) in spans_map.iter_mut() {
+        *start -= root_cycles;
+    }
+    max_end -= root_cycles;
 
     if max_end == 0 {
         println!("Insufficient precision: total cost time < 1 ms");
@@ -57,11 +71,11 @@ pub fn draw_stdout(spans: Vec<crate::Span>) {
 }
 
 fn draw_rec(
-    cur_id: u32,
+    cur_id: u64,
     factor: f64,
-    following: &std::collections::HashMap<u32, Vec<u32>>,
-    children_map: &std::collections::HashMap<u32, Vec<u32>>,
-    spans_map: &std::collections::HashMap<u32, (u32, u32)>,
+    following: &std::collections::HashMap<u64, Vec<u64>>, // id -> [continue/following id]
+    children_map: &std::collections::HashMap<u64, Vec<u64>>, // id -> [child_id]
+    spans_map: &std::collections::HashMap<u64, (u64, u64)>, // id -> (start, duration)
 ) {
     let mut ids = vec![];
     let mut span = vec![];
@@ -78,7 +92,7 @@ fn draw_rec(
         });
 
     let mut draw_len = 0usize;
-    let mut total_cost = 0u32;
+    let mut total_cycles = 0u64;
 
     for (start, duration) in span {
         // draw leading space
@@ -91,14 +105,17 @@ fn draw_rec(
         print!("{:=<1$}", "", bar_len);
         draw_len += bar_len;
 
-        total_cost += duration;
+        total_cycles += duration;
     }
 
     // draw tailing space
     let tailing_space_len = BAR_LEN - draw_len + 1;
     print!("{: <1$}", "", tailing_space_len);
 
-    println!("{:2} ms", total_cost);
+    println!(
+        "{:6.2} ms",
+        total_cycles as f64 * 1_000.0 / crate::cycles_per_sec() as f64
+    );
 
     for id in ids {
         if let Some(children) = children_map.get(&id) {

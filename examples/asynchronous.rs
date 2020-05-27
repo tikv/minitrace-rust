@@ -5,27 +5,23 @@ enum AsyncJob {
     #[allow(dead_code)]
     Unknown = 0u32,
     Root,
-    ParallelJob,
     IterJob,
     OtherJob,
 }
 
-#[minitrace::trace_async(AsyncJob::ParallelJob)]
-async fn parallel_job() {
+fn parallel_job() {
     for i in 0..4 {
-        tokio::spawn(iter_job(i).in_current_span(AsyncJob::IterJob as u32));
+        tokio::spawn(iter_job(i).trace_task(AsyncJob::IterJob as u32));
     }
 }
 
-async fn iter_job(_iter: i32) {
-    for _ in 0..20 {
-        std::thread::sleep(std::time::Duration::from_millis(1))
-    }
+async fn iter_job(iter: u64) {
+    std::thread::sleep(std::time::Duration::from_millis(iter * 10));
     tokio::task::yield_now().await;
     other_job().await;
 }
 
-#[minitrace::trace_async_fine(AsyncJob::OtherJob)]
+#[minitrace::trace_async(AsyncJob::OtherJob as u32)]
 async fn other_job() {
     for i in 0..20 {
         if i == 10 {
@@ -37,21 +33,22 @@ async fn other_job() {
 
 #[tokio::main]
 async fn main() {
-    let (tx, mut rx) = minitrace::Collector::bounded(256);
+    let (root, collector) = minitrace::trace_enable(AsyncJob::Root as u32);
 
     {
+        let _guard = root;
         tokio::spawn(
             async {
-                parallel_job().await;
+                parallel_job();
                 other_job().await;
             }
-            .instrument(minitrace::new_span_root(tx, AsyncJob::Root as u32)),
+            .trace_task(AsyncJob::Root as u32),
         );
     }
 
     // waiting for all spans are finished
     std::thread::sleep(std::time::Duration::from_secs(1));
 
-    let r = rx.collect().unwrap();
+    let r = collector.collect();
     minitrace::util::draw_stdout(r);
 }
