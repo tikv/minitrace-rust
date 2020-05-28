@@ -1,0 +1,8 @@
+[package]
+name = "util"
+version = "0.1.0"
+authors = ["zhongzc <zhongzc_arch@outlook.com>"]
+edition = "2018"
+
+[dependencies]
+minitrace = { path = "../.." }

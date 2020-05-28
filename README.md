@@ -1,5 +1,80 @@
 # Minitrace
-[![Build Status](https://travis-ci.com/zhongzc/minitrace.svg?branch=master)](https://travis-ci.com/zhongzc/minitrace)
+[![Build Status](https://travis-ci.com/pingcap-incubator/minitrace.svg?branch=master)](https://travis-ci.com/pingcap-incubator/minitrace)
+[![LICENSE](https://img.shields.io/github/license/pingcap-incubator/minitrace.svg)](https://github.com/pingcap-incubator/minitrace/blob/master/LICENSE)
+
+A high-performance, ergonomic timeline tracing library for Rust.
+
+
+## Usage
+
+```toml
+[dependencies]
+minitrace = { git = "https://github.com/pingcap-incubator/minitrace.git" }
+```
+
+### In Synchronous Code
+
+```rust
+let (root, collector) = minitrace::trace_enable(0);
+{
+    let _parent_guard = root;
+    {
+        let _child_guard = minitrace::new_span(1);  
+    }
+}
+
+let spans = collector.collect();
+```
+
+### In Asynchronous Code
+
+Futures:
+
+```rust
+use minitrace::prelude::*;
+
+let (root, collector) = minitrace::trace_enable(0);
+
+runtime::spawn(async {
+    let guard = minitrace::new_span(1);
+    // ...
+    drop(guard);
+
+    async {}.trace_async(2).await;
+
+    runtime::spawn(async {}.trace_task(3));
+
+    async {}.trace_async(4).await;
+}.trace_task(5));
+
+drop(root);
+
+let spans = collector.collect();
+```
+
+Threads:
+
+```rust
+let (root, collector) = minitrace::trace_enable(0);
+
+let handle = minitrace::trace_crossthread(1);
+
+std::thread::spawn(move || {
+    let mut handle = handle;
+    let _parent_guard = handle.trace_enable();
+
+    {
+        let _child_guard = minitrace::new_span(2);
+    }
+});
+
+drop(root);
+
+let spans = collector.collect();
+```
+
+
+## Timeline Examples
 
 ```sh
 $ cargo +nightly run --example synchronous

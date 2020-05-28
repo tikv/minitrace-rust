@@ -1,6 +1,6 @@
 const BAR_LEN: usize = 70;
 
-pub fn draw_stdout(spans: Vec<crate::SpanSet>) {
+pub fn draw_stdout(spans: Vec<minitrace::SpanSet>) {
     let mut children = std::collections::HashMap::new();
     let mut following = std::collections::HashMap::new();
     let mut follower_to_header = std::collections::HashMap::new();
@@ -34,14 +34,14 @@ pub fn draw_stdout(spans: Vec<crate::SpanSet>) {
         follower_to_header.insert(span.id, span.id);
 
         match span.link {
-            crate::Link::Root => {
+            minitrace::Link::Root => {
                 root = Some(span.id);
                 root_cycles = Some(span.begin_cycles);
             }
-            crate::Link::Parent { id } => {
+            minitrace::Link::Parent { id } => {
                 children.entry(id).or_insert_with(Vec::new).push(span.id);
             }
-            crate::Link::Continue { id } => {
+            minitrace::Link::Continue { id } => {
                 let header = follower_to_header[&id];
                 follower_to_header.insert(span.id, header);
 
@@ -114,7 +114,7 @@ fn draw_rec(
 
     println!(
         "{:6.2} ms",
-        total_cycles as f64 * 1_000.0 / crate::cycles_per_sec() as f64
+        total_cycles as f64 * 1_000.0 / minitrace::cycles_per_sec() as f64
     );
 
     for id in ids {

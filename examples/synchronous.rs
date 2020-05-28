@@ -18,5 +18,5 @@ fn main() {
         }
     }
 
-    minitrace::util::draw_stdout(collector.collect());
+    minitrace_util::draw_stdout(collector.collect());
 }

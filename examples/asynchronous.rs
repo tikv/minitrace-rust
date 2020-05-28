@@ -47,8 +47,8 @@ async fn main() {
     }
 
     // waiting for all spans are finished
-    std::thread::sleep(std::time::Duration::from_secs(1));
+    std::thread::sleep(std::time::Duration::from_millis(200));
 
     let r = collector.collect();
-    minitrace::util::draw_stdout(r);
+    minitrace_util::draw_stdout(r);
 }
