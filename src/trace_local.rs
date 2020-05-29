@@ -103,7 +103,14 @@ impl Drop for LocalTraceGuard {
                 cycles_per_sec: crate::time::cycles_per_sec(),
                 spans: tl.span_stack[self.start_index..].to_vec(),
             });
-            tl.span_stack.truncate(self.start_index);
+        }
+
+        tl.span_stack.truncate(self.start_index);
+        if tl.span_stack.capacity() > 1024 && tl.span_stack.len() < 512 {
+            tl.span_stack.shrink_to(1024);
+        }
+        if tl.enter_stack.capacity() > 1024 && tl.enter_stack.len() < 512 {
+            tl.enter_stack.shrink_to(1024);
         }
 
         tl.cur_collector = None;
