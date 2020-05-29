@@ -41,16 +41,30 @@ fn rebuild_relation_by_event(spans: Vec<crate::SpanSet>) -> Vec<(u32, Option<u32
     res
 }
 
-fn sync_spanned(event: u32) {
-    let _guard = crate::new_span(event);
+fn check_trace_local<F>(f: F)
+where
+    F: Fn(&crate::trace_local::TraceLocal) -> bool,
+{
+    crate::trace_local::TRACE_LOCAL.with(|trace| {
+        let tl = unsafe { &*trace.get() };
+        assert!(f(tl));
+    });
+}
+
+fn check_clear() {
+    check_trace_local(|tl| {
+        tl.span_stack.is_empty() && tl.enter_stack.is_empty() && tl.cur_collector.is_none()
+    });
 }
 
 #[test]
-fn span_basic() {
+fn trace_basic() {
     let (root, collector) = crate::trace_enable(0);
     {
         let _guard = root;
-        sync_spanned(1);
+        {
+            let _guard = crate::new_span(1);
+        }
     }
 
     let spans = collector.collect();
@@ -58,10 +72,20 @@ fn span_basic() {
 
     assert_eq!(spans.len(), 2);
     assert_eq!(&spans, &[(0, None), (1, Some(0))]);
+    check_clear();
 }
 
 #[test]
-fn span_async_basic() {
+fn trace_not_enable() {
+    {
+        let _guard = crate::new_span(1);
+    }
+
+    check_clear();
+}
+
+#[test]
+fn trace_async_basic() {
     let (root, collector) = crate::trace_enable(0);
 
     let wg = crossbeam::sync::WaitGroup::new();
@@ -115,16 +139,17 @@ fn span_async_basic() {
             (10, Some(0))
         ]
     );
+    check_clear();
 }
 
 #[test]
-fn span_wide_function() {
+fn trace_wide_function() {
     let (root, collector) = crate::trace_enable(0);
 
     {
         let _guard = root;
         for i in 1..=10 {
-            sync_spanned(i);
+            let _guard = crate::new_span(i);
         }
     }
 
@@ -148,10 +173,11 @@ fn span_wide_function() {
             (10, Some(0))
         ]
     );
+    check_clear();
 }
 
 #[test]
-fn span_deep_function() {
+fn trace_deep_function() {
     fn sync_spanned_rec_event_step_to_1(step: u32) {
         let _guard = crate::new_span(step);
 
@@ -187,4 +213,36 @@ fn span_deep_function() {
             (10, Some(0))
         ]
     );
+    check_clear();
+}
+
+#[test]
+fn trace_collect_ahead() {
+    let (root, collector) = crate::trace_enable(0);
+
+    {
+        let _guard = crate::new_span(1);
+    }
+
+    let wg = crossbeam::sync::WaitGroup::new();
+    let wg1 = wg.clone();
+    let handle = crate::trace_crossthread(2);
+    std::thread::spawn(move || {
+        let mut handle = handle;
+        let guard = handle.trace_enable();
+
+        wg1.wait();
+        drop(guard);
+
+        check_clear();
+    });
+
+    drop(root);
+    let spans = collector.collect();
+    drop(wg);
+
+    let spans = rebuild_relation_by_event(spans);
+    assert_eq!(spans.len(), 2);
+    assert_eq!(&spans, &[(0, None), (1, Some(0)),]);
+    check_clear();
 }

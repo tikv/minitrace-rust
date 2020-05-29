@@ -1,4 +1,5 @@
 #![feature(negative_impls)]
+#![feature(shrink_to)]
 
 pub(crate) mod collector;
 pub mod future;
