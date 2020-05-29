@@ -1,5 +1,5 @@
 # Minitrace
-[![Actions Status](https://github.com/pingcap-incubator/minitrace/workflows/rust/badge.svg)](https://github.com/pingcap-incubator/minitrace/actions)
+[![Actions Status](https://github.com/pingcap-incubator/minitrace/workflows/CI/badge.svg)](https://github.com/pingcap-incubator/minitrace/actions)
 [![LICENSE](https://img.shields.io/github/license/pingcap-incubator/minitrace.svg)](https://github.com/pingcap-incubator/minitrace/blob/master/LICENSE)
 
 A high-performance, ergonomic timeline tracing library for Rust.
