@@ -1,0 +1,35 @@
+name: Rust
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [macos-latest, ubuntu-latest]
+
+    steps:
+    - uses: actions/checkout@v2
+    - name: Set up toolchains
+      run: |
+        rustup toolchain install nightly-2020-05-15
+        rustup default nightly-2020-05-15
+        rustup component add rustfmt
+        rustup component add clippy
+    - name: Check format
+      run: cargo fmt --all -- --check
+    - name: Lints
+      run: cargo clippy --all-targets --all-features -- --deny warnings
+    - name: Build
+      run: cargo build --verbose --all
+    - name: Run tests
+      run: cargo test --verbose --all
