@@ -1,7 +1,7 @@
 impl<T: Sized> Instrument for T {}
 pub trait Instrument: Sized {
     #[inline]
-    fn trace_task(self, event: u32) -> TraceSpawned<Self> {
+    fn trace_task<T: Into<u32>>(self, event: T) -> TraceSpawned<Self> {
         TraceSpawned {
             inner: self,
             crossthread_trace: crate::trace::trace_crossthread(event),
@@ -9,8 +9,11 @@ pub trait Instrument: Sized {
     }
 
     #[inline]
-    fn trace_async(self, event: u32) -> TraceWrapped<Self> {
-        TraceWrapped { inner: self, event }
+    fn trace_async<T: Into<u32>>(self, event: T) -> TraceWrapped<Self> {
+        TraceWrapped {
+            inner: self,
+            event: event.into(),
+        }
     }
 }
 

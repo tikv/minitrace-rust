@@ -36,9 +36,9 @@ impl !Sync for LocalTraceGuard {}
 impl !Send for LocalTraceGuard {}
 
 impl LocalTraceGuard {
-    pub(crate) fn new(
+    pub(crate) fn new<T: Into<u32>>(
         collector: std::sync::Arc<crate::collector::CollectorInner>,
-        event: u32,
+        event: T,
         link: crate::Link,
         start_time_ns: u64,
     ) -> Option<(Self, SpanId)> {
@@ -69,7 +69,7 @@ impl LocalTraceGuard {
             link,
             begin_cycles: crate::time::monotonic_cycles(),
             end_cycles: 0,
-            event,
+            event: event.into(),
         });
 
         Some((

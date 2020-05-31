@@ -59,11 +59,11 @@ fn check_clear() {
 
 #[test]
 fn trace_basic() {
-    let (root, collector) = crate::trace_enable(0);
+    let (root, collector) = crate::trace_enable(0u32);
     {
         let _guard = root;
         {
-            let _guard = crate::new_span(1);
+            let _guard = crate::new_span(1u32);
         }
     }
 
@@ -78,7 +78,7 @@ fn trace_basic() {
 #[test]
 fn trace_not_enable() {
     {
-        let _guard = crate::new_span(1);
+        let _guard = crate::new_span(1u32);
     }
 
     check_clear();
@@ -86,7 +86,7 @@ fn trace_not_enable() {
 
 #[test]
 fn trace_async_basic() {
-    let (root, collector) = crate::trace_enable(0);
+    let (root, collector) = crate::trace_enable(0u32);
 
     let wg = crossbeam::sync::WaitGroup::new();
 
@@ -95,7 +95,7 @@ fn trace_async_basic() {
 
         async fn dummy() {};
 
-        for i in 1..=5 {
+        for i in 1..=5u32 {
             let dummy = dummy().trace_task(i);
             let wg = wg.clone();
 
@@ -105,7 +105,7 @@ fn trace_async_basic() {
             });
         }
 
-        for i in 6..=10 {
+        for i in 6..=10u32 {
             let handle = crate::trace_crossthread(i);
             let wg = wg.clone();
 
@@ -144,11 +144,11 @@ fn trace_async_basic() {
 
 #[test]
 fn trace_wide_function() {
-    let (root, collector) = crate::trace_enable(0);
+    let (root, collector) = crate::trace_enable(0u32);
 
     {
         let _guard = root;
-        for i in 1..=10 {
+        for i in 1..=10u32 {
             let _guard = crate::new_span(i);
         }
     }
@@ -186,7 +186,7 @@ fn trace_deep_function() {
         }
     }
 
-    let (root, collector) = crate::trace_enable(0);
+    let (root, collector) = crate::trace_enable(0u32);
 
     {
         let _guard = root;
@@ -218,15 +218,15 @@ fn trace_deep_function() {
 
 #[test]
 fn trace_collect_ahead() {
-    let (root, collector) = crate::trace_enable(0);
+    let (root, collector) = crate::trace_enable(0u32);
 
     {
-        let _guard = crate::new_span(1);
+        let _guard = crate::new_span(1u32);
     }
 
     let wg = crossbeam::sync::WaitGroup::new();
     let wg1 = wg.clone();
-    let handle = crate::trace_crossthread(2);
+    let handle = crate::trace_crossthread(2u32);
     std::thread::spawn(move || {
         let mut handle = handle;
         let guard = handle.trace_enable();

@@ -1,7 +1,7 @@
 #[must_use]
 #[inline]
-pub fn trace_enable(
-    event: u32,
+pub fn trace_enable<T: Into<u32>>(
+    event: T,
 ) -> (
     crate::trace_local::LocalTraceGuard,
     crate::collector::Collector,
@@ -26,9 +26,9 @@ pub fn trace_enable(
 
 #[must_use]
 #[inline]
-pub fn trace_may_enable(
+pub fn trace_may_enable<T: Into<u32>>(
     enable: bool,
-    event: u32,
+    event: T,
 ) -> (
     Option<crate::trace_local::LocalTraceGuard>,
     Option<crate::collector::Collector>,
@@ -43,12 +43,12 @@ pub fn trace_may_enable(
 
 #[must_use]
 #[inline]
-pub fn new_span(event: u32) -> Option<crate::trace_local::SpanGuard> {
-    crate::trace_local::SpanGuard::new(event)
+pub fn new_span<T: Into<u32>>(event: T) -> Option<crate::trace_local::SpanGuard> {
+    crate::trace_local::SpanGuard::new(event.into())
 }
 
 #[must_use]
 #[inline]
-pub fn trace_crossthread(event: u32) -> crate::trace_crossthread::CrossthreadTrace {
-    crate::trace_crossthread::CrossthreadTrace::new(event)
+pub fn trace_crossthread<T: Into<u32>>(event: T) -> crate::trace_crossthread::CrossthreadTrace {
+    crate::trace_crossthread::CrossthreadTrace::new(event.into())
 }

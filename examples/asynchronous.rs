@@ -9,9 +9,15 @@ enum AsyncJob {
     OtherJob,
 }
 
+impl Into<u32> for AsyncJob {
+    fn into(self) -> u32 {
+        self as u32
+    }
+}
+
 fn parallel_job() {
     for i in 0..4 {
-        tokio::spawn(iter_job(i).trace_task(AsyncJob::IterJob as u32));
+        tokio::spawn(iter_job(i).trace_task(AsyncJob::IterJob));
     }
 }
 
@@ -21,7 +27,7 @@ async fn iter_job(iter: u64) {
     other_job().await;
 }
 
-#[minitrace::trace_async(AsyncJob::OtherJob as u32)]
+#[minitrace::trace_async(AsyncJob::OtherJob)]
 async fn other_job() {
     for i in 0..20 {
         if i == 10 {
@@ -33,7 +39,7 @@ async fn other_job() {
 
 #[tokio::main]
 async fn main() {
-    let (root, collector) = minitrace::trace_enable(AsyncJob::Root as u32);
+    let (root, collector) = minitrace::trace_enable(AsyncJob::Root);
 
     {
         let _guard = root;
@@ -42,7 +48,7 @@ async fn main() {
                 parallel_job();
                 other_job().await;
             }
-            .trace_task(AsyncJob::Root as u32),
+            .trace_task(AsyncJob::Root),
         );
     }
 
