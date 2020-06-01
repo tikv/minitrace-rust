@@ -39,6 +39,7 @@ pub enum Link {
 
 #[derive(Debug, Clone)]
 pub struct SpanSet {
+    pub create_time_ns: u64,
     pub start_time_ns: u64,
     pub cycles_per_sec: u64,
     pub spans: Vec<Span>,

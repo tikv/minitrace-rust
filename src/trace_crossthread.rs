@@ -2,6 +2,7 @@ struct CrossthreadTraceInner {
     collector: std::sync::Arc<crate::collector::CollectorInner>,
     link: crate::Link,
     event: u32,
+    create_time_ns: u64,
 }
 
 pub struct CrossthreadTrace {
@@ -26,17 +27,20 @@ impl CrossthreadTrace {
                 collector,
                 link,
                 event,
+                create_time_ns: crate::time::real_time_ns(),
             }),
         }
     }
 
     pub fn trace_enable(&mut self) -> Option<crate::trace_local::LocalTraceGuard> {
         if let Some(inner) = &mut self.inner {
+            let now = crate::time::real_time_ns();
             if let Some((trace_guard, id)) = crate::trace_local::LocalTraceGuard::new(
                 inner.collector.clone(),
                 inner.event,
                 inner.link,
-                crate::time::real_time_ns(),
+                inner.create_time_ns,
+                now,
             ) {
                 inner.link = crate::Link::Continue { id };
                 Some(trace_guard)

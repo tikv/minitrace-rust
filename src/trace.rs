@@ -11,11 +11,13 @@ pub fn trace_enable<T: Into<u32>>(
         closed: std::sync::atomic::AtomicBool::new(false),
     });
 
+    let now = crate::time::real_time_ns();
     let (trace_guard, _) = crate::trace_local::LocalTraceGuard::new(
         collector.clone(),
         event,
         crate::Link::Root,
-        crate::time::real_time_ns(),
+        now,
+        now,
     )
     .unwrap();
 
