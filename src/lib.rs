@@ -39,8 +39,15 @@ pub enum Link {
 
 #[derive(Debug, Clone)]
 pub struct SpanSet {
+    /// The create time of the span set. Used to calculate
+    /// the waiting time of async task.
     pub create_time_ns: u64,
+
+    /// The time corresponding to the `begin_cycles` of the first span
     pub start_time_ns: u64,
+
+    /// For conversion of cycles -> ns
     pub cycles_per_sec: u64,
+
     pub spans: Vec<Span>,
 }
