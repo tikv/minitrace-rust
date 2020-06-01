@@ -1,5 +1,3 @@
-use minitrace::prelude::*;
-
 #[repr(u32)]
 enum AsyncJob {
     #[allow(dead_code)]
@@ -16,6 +14,8 @@ impl Into<u32> for AsyncJob {
 }
 
 fn parallel_job() {
+    use minitrace::prelude::*;
+
     for i in 0..4 {
         tokio::spawn(iter_job(i).trace_task(AsyncJob::IterJob));
     }
@@ -39,6 +39,8 @@ async fn other_job() {
 
 #[tokio::main]
 async fn main() {
+    use minitrace::prelude::*;
+
     let (root, collector) = minitrace::trace_enable(AsyncJob::Root);
 
     {

@@ -109,6 +109,7 @@ pub fn trace_async(args: TokenStream, item: TokenStream) -> TokenStream {
         #vis #constness #unsafety #asyncness #abi fn #ident<#gen_params>(#params) #return_type
         #where_clause
         {
+            use minitrace::prelude::*;
             #body
         }
     )
