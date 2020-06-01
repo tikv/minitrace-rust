@@ -29,6 +29,7 @@ pub struct LocalTraceGuard {
     collector: std::sync::Arc<crate::collector::CollectorInner>,
     trace_local: *mut TraceLocal,
     start_index: usize,
+    create_time_ns: u64,
     start_time_ns: u64,
 }
 
@@ -40,6 +41,7 @@ impl LocalTraceGuard {
         collector: std::sync::Arc<crate::collector::CollectorInner>,
         event: T,
         link: crate::Link,
+        create_time_ns: u64,
         start_time_ns: u64,
     ) -> Option<(Self, SpanId)> {
         if collector.closed.load(std::sync::atomic::Ordering::SeqCst) {
@@ -77,6 +79,7 @@ impl LocalTraceGuard {
                 collector,
                 trace_local,
                 start_index,
+                create_time_ns,
                 start_time_ns,
             },
             id,
@@ -99,6 +102,7 @@ impl Drop for LocalTraceGuard {
             .load(std::sync::atomic::Ordering::SeqCst)
         {
             self.collector.queue.push(crate::SpanSet {
+                create_time_ns: self.create_time_ns,
                 start_time_ns: self.start_time_ns,
                 cycles_per_sec: crate::time::cycles_per_sec(),
                 spans: tl.span_stack[self.start_index..].to_vec(),
