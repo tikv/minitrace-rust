@@ -1,3 +1,5 @@
+// Copyright 2020 TiKV Project Authors. Licensed under Apache-2.0.
+
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 
 fn dummy_iter(i: usize) {

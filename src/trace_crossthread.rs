@@ -1,3 +1,5 @@
+// Copyright 2020 TiKV Project Authors. Licensed under Apache-2.0.
+
 struct CrossthreadTraceInner {
     collector: std::sync::Arc<crate::collector::CollectorInner>,
     link: crate::Link,

@@ -1,3 +1,7 @@
+// Copyright 2020 TiKV Project Authors. Licensed under Apache-2.0.
+
+mod common;
+
 #[repr(u32)]
 enum AsyncJob {
     #[allow(dead_code)]
@@ -58,5 +62,5 @@ async fn main() {
     std::thread::sleep(std::time::Duration::from_millis(200));
 
     let r = collector.collect();
-    minitrace_util::draw_stdout(r);
+    crate::common::draw_stdout(r);
 }

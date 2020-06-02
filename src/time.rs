@@ -1,3 +1,5 @@
+// Copyright 2020 TiKV Project Authors. Licensed under Apache-2.0.
+
 #[cfg(target_arch = "x86")]
 use core::arch::x86::_rdtsc;
 #[cfg(target_arch = "x86_64")]

@@ -1,3 +1,5 @@
+// Copyright 2020 TiKV Project Authors. Licensed under Apache-2.0.
+
 const BAR_LEN: usize = 70;
 
 pub fn draw_stdout(spans: Vec<minitrace::SpanSet>) {
