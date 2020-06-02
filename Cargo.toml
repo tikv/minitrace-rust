@@ -1,7 +1,9 @@
 [package]
 name = "minitrace"
 version = "0.1.0"
-authors = ["zhongzc <zhongzc_arch@outlook.com>"]
+authors = ["The TiKV Project Authors"]
+description = "A high-performance timeline tracing library for Rust, used by TiKV"
+license = "Apache-2.0"
 edition = "2018"
 
 [features]
@@ -31,7 +33,6 @@ tracing-opentelemetry = "0.4"
 tracing = "0.1"
 tracing-core = "0.1"
 tracing-subscriber = "0.2"
-minitrace-util = { path = "crates/util", package = "util" }
 
 [[bench]]
 name = "trace"

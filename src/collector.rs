@@ -1,3 +1,5 @@
+// Copyright 2020 TiKV Project Authors. Licensed under Apache-2.0.
+
 pub(crate) struct CollectorInner {
     pub(crate) queue: crossbeam::queue::SegQueue<crate::SpanSet>,
     pub(crate) closed: std::sync::atomic::AtomicBool,

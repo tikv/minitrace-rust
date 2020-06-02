@@ -1,3 +1,7 @@
+// Copyright 2020 TiKV Project Authors. Licensed under Apache-2.0.
+
+mod common;
+
 fn func1(i: u64) {
     let _guard = minitrace::new_span(0u32);
     std::thread::sleep(std::time::Duration::from_millis(i));
@@ -18,5 +22,5 @@ fn main() {
         }
     }
 
-    minitrace_util::draw_stdout(collector.collect());
+    crate::common::draw_stdout(collector.collect());
 }
