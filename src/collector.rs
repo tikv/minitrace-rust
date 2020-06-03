@@ -10,6 +10,15 @@ pub struct Collector {
 }
 
 impl Collector {
+    pub(crate) fn new() -> Self {
+        let collector = std::sync::Arc::new(crate::collector::CollectorInner {
+            queue: crossbeam::queue::SegQueue::new(),
+            closed: std::sync::atomic::AtomicBool::new(false),
+        });
+
+        crate::collector::Collector { inner: collector }
+    }
+
     #[inline]
     pub fn collect(self) -> Vec<crate::SpanSet> {
         self.collect_once()

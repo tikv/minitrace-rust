@@ -54,4 +54,18 @@ impl CrossthreadTrace {
             None
         }
     }
+
+    pub(crate) fn new_root(
+        event: u32,
+        collector: std::sync::Arc<crate::collector::CollectorInner>,
+    ) -> Self {
+        Self {
+            inner: Some(CrossthreadTraceInner {
+                collector,
+                link: crate::Link::Root,
+                event,
+                create_time_ns: crate::time::real_time_ns(),
+            }),
+        }
+    }
 }
