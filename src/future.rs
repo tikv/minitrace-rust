@@ -33,7 +33,7 @@ pub trait Instrument: Sized {
     }
 
     #[inline]
-    fn trace_root_future_may_enable<T: Into<u32>>(
+    fn may_trace_root_future<T: Into<u32>>(
         self,
         enable: bool,
         event: T,
