@@ -19,7 +19,7 @@ pub trait Instrument: Sized {
     }
 
     #[inline]
-    fn trace_root_future<T: Into<u32>>(self, event: T) -> TraceRootFuture<Self> {
+    fn future_trace_enable<T: Into<u32>>(self, event: T) -> TraceRootFuture<Self> {
         let collector = crate::collector::Collector::new();
 
         TraceRootFuture {
@@ -33,7 +33,7 @@ pub trait Instrument: Sized {
     }
 
     #[inline]
-    fn may_trace_root_future<T: Into<u32>>(
+    fn future_trace_may_enable<T: Into<u32>>(
         self,
         enable: bool,
         event: T,

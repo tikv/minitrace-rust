@@ -45,7 +45,7 @@ let task = async {
     async {}.trace_async(4).await;
 };
 
-let (spans, _r) = runtime::block_on(task.trace_root_future(0));
+let (spans, _r) = runtime::block_on(task.future_trace_enable(0));
 ```
 
 Threads:

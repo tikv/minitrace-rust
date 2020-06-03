@@ -52,7 +52,7 @@ async fn main() {
             jh.await.unwrap();
         }
     }
-    .trace_root_future(AsyncJob::Root)
+    .future_trace_enable(AsyncJob::Root)
     .await;
 
     crate::common::draw_stdout(spans);
