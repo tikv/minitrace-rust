@@ -8,22 +8,17 @@ pub fn trace_enable<T: Into<u32>>(
     crate::trace_local::LocalTraceGuard,
     crate::collector::Collector,
 ) {
-    let collector = std::sync::Arc::new(crate::collector::CollectorInner {
-        queue: crossbeam::queue::SegQueue::new(),
-        closed: std::sync::atomic::AtomicBool::new(false),
-    });
+    let collector = crate::collector::Collector::new();
 
     let now = crate::time::real_time_ns();
     let (trace_guard, _) = crate::trace_local::LocalTraceGuard::new(
-        collector.clone(),
+        collector.inner.clone(),
         event,
         crate::Link::Root,
         now,
         now,
     )
     .unwrap();
-
-    let collector = crate::collector::Collector { inner: collector };
 
     (trace_guard, collector)
 }

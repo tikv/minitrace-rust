@@ -1,6 +1,7 @@
 // Copyright 2020 TiKV Project Authors. Licensed under Apache-2.0.
 
 mod common;
+use minitrace::prelude::*;
 
 #[repr(u32)]
 enum AsyncJob {
@@ -17,12 +18,12 @@ impl Into<u32> for AsyncJob {
     }
 }
 
-fn parallel_job() {
-    use minitrace::prelude::*;
-
+fn parallel_job() -> Vec<tokio::task::JoinHandle<()>> {
+    let mut v = Vec::with_capacity(4);
     for i in 0..4 {
-        tokio::spawn(iter_job(i).trace_task(AsyncJob::IterJob));
+        v.push(tokio::spawn(iter_job(i).trace_task(AsyncJob::IterJob)));
     }
+    v
 }
 
 async fn iter_job(iter: u64) {
@@ -43,24 +44,16 @@ async fn other_job() {
 
 #[tokio::main]
 async fn main() {
-    use minitrace::prelude::*;
+    let (spans, _) = async {
+        let jhs = parallel_job();
+        other_job().await;
 
-    let (root, collector) = minitrace::trace_enable(AsyncJob::Root);
-
-    {
-        let _guard = root;
-        tokio::spawn(
-            async {
-                parallel_job();
-                other_job().await;
-            }
-            .trace_task(AsyncJob::Root),
-        );
+        for jh in jhs {
+            jh.await.unwrap();
+        }
     }
+    .trace_root_future(AsyncJob::Root)
+    .await;
 
-    // waiting for all spans are finished
-    std::thread::sleep(std::time::Duration::from_millis(200));
-
-    let r = collector.collect();
-    crate::common::draw_stdout(r);
+    crate::common::draw_stdout(spans);
 }
