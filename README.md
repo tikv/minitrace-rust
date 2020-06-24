@@ -9,17 +9,17 @@ A high-performance, ergonomic timeline tracing library for Rust.
 
 ```toml
 [dependencies]
-minitrace = { git = "https://github.com/pingcap-incubator/minitrace.git" }
+minitrace = { git = "https://github.com/pingcap-incubator/minitrace-rust.git" }
 ```
 
 ### In Synchronous Code
 
 ```rust
-let (root, collector) = minitrace::trace_enable(0);
+let (root, collector) = minitrace::trace_enable(0u32);
 {
     let _parent_guard = root;
     {
-        let _child_guard = minitrace::new_span(1);  
+        let _child_guard = minitrace::new_span(1u32);  
     }
 }
 
@@ -34,33 +34,33 @@ Futures:
 use minitrace::prelude::*;
 
 let task = async {
-    let guard = minitrace::new_span(1);
+    let guard = minitrace::new_span(1u32);
     // ...
     drop(guard);
 
-    async {}.trace_async(2).await;
+    async {}.trace_async(2u32).await;
 
-    runtime::spawn(async {}.trace_task(3));
+    runtime::spawn(async {}.trace_task(3u32));
 
-    async {}.trace_async(4).await;
+    async {}.trace_async(4u32).await;
 };
 
-let (spans, _r) = runtime::block_on(task.future_trace_enable(0));
+let (spans, _r) = runtime::block_on(task.future_trace_enable(0u32));
 ```
 
 Threads:
 
 ```rust
-let (root, collector) = minitrace::trace_enable(0);
+let (root, collector) = minitrace::trace_enable(0u32);
 
-let handle = minitrace::trace_crossthread(1);
+let handle = minitrace::trace_crossthread(1u32);
 
 std::thread::spawn(move || {
     let mut handle = handle;
     let _parent_guard = handle.trace_enable();
 
     {
-        let _child_guard = minitrace::new_span(2);
+        let _child_guard = minitrace::new_span(2u32);
     }
 });
 
