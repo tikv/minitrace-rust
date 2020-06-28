@@ -22,7 +22,7 @@ mod tests;
 
 pub use minitrace_attribute::{trace, trace_async};
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub struct Span {
     pub id: u64,
     pub link: Link,
@@ -32,14 +32,14 @@ pub struct Span {
     pub event: u32,
 }
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub enum Link {
     Root,
     Parent { id: u64 },
     Continue { id: u64 },
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct SpanSet {
     /// The create time of the span set. Used to calculate
     /// the waiting time of async task.

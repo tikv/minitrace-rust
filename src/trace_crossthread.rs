@@ -11,6 +11,26 @@ pub struct CrossthreadTrace {
     inner: Option<CrossthreadTraceInner>,
 }
 
+pub struct LocalTraceGuard<'a> {
+    _local: crate::trace_local::LocalTraceGuard,
+
+    // `CrossthreadTrace` may be used to trace a `Future` task which
+    // consists of a sequence of local-tracings.
+    //
+    // We can treat the end of current local-tracing as the creation of
+    // the next local-tracing. By the moment that the next local-tracing
+    // is started, the gap time is the wait time of the next local-tracing.
+    //
+    // Here is the mutable reference for this purpose.
+    create_time_ns: &'a mut u64,
+}
+
+impl Drop for LocalTraceGuard<'_> {
+    fn drop(&mut self) {
+        *self.create_time_ns = crate::time::real_time_ns();
+    }
+}
+
 impl CrossthreadTrace {
     pub(crate) fn new(event: u32) -> Self {
         let trace_local = crate::trace_local::TRACE_LOCAL.with(|trace_local| trace_local.get());
@@ -34,7 +54,7 @@ impl CrossthreadTrace {
         }
     }
 
-    pub fn trace_enable(&mut self) -> Option<crate::trace_local::LocalTraceGuard> {
+    pub fn trace_enable(&mut self) -> Option<LocalTraceGuard> {
         if let Some(inner) = &mut self.inner {
             let now = crate::time::real_time_ns();
             if let Some((trace_guard, id)) = crate::trace_local::LocalTraceGuard::new(
@@ -45,9 +65,11 @@ impl CrossthreadTrace {
                 now,
             ) {
                 inner.link = crate::Link::Continue { id };
-                Some(trace_guard)
+                Some(LocalTraceGuard {
+                    _local: trace_guard,
+                    create_time_ns: &mut inner.create_time_ns,
+                })
             } else {
-                self.inner = None;
                 None
             }
         } else {
