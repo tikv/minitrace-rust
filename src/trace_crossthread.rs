@@ -17,10 +17,10 @@ pub struct LocalTraceGuard<'a> {
     // `CrossthreadTrace` may be used to trace a `Future` task which
     // consists of a sequence of local-tracings.
     //
-    // We can treat the end of current local-tracing as the creation of 
-    // the next local-tracing. By the moment that the next local-tracing 
+    // We can treat the end of current local-tracing as the creation of
+    // the next local-tracing. By the moment that the next local-tracing
     // is started, the gap time is the wait time of the next local-tracing.
-    // 
+    //
     // Here is the mutable reference for this purpose.
     create_time_ns: &'a mut u64,
 }
