@@ -30,16 +30,9 @@ pub(crate) fn monotonic_cycles() -> u64 {
     (*OFFSET_INSTANT).elapsed().as_nanos() as u64
 }
 
-#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
 #[inline]
 pub fn cycles_per_sec() -> u64 {
     *CYCLES_PER_SEC
-}
-
-#[cfg(not(any(target_arch = "x86", target_arch = "x86_64")))]
-#[inline]
-pub fn cycles_per_sec() -> u64 {
-    1_000_000_000
 }
 
 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
@@ -77,4 +70,10 @@ fn init_cycles_per_sec() -> u64 {
     }
 
     cycles_per_sec.round() as u64
+}
+
+#[cfg(not(any(target_arch = "x86", target_arch = "x86_64")))]
+fn init_cycles_per_sec() -> u64 {
+    // FIXME this value is a bogus placeholder
+    1_000_000_000
 }
