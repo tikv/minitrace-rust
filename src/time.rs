@@ -34,7 +34,7 @@ pub(crate) fn monotonic_cycles() -> u64 {
 
 #[inline]
 pub(crate) fn elapsed_cycles(from: u64) -> u64 {
-    monotonic_cycles().checked_sub(from).unwrap_or(0)
+    monotonic_cycles().saturating_sub(from)
 }
 
 #[inline]
