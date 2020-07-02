@@ -28,7 +28,7 @@ pub struct Span {
     pub link: Link,
     // TODO: add cargo feature to allow altering to ns
     pub begin_cycles: u64,
-    pub end_cycles: u64,
+    pub elapsed_cycles: u64,
     pub event: u32,
 }
 

@@ -27,7 +27,14 @@ pub(crate) fn monotonic_cycles() -> u64 {
 #[cfg(not(any(target_arch = "x86", target_arch = "x86_64")))]
 #[inline]
 pub(crate) fn monotonic_cycles() -> u64 {
+    // There is a virtual generic 1GHz processor ticking every ns
+    // called nanosecond clock.
     (*OFFSET_INSTANT).elapsed().as_nanos() as u64
+}
+
+#[inline]
+pub(crate) fn elapsed_cycles(from: u64) -> u64 {
+    monotonic_cycles().saturating_sub(from)
 }
 
 #[inline]
@@ -74,6 +81,6 @@ fn init_cycles_per_sec() -> u64 {
 
 #[cfg(not(any(target_arch = "x86", target_arch = "x86_64")))]
 fn init_cycles_per_sec() -> u64 {
-    // FIXME this value is a bogus placeholder
+    // The nanosecond clock ticks 1,000,000,000 times every second.
     1_000_000_000
 }

@@ -72,7 +72,7 @@ impl LocalTraceGuard {
             id,
             link,
             begin_cycles: crate::time::monotonic_cycles(),
-            end_cycles: 0,
+            elapsed_cycles: 0,
             event: event.into(),
         });
 
@@ -93,7 +93,8 @@ impl Drop for LocalTraceGuard {
     fn drop(&mut self) {
         let tl = unsafe { &mut *self.trace_local };
 
-        tl.span_stack[self.start_index].end_cycles = crate::time::monotonic_cycles();
+        tl.span_stack[self.start_index].elapsed_cycles =
+            crate::time::elapsed_cycles(tl.span_stack[self.start_index].begin_cycles);
         let id = tl.span_stack[self.start_index].id;
 
         assert_eq!(tl.enter_stack.pop().unwrap(), id, "corrupted stack");
@@ -159,7 +160,7 @@ impl SpanGuard {
             id,
             link: crate::Link::Parent { id: parent },
             begin_cycles: crate::time::monotonic_cycles(),
-            end_cycles: 0,
+            elapsed_cycles: 0,
             event,
         });
 
@@ -170,7 +171,8 @@ impl SpanGuard {
 impl Drop for SpanGuard {
     fn drop(&mut self) {
         let tl = unsafe { &mut *self.trace_local };
-        tl.span_stack[self.index].end_cycles = crate::time::monotonic_cycles();
+        tl.span_stack[self.index].elapsed_cycles =
+            crate::time::elapsed_cycles(tl.span_stack[self.index].begin_cycles);
         tl.enter_stack.pop();
     }
 }
