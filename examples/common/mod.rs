@@ -20,7 +20,7 @@ pub fn draw_stdout(spans: Vec<minitrace::SpanSet>) {
 
     for span in spans {
         let start = span.begin_cycles;
-        let end = span.end_cycles;
+        let end = start + span.elapsed_cycles;
 
         if end > max_end {
             max_end = end;
@@ -57,6 +57,7 @@ pub fn draw_stdout(spans: Vec<minitrace::SpanSet>) {
 
     let root = root.expect("can not find root");
     let root_cycles = root_cycles.unwrap();
+
     for (_, (start, _)) in spans_map.iter_mut() {
         *start -= root_cycles;
     }

@@ -5,6 +5,7 @@ use core::arch::x86::_rdtsc;
 #[cfg(target_arch = "x86_64")]
 use core::arch::x86_64::_rdtsc;
 
+
 lazy_static::lazy_static! {
     static ref CYCLES_PER_SEC: u64 = init_cycles_per_sec();
     static ref OFFSET_INSTANT: std::time::Instant = std::time::Instant::now();
@@ -27,7 +28,14 @@ pub(crate) fn monotonic_cycles() -> u64 {
 #[cfg(not(any(target_arch = "x86", target_arch = "x86_64")))]
 #[inline]
 pub(crate) fn monotonic_cycles() -> u64 {
+    // There is a virtual generic 1GHz processor ticking every ns 
+    // called nanosecond clock.
     (*OFFSET_INSTANT).elapsed().as_nanos() as u64
+}
+
+#[inline]
+pub(crate) fn elapsed_cycles(from: u64) -> u64 {
+    monotonic_cycles().checked_sub(from).unwrap_or(0)
 }
 
 #[inline]
@@ -74,6 +82,6 @@ fn init_cycles_per_sec() -> u64 {
 
 #[cfg(not(any(target_arch = "x86", target_arch = "x86_64")))]
 fn init_cycles_per_sec() -> u64 {
-    // FIXME this value is a bogus placeholder
+    // The nanosecond clock ticks 1,000,000,000 times every second.
     1_000_000_000
 }
