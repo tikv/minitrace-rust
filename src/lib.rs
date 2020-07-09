@@ -12,7 +12,6 @@ pub(crate) mod trace_crossthread;
 pub(crate) mod trace_local;
 
 pub use collector::*;
-pub use time::*;
 pub use trace::*;
 pub use trace_crossthread::*;
 pub use trace_local::*;
