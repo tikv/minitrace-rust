@@ -117,7 +117,7 @@ fn draw_rec(
 
     println!(
         "{:6.2} ms",
-        total_cycles as f64 * 1_000.0 / minitrace::cycles_per_sec() as f64
+        total_cycles as f64 * 1_000.0 / minstant::cycles_per_second() as f64
     );
 
     for id in ids {

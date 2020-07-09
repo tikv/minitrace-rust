@@ -14,6 +14,7 @@ pin-project = "0.4"
 minitrace-attribute = { path = "crates/attribute" }
 lazy_static = "1.4.0"
 crossbeam = "0.7"
+minstant = { git = "https://github.com/zhongzc/minstant.git" }
 
 [dependencies.futures_01]
 version = "0.1"
