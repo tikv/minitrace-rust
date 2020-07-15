@@ -2,7 +2,9 @@
 
 const BAR_LEN: usize = 70;
 
-pub fn draw_stdout(spans: Vec<minitrace::SpanSet>) {
+pub fn draw_stdout(trace_details: minitrace::TraceDetails) {
+    let spans = trace_details.span_sets;
+    let cycles_per_sec = trace_details.cycles_per_second;
     let mut children = std::collections::HashMap::new();
     let mut following = std::collections::HashMap::new();
     let mut follower_to_header = std::collections::HashMap::new();
@@ -70,12 +72,20 @@ pub fn draw_stdout(spans: Vec<minitrace::SpanSet>) {
 
     let factor = BAR_LEN as f64 / max_end as f64;
 
-    draw_rec(root, factor, &following, &children, &spans_map);
+    draw_rec(
+        root,
+        factor,
+        cycles_per_sec,
+        &following,
+        &children,
+        &spans_map,
+    );
 }
 
 fn draw_rec(
     cur_id: u64,
     factor: f64,
+    cycles_per_sec: u64,
     following: &std::collections::HashMap<u64, Vec<u64>>, // id -> [continue/following id]
     children_map: &std::collections::HashMap<u64, Vec<u64>>, // id -> [child_id]
     spans_map: &std::collections::HashMap<u64, (u64, u64)>, // id -> (start, duration)
@@ -117,13 +127,20 @@ fn draw_rec(
 
     println!(
         "{:6.2} ms",
-        total_cycles as f64 * 1_000.0 / minstant::cycles_per_second() as f64
+        total_cycles as f64 * 1_000.0 / cycles_per_sec as f64
     );
 
     for id in ids {
         if let Some(children) = children_map.get(&id) {
             for child in children {
-                draw_rec(*child, factor, &following, &children_map, &spans_map);
+                draw_rec(
+                    *child,
+                    factor,
+                    cycles_per_sec,
+                    &following,
+                    &children_map,
+                    &spans_map,
+                );
             }
         }
     }

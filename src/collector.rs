@@ -1,6 +1,7 @@
 // Copyright 2020 TiKV Project Authors. Licensed under Apache-2.0.
 
 pub(crate) struct CollectorInner {
+    start_time_ns: u64,
     pub(crate) queue: crossbeam::queue::SegQueue<crate::SpanSet>,
     pub(crate) closed: std::sync::atomic::AtomicBool,
 }
@@ -10,8 +11,9 @@ pub struct Collector {
 }
 
 impl Collector {
-    pub(crate) fn new() -> Self {
+    pub(crate) fn new(start_time_ns: u64) -> Self {
         let collector = std::sync::Arc::new(crate::collector::CollectorInner {
+            start_time_ns,
             queue: crossbeam::queue::SegQueue::new(),
             closed: std::sync::atomic::AtomicBool::new(false),
         });
@@ -20,8 +22,13 @@ impl Collector {
     }
 
     #[inline]
-    pub fn collect(self) -> Vec<crate::SpanSet> {
-        self.collect_once()
+    pub fn collect(self) -> crate::TraceDetails {
+        crate::TraceDetails {
+            start_time_ns: self.inner.start_time_ns,
+            elapsed_ns: crate::time::real_time_ns().saturating_sub(self.inner.start_time_ns),
+            cycles_per_second: minstant::cycles_per_second(),
+            span_sets: self.collect_once(),
+        }
     }
 
     #[inline]

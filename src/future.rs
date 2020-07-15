@@ -21,12 +21,14 @@ pub trait Instrument: Sized {
 
     #[inline]
     fn future_trace_enable<T: Into<u32>>(self, event: T) -> TraceRootFuture<Self> {
-        let collector = crate::collector::Collector::new();
+        let now = crate::time::real_time_ns();
+        let collector = crate::collector::Collector::new(now);
 
         TraceRootFuture {
             inner: self,
             event: event.into(),
             crossthread_trace: crate::trace_crossthread::CrossthreadTrace::new_root(
+                now,
                 collector.inner.clone(),
             ),
             collector: Some(collector),
@@ -40,11 +42,13 @@ pub trait Instrument: Sized {
         event: T,
     ) -> MayTraceRootFuture<Self> {
         if enable {
-            let collector = crate::collector::Collector::new();
+            let now = crate::time::real_time_ns();
+            let collector = crate::collector::Collector::new(now);
             MayTraceRootFuture {
                 inner: self,
                 event: event.into(),
                 crossthread_trace: Some(crate::trace_crossthread::CrossthreadTrace::new_root(
+                    now,
                     collector.inner.clone(),
                 )),
                 collector: Some(collector),
@@ -131,7 +135,7 @@ pub struct MayTraceRootFuture<T> {
 }
 
 impl<T: std::future::Future> std::future::Future for MayTraceRootFuture<T> {
-    type Output = (Option<Vec<crate::SpanSet>>, T::Output);
+    type Output = (Option<crate::TraceDetails>, T::Output);
 
     fn poll(
         self: std::pin::Pin<&mut Self>,
@@ -156,7 +160,7 @@ impl<T: std::future::Future> std::future::Future for MayTraceRootFuture<T> {
 }
 
 impl<T: futures_01::Future> futures_01::Future for MayTraceRootFuture<T> {
-    type Item = (Option<Vec<crate::SpanSet>>, T::Item);
+    type Item = (Option<crate::TraceDetails>, T::Item);
     type Error = T::Error;
 
     fn poll(&mut self) -> futures_01::Poll<Self::Item, Self::Error> {
@@ -196,7 +200,7 @@ pub struct TraceRootFuture<T> {
 }
 
 impl<T: std::future::Future> std::future::Future for TraceRootFuture<T> {
-    type Output = (Vec<crate::SpanSet>, T::Output);
+    type Output = (crate::TraceDetails, T::Output);
 
     fn poll(
         self: std::pin::Pin<&mut Self>,
@@ -217,7 +221,7 @@ impl<T: std::future::Future> std::future::Future for TraceRootFuture<T> {
 }
 
 impl<T: futures_01::Future> futures_01::Future for TraceRootFuture<T> {
-    type Item = (Vec<crate::SpanSet>, T::Item);
+    type Item = (crate::TraceDetails, T::Item);
     type Error = T::Error;
 
     fn poll(&mut self) -> futures_01::Poll<Self::Item, Self::Error> {

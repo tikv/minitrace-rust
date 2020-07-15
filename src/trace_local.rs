@@ -94,7 +94,7 @@ impl Drop for LocalTraceGuard {
         let tl = unsafe { &mut *self.trace_local };
 
         tl.span_stack[self.start_index].elapsed_cycles =
-            minstant::now() - tl.span_stack[self.start_index].begin_cycles;
+            minstant::now().saturating_sub(tl.span_stack[self.start_index].begin_cycles);
         let id = tl.span_stack[self.start_index].id;
 
         assert_eq!(tl.enter_stack.pop().unwrap(), id, "corrupted stack");
@@ -107,7 +107,6 @@ impl Drop for LocalTraceGuard {
             self.collector.queue.push(crate::SpanSet {
                 create_time_ns: self.create_time_ns,
                 start_time_ns: self.start_time_ns,
-                cycles_per_sec: minstant::cycles_per_second(),
                 spans: tl.span_stack[self.start_index..].to_vec(),
             });
         }
@@ -172,7 +171,7 @@ impl Drop for SpanGuard {
     fn drop(&mut self) {
         let tl = unsafe { &mut *self.trace_local };
         tl.span_stack[self.index].elapsed_cycles =
-            minstant::now() - tl.span_stack[self.index].begin_cycles;
+            minstant::now().saturating_sub(tl.span_stack[self.index].begin_cycles);
         tl.enter_stack.pop();
     }
 }
