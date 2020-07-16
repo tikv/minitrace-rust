@@ -29,7 +29,7 @@ pub fn draw_stdout(trace_details: minitrace::TraceDetails) {
         }
 
         assert_eq!(
-            spans_map.insert(span.id, (start, end - start)),
+            spans_map.insert(span.id, (start, span.elapsed_cycles)),
             None,
             "duplicated id {:#?}",
             span.id
@@ -66,8 +66,7 @@ pub fn draw_stdout(trace_details: minitrace::TraceDetails) {
     max_end -= root_cycles;
 
     if max_end == 0 {
-        println!("Insufficient precision: total cost time < 1 ms");
-        return;
+        panic!("Insufficient precision");
     }
 
     let factor = BAR_LEN as f64 / max_end as f64;
