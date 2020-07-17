@@ -27,8 +27,8 @@ pub struct TraceDetails {
     /// when calling `trace_enable`
     pub start_time_ns: u64,
 
-    /// The elapsed of the whole tracing process this is the time
-    /// when calling `collect`
+    /// The elapsed of the whole tracing process that is the time diff
+    /// from calling `trace_enable` to calling `collect`
     pub elapsed_ns: u64,
 
     /// For conversion of cycles -> ns
