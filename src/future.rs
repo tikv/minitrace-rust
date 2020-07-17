@@ -6,7 +6,8 @@ pub trait Instrument: Sized {
     fn trace_task<T: Into<u32>>(self, event: T) -> TraceSpawned<Self> {
         TraceSpawned {
             inner: self,
-            crossthread_trace: crate::trace::trace_crossthread(event),
+            event: event.into(),
+            crossthread_trace: crate::trace::trace_crossthread(),
         }
     }
 
@@ -24,8 +25,8 @@ pub trait Instrument: Sized {
 
         TraceRootFuture {
             inner: self,
+            event: event.into(),
             crossthread_trace: crate::trace_crossthread::CrossthreadTrace::new_root(
-                event.into(),
                 collector.inner.clone(),
             ),
             collector: Some(collector),
@@ -42,8 +43,8 @@ pub trait Instrument: Sized {
             let collector = crate::collector::Collector::new();
             MayTraceRootFuture {
                 inner: self,
+                event: event.into(),
                 crossthread_trace: Some(crate::trace_crossthread::CrossthreadTrace::new_root(
-                    event.into(),
                     collector.inner.clone(),
                 )),
                 collector: Some(collector),
@@ -51,6 +52,7 @@ pub trait Instrument: Sized {
         } else {
             MayTraceRootFuture {
                 inner: self,
+                event: event.into(),
                 collector: None,
                 crossthread_trace: None,
             }
@@ -62,6 +64,7 @@ pub trait Instrument: Sized {
 pub struct TraceSpawned<T> {
     #[pin]
     inner: T,
+    event: u32,
     crossthread_trace: crate::trace_crossthread::CrossthreadTrace,
 }
 
@@ -73,7 +76,7 @@ impl<T: std::future::Future> std::future::Future for TraceSpawned<T> {
         cx: &mut std::task::Context<'_>,
     ) -> std::task::Poll<Self::Output> {
         let this = self.project();
-        let _guard = this.crossthread_trace.trace_enable();
+        let _guard = this.crossthread_trace.trace_enable(*this.event);
         this.inner.poll(cx)
     }
 }
@@ -83,7 +86,7 @@ impl<T: futures_01::Future> futures_01::Future for TraceSpawned<T> {
     type Error = T::Error;
 
     fn poll(&mut self) -> futures_01::Poll<Self::Item, Self::Error> {
-        let _guard = self.crossthread_trace.trace_enable();
+        let _guard = self.crossthread_trace.trace_enable(self.event);
         self.inner.poll()
     }
 }
@@ -122,6 +125,7 @@ impl<T: futures_01::Future> futures_01::Future for TraceWrapped<T> {
 pub struct MayTraceRootFuture<T> {
     #[pin]
     inner: T,
+    event: u32,
     collector: Option<crate::collector::Collector>,
     crossthread_trace: Option<crate::trace_crossthread::CrossthreadTrace>,
 }
@@ -134,10 +138,11 @@ impl<T: std::future::Future> std::future::Future for MayTraceRootFuture<T> {
         cx: &mut std::task::Context<'_>,
     ) -> std::task::Poll<Self::Output> {
         let this = self.project();
+        let event = *this.event;
         let guard = this
             .crossthread_trace
             .as_mut()
-            .and_then(|a| a.trace_enable());
+            .and_then(|a| a.trace_enable(event));
         let r = this.inner.poll(cx);
 
         let r = match r {
@@ -155,10 +160,11 @@ impl<T: futures_01::Future> futures_01::Future for MayTraceRootFuture<T> {
     type Error = T::Error;
 
     fn poll(&mut self) -> futures_01::Poll<Self::Item, Self::Error> {
+        let event = self.event;
         let guard = self
             .crossthread_trace
             .as_mut()
-            .and_then(|a| a.trace_enable());
+            .and_then(|a| a.trace_enable(event));
         let r = self.inner.poll();
 
         let r = match r {
@@ -184,6 +190,7 @@ impl<T: futures_01::Future> futures_01::Future for MayTraceRootFuture<T> {
 pub struct TraceRootFuture<T> {
     #[pin]
     inner: T,
+    event: u32,
     collector: Option<crate::collector::Collector>,
     crossthread_trace: crate::trace_crossthread::CrossthreadTrace,
 }
@@ -196,7 +203,7 @@ impl<T: std::future::Future> std::future::Future for TraceRootFuture<T> {
         cx: &mut std::task::Context<'_>,
     ) -> std::task::Poll<Self::Output> {
         let this = self.project();
-        let guard = this.crossthread_trace.trace_enable();
+        let guard = this.crossthread_trace.trace_enable(*this.event);
         let r = this.inner.poll(cx);
 
         let r = match r {
@@ -214,7 +221,7 @@ impl<T: futures_01::Future> futures_01::Future for TraceRootFuture<T> {
     type Error = T::Error;
 
     fn poll(&mut self) -> futures_01::Poll<Self::Item, Self::Error> {
-        let guard = self.crossthread_trace.trace_enable();
+        let guard = self.crossthread_trace.trace_enable(self.event);
         let r = self.inner.poll();
 
         let r = match r {

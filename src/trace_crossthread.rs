@@ -3,7 +3,6 @@
 struct CrossthreadTraceInner {
     collector: std::sync::Arc<crate::collector::CollectorInner>,
     link: crate::Link,
-    event: u32,
     create_time_ns: u64,
 }
 
@@ -32,7 +31,7 @@ impl Drop for LocalTraceGuard<'_> {
 }
 
 impl CrossthreadTrace {
-    pub(crate) fn new(event: u32) -> Self {
+    pub(crate) fn new() -> Self {
         let trace_local = crate::trace_local::TRACE_LOCAL.with(|trace_local| trace_local.get());
         let tl = unsafe { &mut *trace_local };
 
@@ -48,18 +47,17 @@ impl CrossthreadTrace {
             inner: Some(CrossthreadTraceInner {
                 collector,
                 link,
-                event,
                 create_time_ns: crate::time::real_time_ns(),
             }),
         }
     }
 
-    pub fn trace_enable(&mut self) -> Option<LocalTraceGuard> {
+    pub fn trace_enable<T: Into<u32>>(&mut self, event: T) -> Option<LocalTraceGuard> {
         if let Some(inner) = &mut self.inner {
             let now = crate::time::real_time_ns();
             if let Some((trace_guard, id)) = crate::trace_local::LocalTraceGuard::new(
                 inner.collector.clone(),
-                inner.event,
+                event.into(),
                 inner.link,
                 inner.create_time_ns,
                 now,
@@ -77,15 +75,11 @@ impl CrossthreadTrace {
         }
     }
 
-    pub(crate) fn new_root(
-        event: u32,
-        collector: std::sync::Arc<crate::collector::CollectorInner>,
-    ) -> Self {
+    pub(crate) fn new_root(collector: std::sync::Arc<crate::collector::CollectorInner>) -> Self {
         Self {
             inner: Some(CrossthreadTraceInner {
                 collector,
                 link: crate::Link::Root,
-                event,
                 create_time_ns: crate::time::real_time_ns(),
             }),
         }
