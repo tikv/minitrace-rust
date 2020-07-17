@@ -75,9 +75,7 @@ impl CrossthreadTrace {
         }
     }
 
-    pub(crate) fn new_root(
-        collector: std::sync::Arc<crate::collector::CollectorInner>,
-    ) -> Self {
+    pub(crate) fn new_root(collector: std::sync::Arc<crate::collector::CollectorInner>) -> Self {
         Self {
             inner: Some(CrossthreadTraceInner {
                 collector,
