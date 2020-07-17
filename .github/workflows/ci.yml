@@ -35,3 +35,7 @@ jobs:
       run: cargo test --verbose --all
     - name: Run benches
       run: cargo bench --verbose --all
+    - name: Run examples
+      run: |
+        cargo run --example asynchronous --verbose
+        cargo run --example synchronous --verbose

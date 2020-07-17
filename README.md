@@ -53,11 +53,11 @@ Threads:
 ```rust
 let (root, collector) = minitrace::trace_enable(0u32);
 
-let handle = minitrace::trace_crossthread(1u32);
+let handle = minitrace::trace_crossthread();
 
-std::thread::spawn(move || {
+let th = std::thread::spawn(move || {
     let mut handle = handle;
-    let _parent_guard = handle.trace_enable();
+    let _parent_guard = handle.trace_enable(1u32);
 
     {
         let _child_guard = minitrace::new_span(2u32);
@@ -66,6 +66,7 @@ std::thread::spawn(move || {
 
 drop(root);
 
+th.join().unwrap();
 let spans = collector.collect();
 ```
 
