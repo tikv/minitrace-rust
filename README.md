@@ -23,7 +23,7 @@ let (root, collector) = minitrace::trace_enable(0u32);
     }
 }
 
-let spans = collector.collect();
+let trace_details = collector.collect();
 ```
 
 ### In Asynchronous Code
@@ -35,17 +35,23 @@ use minitrace::prelude::*;
 
 let task = async {
     let guard = minitrace::new_span(1u32);
-    // ...
+    // current future ...
     drop(guard);
 
-    async {}.trace_async(2u32).await;
+    async {
+        // current future ...
+    }.trace_async(2u32).await;
 
-    runtime::spawn(async {}.trace_task(3u32));
+    runtime::spawn(async {
+        // new future ...
+    }.trace_task(3u32));
 
-    async {}.trace_async(4u32).await;
+    async {
+        // current future ...
+    }.trace_async(4u32).await;
 };
 
-let (spans, _r) = runtime::block_on(task.future_trace_enable(0u32));
+let (trace_details, value) = runtime::block_on(task.future_trace_enable(0u32));
 ```
 
 Threads:
@@ -67,7 +73,7 @@ let th = std::thread::spawn(move || {
 drop(root);
 
 th.join().unwrap();
-let spans = collector.collect();
+let trace_details = collector.collect();
 ```
 
 

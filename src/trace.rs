@@ -8,9 +8,9 @@ pub fn trace_enable<T: Into<u32>>(
     crate::trace_local::LocalTraceGuard,
     crate::collector::Collector,
 ) {
-    let collector = crate::collector::Collector::new();
-
     let now = crate::time::real_time_ns();
+    let collector = crate::collector::Collector::new(now);
+
     let (trace_guard, _) = crate::trace_local::LocalTraceGuard::new(
         collector.inner.clone(),
         event,

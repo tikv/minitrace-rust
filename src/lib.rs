@@ -21,6 +21,23 @@ mod tests;
 
 pub use minitrace_attribute::{trace, trace_async};
 
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub struct TraceDetails {
+    /// The start time of the whole tracing process that is the time
+    /// when calling `trace_enable`
+    pub start_time_ns: u64,
+
+    /// The elapsed of the whole tracing process that is the time diff
+    /// from calling `trace_enable` to calling `collect`
+    pub elapsed_ns: u64,
+
+    /// For conversion of cycles -> ns
+    pub cycles_per_second: u64,
+
+    /// Spanset collection
+    pub span_sets: Vec<SpanSet>,
+}
+
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub struct Span {
     pub id: u64,
@@ -47,8 +64,6 @@ pub struct SpanSet {
     /// The time corresponding to the `begin_cycles` of the first span
     pub start_time_ns: u64,
 
-    /// For conversion of cycles -> ns
-    pub cycles_per_sec: u64,
-
+    /// Span collection
     pub spans: Vec<Span>,
 }
