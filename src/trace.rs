@@ -51,3 +51,8 @@ pub fn new_span<T: Into<u32>>(event: T) -> Option<crate::trace_local::SpanGuard>
 pub fn trace_crossthread() -> crate::trace_crossthread::CrossthreadTrace {
     crate::trace_crossthread::CrossthreadTrace::new()
 }
+
+#[inline]
+pub fn property(p: &[u8]) {
+    crate::trace_local::append_property(p);
+}

@@ -55,7 +55,11 @@ where
 
 fn check_clear() {
     check_trace_local(|tl| {
-        tl.spans.is_empty() && tl.enter_stack.is_empty() && tl.cur_collector.is_none()
+        tl.spans.is_empty()
+            && tl.enter_stack.is_empty()
+            && tl.cur_collector.is_none()
+            && tl.property_id_to_len.is_empty()
+            && tl.property_payload.is_empty()
     });
 }
 
@@ -246,5 +250,47 @@ fn trace_collect_ahead() {
     let spans = rebuild_relation_by_event(spans.span_sets);
     assert_eq!(spans.len(), 2);
     assert_eq!(&spans, &[(0, None), (1, Some(0)),]);
+    check_clear();
+}
+
+#[test]
+fn test_payload() {
+    let (root, collector) = crate::trace_enable(0u32);
+    crate::property(b"123");
+
+    let g1 = crate::new_span(1u32);
+    let g2 = crate::new_span(2u32);
+    crate::property(b"abc");
+    crate::property(b"");
+
+    let g3 = crate::new_span(2u32);
+    crate::property(b"edf");
+
+    drop(g3);
+    drop(g2);
+    drop(g1);
+    drop(root);
+
+    let trace_details = collector.collect();
+    assert_eq!(trace_details.span_sets.len(), 1);
+
+    let span_set = trace_details.span_sets[0].clone();
+    assert_eq!(span_set.spans.len(), 4);
+    assert_eq!(span_set.properties.span_id_to_len.len(), 4);
+    assert_eq!(span_set.properties.payload.len(), 9);
+    assert_eq!(span_set.properties.payload, b"123abcedf");
+
+    for (x, y) in [
+        (span_set.spans[0].id, 3),
+        (span_set.spans[2].id, 3),
+        (span_set.spans[2].id, 0),
+        (span_set.spans[3].id, 3),
+    ]
+    .iter()
+    .zip(span_set.properties.span_id_to_len)
+    {
+        assert_eq!(*x, y);
+    }
+
     check_clear();
 }

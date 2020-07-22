@@ -18,12 +18,21 @@ thread_local! {
 }
 
 pub(crate) struct TraceLocal {
+    /// local span collector
     pub(crate) spans: Vec<crate::Span>,
+
+    /// for parent-child relation contruction
     pub(crate) enter_stack: Vec<SpanId>,
+
+    /// local property collector
     pub(crate) property_id_to_len: Vec<(SpanId, u64)>,
     pub(crate) property_payload: Vec<u8>,
+
+    /// for id contruction
     pub(crate) id_prefix: u32,
     pub(crate) id_suffix: u32,
+
+    /// shared tracing collector
     pub(crate) cur_collector: Option<std::sync::Arc<crate::collector::CollectorInner>>,
 }
 
@@ -111,7 +120,7 @@ impl Drop for LocalTraceGuard {
         tl.spans[self.span_start_index].elapsed_cycles =
             minstant::now().saturating_sub(tl.spans[self.span_start_index].begin_cycles);
 
-        // check if enter stack is corrupted
+        // check if the enter stack is corrupted
         let id = tl.spans[self.span_start_index].id;
         assert_eq!(tl.enter_stack.pop().unwrap(), id, "corrupted stack");
 
@@ -137,7 +146,7 @@ impl Drop for LocalTraceGuard {
             });
         }
 
-        // shrink all vectors in case they take up too much memory
+        // try to shrink all vectors in case they take up too much memory
         if tl.spans.capacity() > INIT_NORMAL_LEN && tl.spans.len() < INIT_NORMAL_LEN / 2 {
             tl.spans.shrink_to(INIT_NORMAL_LEN);
         }
@@ -211,4 +220,20 @@ impl Drop for SpanGuard {
             minstant::now().saturating_sub(tl.spans[self.index].begin_cycles);
         tl.enter_stack.pop();
     }
+}
+
+pub(crate) fn append_property(payload: &[u8]) {
+    let trace_local = TRACE_LOCAL.with(|trace_local| trace_local.get());
+    let tl = unsafe { &mut *trace_local };
+
+    if tl.cur_collector.is_none() || tl.enter_stack.is_empty() {
+        return;
+    }
+
+    let cur_span_id = *tl.enter_stack.last().unwrap();
+    let payload_len = payload.len();
+
+    tl.property_id_to_len
+        .push((cur_span_id, payload_len as u64));
+    tl.property_payload.extend_from_slice(payload);
 }
