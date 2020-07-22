@@ -146,6 +146,11 @@ impl Drop for LocalTraceGuard {
             });
         }
 
+        tl.spans.truncate(self.span_start_index);
+        tl.property_id_to_len.truncate(self.property_start_index);
+        tl.property_payload
+            .truncate(self.property_payload_start_index);
+
         // try to shrink all vectors in case they take up too much memory
         if tl.spans.capacity() > INIT_NORMAL_LEN && tl.spans.len() < INIT_NORMAL_LEN / 2 {
             tl.spans.shrink_to(INIT_NORMAL_LEN);
