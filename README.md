@@ -15,14 +15,15 @@ minitrace = { git = "https://github.com/pingcap-incubator/minitrace-rust.git" }
 ### In Synchronous Code
 
 ```rust
-let (root, collector) = minitrace::trace_enable(0u32);
+let (root_guard, collector) = minitrace::trace_enable(0u32);
+minitrace::property(b"tracing started");
+
 {
-    let _parent_guard = root;
-    {
-        let _child_guard = minitrace::new_span(1u32);  
-    }
+    let _child_guard = minitrace::new_span(1u32);
+    minitrace::property(b"in child");
 }
 
+drop(root_guard);
 let trace_details = collector.collect();
 ```
 
@@ -36,6 +37,9 @@ use minitrace::prelude::*;
 let task = async {
     let guard = minitrace::new_span(1u32);
     // current future ...
+
+    // should drop here or it would fail compilation
+    // because local guards cannot cross-thread.
     drop(guard);
 
     async {
@@ -44,6 +48,7 @@ let task = async {
 
     runtime::spawn(async {
         // new future ...
+        minitrace::property(b"spawned to some runtime");
     }.trace_task(3u32));
 
     async {
