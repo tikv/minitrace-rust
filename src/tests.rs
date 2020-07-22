@@ -95,7 +95,7 @@ fn trace_async_basic() {
     let (root, collector) = crate::trace_enable(0u32);
 
     let wg = crossbeam::sync::WaitGroup::new();
-
+    let mut join_handles = vec![];
     {
         let _guard = root;
 
@@ -105,22 +105,26 @@ fn trace_async_basic() {
             let dummy = dummy().trace_task(i);
             let wg = wg.clone();
 
-            std::thread::spawn(move || {
+            join_handles.push(std::thread::spawn(move || {
                 futures_03::executor::block_on(dummy);
                 drop(wg);
-            });
+
+                check_clear();
+            }));
         }
 
         for i in 6..=10u32 {
             let handle = crate::trace_crossthread();
             let wg = wg.clone();
 
-            std::thread::spawn(move || {
+            join_handles.push(std::thread::spawn(move || {
                 let mut handle = handle;
                 let guard = handle.trace_enable(i);
                 drop(guard);
                 drop(wg);
-            });
+
+                check_clear();
+            }));
         }
     }
 
@@ -145,7 +149,9 @@ fn trace_async_basic() {
             (10, Some(0))
         ]
     );
+
     check_clear();
+    join_handles.into_iter().for_each(|jh| jh.join().unwrap());
 }
 
 #[test]
@@ -256,7 +262,7 @@ fn trace_collect_ahead() {
 }
 
 #[test]
-fn test_property_single_thread() {
+fn test_property_sync() {
     let (root, collector) = crate::trace_enable(0u32);
     crate::property(b"123");
 
@@ -302,6 +308,7 @@ fn test_property_async() {
     let (root, collector) = crate::trace_enable(0u32);
 
     let wg = crossbeam::sync::WaitGroup::new();
+    let mut join_handles = vec![];
 
     {
         let _guard = root;
@@ -311,13 +318,15 @@ fn test_property_async() {
             let handle = crate::trace_crossthread();
             let wg = wg.clone();
 
-            std::thread::spawn(move || {
+            join_handles.push(std::thread::spawn(move || {
                 let mut handle = handle;
                 let guard = handle.trace_enable(i);
                 crate::property(&i.to_be_bytes());
                 drop(guard);
                 drop(wg);
-            });
+
+                check_clear();
+            }));
         }
     }
 
@@ -335,4 +344,5 @@ fn test_property_async() {
     }
 
     check_clear();
+    join_handles.into_iter().for_each(|jh| jh.join().unwrap());
 }
