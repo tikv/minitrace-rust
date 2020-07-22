@@ -55,7 +55,7 @@ where
 
 fn check_clear() {
     check_trace_local(|tl| {
-        tl.span_stack.is_empty() && tl.enter_stack.is_empty() && tl.cur_collector.is_none()
+        tl.spans.is_empty() && tl.enter_stack.is_empty() && tl.cur_collector.is_none()
     });
 }
 

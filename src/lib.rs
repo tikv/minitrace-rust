@@ -55,9 +55,19 @@ pub enum Link {
     Continue { id: u64 },
 }
 
+/// span id -> property
+/// 10      -> b"123"
+/// 10      -> b"!@$#$%"
+/// 12      -> b"abcd"
+/// 14      -> b"xyz"
+///
+/// would be stored as:
+///
+/// span_id_to_len: [(10, 3), (10, 6), (12, 4), (14, 3)]
+/// payload: b"123!@$#$%abcdxyz"
 #[derive(Debug, Clone)]
-pub struct Property {
-    pub span_id: u64,
+pub struct Properties {
+    pub span_id_to_len: Vec<(u64, u64)>,
     pub payload: Vec<u8>,
 }
 
@@ -74,5 +84,5 @@ pub struct SpanSet {
     pub spans: Vec<Span>,
 
     /// Property collection
-    pub properties: Vec<Property>,
+    pub properties: Properties,
 }
