@@ -58,8 +58,7 @@ pub enum Link {
 #[derive(Debug, Clone)]
 pub struct Property {
     pub span_id: u64,
-    pub key: Vec<u8>,
-    pub value: Vec<u8>,
+    pub payload: Vec<u8>,
 }
 
 #[derive(Debug, Clone)]
