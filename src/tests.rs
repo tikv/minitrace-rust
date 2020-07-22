@@ -233,7 +233,7 @@ fn trace_collect_ahead() {
     let wg = crossbeam::sync::WaitGroup::new();
     let wg1 = wg.clone();
     let handle = crate::trace_crossthread();
-    std::thread::spawn(move || {
+    let jh = std::thread::spawn(move || {
         let mut handle = handle;
         let guard = handle.trace_enable(2u32);
 
@@ -251,6 +251,8 @@ fn trace_collect_ahead() {
     assert_eq!(spans.len(), 2);
     assert_eq!(&spans, &[(0, None), (1, Some(0)),]);
     check_clear();
+
+    jh.join().unwrap();
 }
 
 #[test]

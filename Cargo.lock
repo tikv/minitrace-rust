@@ -549,7 +549,7 @@ dependencies = [
 [[package]]
 name = "minstant"
 version = "0.0.0"
-source = "git+https://github.com/zhongzc/minstant.git#3b40d95c7879b132778a8058d50fbc70b531fef8"
+source = "git+https://github.com/zhongzc/minstant.git#48a631c19532d05e32420262779a51621b509021"
 dependencies = [
  "lazy_static",
  "libc",

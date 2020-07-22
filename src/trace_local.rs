@@ -124,17 +124,17 @@ impl Drop for LocalTraceGuard {
         let id = tl.spans[self.span_start_index].id;
         assert_eq!(tl.enter_stack.pop().unwrap(), id, "corrupted stack");
 
+        let spans = tl.spans.split_off(self.span_start_index);
+        let property_id_to_len = tl.property_id_to_len.split_off(self.property_start_index);
+        let property_payload = tl
+            .property_payload
+            .split_off(self.property_payload_start_index);
+
         if !self
             .collector
             .closed
             .load(std::sync::atomic::Ordering::SeqCst)
         {
-            let spans = tl.spans.split_off(self.span_start_index);
-            let property_id_to_len = tl.property_id_to_len.split_off(self.property_start_index);
-            let property_payload = tl
-                .property_payload
-                .split_off(self.property_payload_start_index);
-
             self.collector.queue.push(crate::SpanSet {
                 create_time_ns: self.create_time_ns,
                 start_time_ns: self.start_time_ns,
