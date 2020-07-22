@@ -4,17 +4,13 @@ mod common;
 
 fn func1(i: u64) {
     let _guard = minitrace::new_span(0u32);
-    for _ in 0..i * 1000 {
-        std::process::id();
-    }
+    std::thread::sleep(std::time::Duration::from_millis(i));
     func2(i);
 }
 
 #[minitrace::trace(0u32)]
 fn func2(i: u64) {
-    for _ in 0..i * 1000 {
-        std::process::id();
-    }
+    std::thread::sleep(std::time::Duration::from_millis(i));
 }
 
 fn main() {

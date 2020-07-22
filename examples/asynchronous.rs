@@ -27,9 +27,7 @@ fn parallel_job() -> Vec<tokio::task::JoinHandle<()>> {
 }
 
 async fn iter_job(iter: u64) {
-    for _ in 0..iter * 10000 {
-        std::process::id();
-    }
+    std::thread::sleep(std::time::Duration::from_millis(iter * 10));
     tokio::task::yield_now().await;
     other_job().await;
 }
@@ -40,10 +38,7 @@ async fn other_job() {
         if i == 10 {
             tokio::task::yield_now().await;
         }
-
-        for _ in 0..1000 {
-            std::process::id();
-        }
+        std::thread::sleep(std::time::Duration::from_millis(1));
     }
 }
 
