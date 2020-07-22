@@ -55,7 +55,11 @@ where
 
 fn check_clear() {
     check_trace_local(|tl| {
-        tl.span_stack.is_empty() && tl.enter_stack.is_empty() && tl.cur_collector.is_none()
+        tl.spans.is_empty()
+            && tl.enter_stack.is_empty()
+            && tl.cur_collector.is_none()
+            && tl.property_id_to_len.is_empty()
+            && tl.property_payload.is_empty()
     });
 }
 
@@ -69,8 +73,8 @@ fn trace_basic() {
         }
     }
 
-    let spans = collector.collect();
-    let spans = rebuild_relation_by_event(spans.span_sets);
+    let trace_details = collector.collect();
+    let spans = rebuild_relation_by_event(trace_details.span_sets);
 
     assert_eq!(spans.len(), 2);
     assert_eq!(&spans, &[(0, None), (1, Some(0))]);
@@ -91,7 +95,7 @@ fn trace_async_basic() {
     let (root, collector) = crate::trace_enable(0u32);
 
     let wg = crossbeam::sync::WaitGroup::new();
-
+    let mut join_handles = vec![];
     {
         let _guard = root;
 
@@ -101,28 +105,32 @@ fn trace_async_basic() {
             let dummy = dummy().trace_task(i);
             let wg = wg.clone();
 
-            std::thread::spawn(move || {
+            join_handles.push(std::thread::spawn(move || {
                 futures_03::executor::block_on(dummy);
                 drop(wg);
-            });
+
+                check_clear();
+            }));
         }
 
         for i in 6..=10u32 {
             let handle = crate::trace_crossthread();
             let wg = wg.clone();
 
-            std::thread::spawn(move || {
+            join_handles.push(std::thread::spawn(move || {
                 let mut handle = handle;
                 let guard = handle.trace_enable(i);
                 drop(guard);
                 drop(wg);
-            });
+
+                check_clear();
+            }));
         }
     }
 
     wg.wait();
-    let spans = collector.collect();
-    let spans = rebuild_relation_by_event(spans.span_sets);
+    let trace_details = collector.collect();
+    let spans = rebuild_relation_by_event(trace_details.span_sets);
 
     assert_eq!(spans.len(), 11);
     assert_eq!(
@@ -141,7 +149,9 @@ fn trace_async_basic() {
             (10, Some(0))
         ]
     );
+
     check_clear();
+    join_handles.into_iter().for_each(|jh| jh.join().unwrap());
 }
 
 #[test]
@@ -155,8 +165,8 @@ fn trace_wide_function() {
         }
     }
 
-    let spans = collector.collect();
-    let spans = rebuild_relation_by_event(spans.span_sets);
+    let trace_details = collector.collect();
+    let spans = rebuild_relation_by_event(trace_details.span_sets);
 
     assert_eq!(spans.len(), 11);
     assert_eq!(
@@ -195,8 +205,8 @@ fn trace_deep_function() {
         sync_spanned_rec_event_step_to_1(10);
     }
 
-    let spans = collector.collect();
-    let spans = rebuild_relation_by_event(spans.span_sets);
+    let trace_details = collector.collect();
+    let spans = rebuild_relation_by_event(trace_details.span_sets);
 
     assert_eq!(spans.len(), 11);
     assert_eq!(
@@ -229,7 +239,7 @@ fn trace_collect_ahead() {
     let wg = crossbeam::sync::WaitGroup::new();
     let wg1 = wg.clone();
     let handle = crate::trace_crossthread();
-    std::thread::spawn(move || {
+    let jh = std::thread::spawn(move || {
         let mut handle = handle;
         let guard = handle.trace_enable(2u32);
 
@@ -240,11 +250,99 @@ fn trace_collect_ahead() {
     });
 
     drop(root);
-    let spans = collector.collect();
+    let trace_details = collector.collect();
     drop(wg);
 
-    let spans = rebuild_relation_by_event(spans.span_sets);
+    let spans = rebuild_relation_by_event(trace_details.span_sets);
     assert_eq!(spans.len(), 2);
     assert_eq!(&spans, &[(0, None), (1, Some(0)),]);
     check_clear();
+
+    jh.join().unwrap();
+}
+
+#[test]
+fn test_property_sync() {
+    let (root, collector) = crate::trace_enable(0u32);
+    crate::property(b"123");
+
+    let g1 = crate::new_span(1u32);
+    let g2 = crate::new_span(2u32);
+    crate::property(b"abc");
+    crate::property(b"");
+
+    let g3 = crate::new_span(2u32);
+    crate::property(b"edf");
+
+    drop(g3);
+    drop(g2);
+    drop(g1);
+    drop(root);
+
+    let trace_details = collector.collect();
+    assert_eq!(trace_details.span_sets.len(), 1);
+
+    let span_set = trace_details.span_sets[0].clone();
+    assert_eq!(span_set.spans.len(), 4);
+    assert_eq!(span_set.properties.span_id_to_len.len(), 4);
+    assert_eq!(span_set.properties.payload.len(), 9);
+    assert_eq!(span_set.properties.payload, b"123abcedf");
+
+    for (x, y) in [
+        (span_set.spans[0].id, 3),
+        (span_set.spans[2].id, 3),
+        (span_set.spans[2].id, 0),
+        (span_set.spans[3].id, 3),
+    ]
+    .iter()
+    .zip(span_set.properties.span_id_to_len)
+    {
+        assert_eq!(*x, y);
+    }
+
+    check_clear();
+}
+
+#[test]
+fn test_property_async() {
+    let (root, collector) = crate::trace_enable(0u32);
+
+    let wg = crossbeam::sync::WaitGroup::new();
+    let mut join_handles = vec![];
+
+    {
+        let _guard = root;
+        crate::property(&0u32.to_be_bytes());
+
+        for i in 1..=5u32 {
+            let handle = crate::trace_crossthread();
+            let wg = wg.clone();
+
+            join_handles.push(std::thread::spawn(move || {
+                let mut handle = handle;
+                let guard = handle.trace_enable(i);
+                crate::property(&i.to_be_bytes());
+                drop(guard);
+                drop(wg);
+
+                check_clear();
+            }));
+        }
+    }
+
+    wg.wait();
+
+    let trace_details = collector.collect();
+    for span_set in trace_details.span_sets {
+        assert_eq!(span_set.spans.len(), 1);
+        let id = span_set.spans[0].id;
+        let event = span_set.spans[0].event;
+
+        assert_eq!(span_set.properties.span_id_to_len.len(), 1);
+        assert_eq!(span_set.properties.span_id_to_len[0], (id, 4));
+        assert_eq!(span_set.properties.payload, event.to_be_bytes());
+    }
+
+    check_clear();
+    join_handles.into_iter().for_each(|jh| jh.join().unwrap());
 }

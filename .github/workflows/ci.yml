@@ -30,12 +30,12 @@ jobs:
     - name: Lints
       run: cargo clippy --all-targets --all-features -- --deny warnings
     - name: Build
-      run: cargo build --verbose --all
+      run: cargo build --workspace --all-targets
     - name: Run tests
-      run: cargo test --verbose --all
+      run: cargo test --workspace --all-targets
     - name: Run benches
-      run: cargo bench --verbose --all
+      run: cargo bench --workspace --all-targets
     - name: Run examples
       run: |
-        cargo run --example asynchronous --verbose
-        cargo run --example synchronous --verbose
+        cargo run --example asynchronous
+        cargo run --example synchronous

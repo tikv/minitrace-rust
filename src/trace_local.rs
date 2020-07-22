@@ -2,10 +2,15 @@
 
 type SpanId = u64;
 
+const INIT_NORMAL_LEN: usize = 1024;
+const INIT_BYTES_LEN: usize = 16384;
+
 thread_local! {
     pub(crate) static TRACE_LOCAL: std::cell::UnsafeCell<TraceLocal> = std::cell::UnsafeCell::new(TraceLocal {
-        span_stack: Vec::with_capacity(1024),
-        enter_stack: Vec::with_capacity(1024),
+        spans: Vec::with_capacity(INIT_NORMAL_LEN),
+        enter_stack: Vec::with_capacity(INIT_NORMAL_LEN),
+        property_id_to_len: Vec::with_capacity(INIT_NORMAL_LEN),
+        property_payload: Vec::with_capacity(INIT_BYTES_LEN),
         id_prefix: next_global_id_prefix(),
         id_suffix: 0,
         cur_collector: None,
@@ -13,10 +18,21 @@ thread_local! {
 }
 
 pub(crate) struct TraceLocal {
-    pub(crate) span_stack: Vec<crate::Span>,
+    /// local span collector
+    pub(crate) spans: Vec<crate::Span>,
+
+    /// for parent-child relation contruction
     pub(crate) enter_stack: Vec<SpanId>,
+
+    /// local property collector
+    pub(crate) property_id_to_len: Vec<(SpanId, u64)>,
+    pub(crate) property_payload: Vec<u8>,
+
+    /// for id contruction
     pub(crate) id_prefix: u32,
     pub(crate) id_suffix: u32,
+
+    /// shared tracing collector
     pub(crate) cur_collector: Option<std::sync::Arc<crate::collector::CollectorInner>>,
 }
 
@@ -30,9 +46,12 @@ fn next_global_id_prefix() -> u32 {
 pub struct LocalTraceGuard {
     collector: std::sync::Arc<crate::collector::CollectorInner>,
     trace_local: *mut TraceLocal,
-    start_index: usize,
     create_time_ns: u64,
     start_time_ns: u64,
+
+    span_start_index: usize,
+    property_start_index: usize,
+    property_payload_start_index: usize,
 }
 
 impl !Sync for LocalTraceGuard {}
@@ -66,9 +85,11 @@ impl LocalTraceGuard {
         };
 
         tl.enter_stack.push(id);
-        let start_index = tl.span_stack.len();
+        let span_start_index = tl.spans.len();
+        let property_start_index = tl.property_id_to_len.len();
+        let property_payload_start_index = tl.property_payload.len();
 
-        tl.span_stack.push(crate::Span {
+        tl.spans.push(crate::Span {
             id,
             link,
             begin_cycles: minstant::now(),
@@ -80,7 +101,9 @@ impl LocalTraceGuard {
             Self {
                 collector,
                 trace_local,
-                start_index,
+                span_start_index,
+                property_start_index,
+                property_payload_start_index,
                 create_time_ns,
                 start_time_ns,
             },
@@ -93,10 +116,12 @@ impl Drop for LocalTraceGuard {
     fn drop(&mut self) {
         let tl = unsafe { &mut *self.trace_local };
 
-        tl.span_stack[self.start_index].elapsed_cycles =
-            minstant::now().saturating_sub(tl.span_stack[self.start_index].begin_cycles);
-        let id = tl.span_stack[self.start_index].id;
+        // fill the elapsed cycles of the first span
+        tl.spans[self.span_start_index].elapsed_cycles =
+            minstant::now().saturating_sub(tl.spans[self.span_start_index].begin_cycles);
 
+        // check if the enter stack is corrupted
+        let id = tl.spans[self.span_start_index].id;
         assert_eq!(tl.enter_stack.pop().unwrap(), id, "corrupted stack");
 
         if !self
@@ -104,19 +129,45 @@ impl Drop for LocalTraceGuard {
             .closed
             .load(std::sync::atomic::Ordering::SeqCst)
         {
+            let spans = tl.spans.split_off(self.span_start_index);
+            let property_id_to_len = tl.property_id_to_len.split_off(self.property_start_index);
+            let property_payload = tl
+                .property_payload
+                .split_off(self.property_payload_start_index);
+
             self.collector.queue.push(crate::SpanSet {
                 create_time_ns: self.create_time_ns,
                 start_time_ns: self.start_time_ns,
-                spans: tl.span_stack[self.start_index..].to_vec(),
+                spans,
+                properties: crate::Properties {
+                    span_id_to_len: property_id_to_len,
+                    payload: property_payload,
+                },
             });
+        } else {
+            tl.spans.truncate(self.span_start_index);
+            tl.property_id_to_len.truncate(self.property_start_index);
+            tl.property_payload
+                .truncate(self.property_payload_start_index);
         }
 
-        tl.span_stack.truncate(self.start_index);
-        if tl.span_stack.capacity() > 1024 && tl.span_stack.len() < 512 {
-            tl.span_stack.shrink_to(1024);
+        // try to shrink all vectors in case they take up too much memory
+        if tl.spans.capacity() > INIT_NORMAL_LEN && tl.spans.len() < INIT_NORMAL_LEN / 2 {
+            tl.spans.shrink_to(INIT_NORMAL_LEN);
         }
-        if tl.enter_stack.capacity() > 1024 && tl.enter_stack.len() < 512 {
-            tl.enter_stack.shrink_to(1024);
+        if tl.enter_stack.capacity() > INIT_NORMAL_LEN && tl.enter_stack.len() < INIT_NORMAL_LEN / 2
+        {
+            tl.enter_stack.shrink_to(INIT_NORMAL_LEN);
+        }
+        if tl.property_id_to_len.capacity() > INIT_NORMAL_LEN
+            && tl.property_id_to_len.len() < INIT_NORMAL_LEN / 2
+        {
+            tl.property_id_to_len.shrink_to(INIT_NORMAL_LEN);
+        }
+        if tl.property_payload.capacity() > INIT_BYTES_LEN
+            && tl.property_payload.len() < INIT_BYTES_LEN / 2
+        {
+            tl.property_payload.shrink_to(INIT_BYTES_LEN);
         }
 
         tl.cur_collector = None;
@@ -140,7 +191,7 @@ impl SpanGuard {
             return None;
         }
 
-        let index = tl.span_stack.len();
+        let index = tl.spans.len();
         let parent = *tl.enter_stack.last().unwrap();
 
         let id = {
@@ -155,7 +206,7 @@ impl SpanGuard {
 
         tl.enter_stack.push(id);
 
-        tl.span_stack.push(crate::Span {
+        tl.spans.push(crate::Span {
             id,
             link: crate::Link::Parent { id: parent },
             begin_cycles: minstant::now(),
@@ -170,8 +221,24 @@ impl SpanGuard {
 impl Drop for SpanGuard {
     fn drop(&mut self) {
         let tl = unsafe { &mut *self.trace_local };
-        tl.span_stack[self.index].elapsed_cycles =
-            minstant::now().saturating_sub(tl.span_stack[self.index].begin_cycles);
+        tl.spans[self.index].elapsed_cycles =
+            minstant::now().saturating_sub(tl.spans[self.index].begin_cycles);
         tl.enter_stack.pop();
     }
+}
+
+pub(crate) fn append_property(payload: &[u8]) {
+    let trace_local = TRACE_LOCAL.with(|trace_local| trace_local.get());
+    let tl = unsafe { &mut *trace_local };
+
+    if tl.cur_collector.is_none() || tl.enter_stack.is_empty() {
+        return;
+    }
+
+    let cur_span_id = *tl.enter_stack.last().unwrap();
+    let payload_len = payload.len();
+
+    tl.property_id_to_len
+        .push((cur_span_id, payload_len as u64));
+    tl.property_payload.extend_from_slice(payload);
 }

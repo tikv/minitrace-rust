@@ -38,7 +38,7 @@ async fn other_job() {
         if i == 10 {
             tokio::task::yield_now().await;
         }
-        std::thread::sleep(std::time::Duration::from_millis(1))
+        std::thread::sleep(std::time::Duration::from_millis(1));
     }
 }
 
