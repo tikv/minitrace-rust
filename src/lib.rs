@@ -55,16 +55,33 @@ pub enum Link {
     Continue { id: u64 },
 }
 
+/// Properties can used to attach some information about tracing context
+/// to current span, e.g. host of the request, CPU usage.
+///
+/// Usage:
+/// ```rust
+/// {
+///     let _guard = minitrace::new_span(event_id);
+///     minitrace::property(b"host:127.0.0.1");
+///     minitrace::property(b"cpu_usage:42%");
+/// }
+/// ```
+///
+/// Every property will relate to a span. Logically properties are a sequence
+/// of (span id, property) pairs:
+/// ```
 /// span id -> property
 /// 10      -> b"123"
 /// 10      -> b"!@$#$%"
 /// 12      -> b"abcd"
 /// 14      -> b"xyz"
+/// ```
 ///
-/// would be stored as:
-///
+/// and will be stored into `Properties` struct as:
+/// ```
 /// span_id_to_len: [(10, 3), (10, 6), (12, 4), (14, 3)]
 /// payload: b"123!@$#$%abcdxyz"
+/// ```
 #[derive(Debug, Clone)]
 pub struct Properties {
     pub span_id_to_len: Vec<(u64, u64)>,
