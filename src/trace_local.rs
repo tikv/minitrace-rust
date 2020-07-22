@@ -108,6 +108,7 @@ impl Drop for LocalTraceGuard {
                 create_time_ns: self.create_time_ns,
                 start_time_ns: self.start_time_ns,
                 spans: tl.span_stack[self.start_index..].to_vec(),
+                properties: vec![],
             });
         }
 

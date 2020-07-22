@@ -21,7 +21,7 @@ mod tests;
 
 pub use minitrace_attribute::{trace, trace_async};
 
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone)]
 pub struct TraceDetails {
     /// The start time of the whole tracing process that is the time
     /// when calling `trace_enable`
@@ -55,7 +55,14 @@ pub enum Link {
     Continue { id: u64 },
 }
 
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone)]
+pub struct Property {
+    pub span_id: u64,
+    pub key: Vec<u8>,
+    pub value: Vec<u8>,
+}
+
+#[derive(Debug, Clone)]
 pub struct SpanSet {
     /// The create time of the span set. Used to calculate
     /// the waiting time of async task.
@@ -66,4 +73,7 @@ pub struct SpanSet {
 
     /// Span collection
     pub spans: Vec<Span>,
+
+    /// Property collection
+    pub properties: Vec<Property>,
 }
