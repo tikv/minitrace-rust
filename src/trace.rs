@@ -52,8 +52,8 @@ pub fn trace_crossthread() -> crate::trace_crossthread::CrossthreadTrace {
     crate::trace_crossthread::CrossthreadTrace::new()
 }
 
-/// The property is in bytes format, so it is not limited to be a key-value pair but 
-/// anything intend. However, the downside of flexibility is that encoding and decoding 
+/// The property is in bytes format, so it is not limited to be a key-value pair but
+/// anything intended. However, the downside of flexibility is that encoding and decoding
 /// should be handled handly.
 #[inline]
 pub fn property(p: &[u8]) {
