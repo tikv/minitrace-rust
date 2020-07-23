@@ -59,17 +59,17 @@ pub enum Link {
 /// to current span, e.g. host of the request, CPU usage.
 ///
 /// Usage:
-/// ```rust
-/// {
-///     let _guard = minitrace::new_span(event_id);
-///     minitrace::property(b"host:127.0.0.1");
-///     minitrace::property(b"cpu_usage:42%");
-/// }
+/// ```
+/// # let event_id = 1u32;
+/// let _guard = minitrace::new_span(event_id);
+/// minitrace::property(b"host:127.0.0.1");
+/// minitrace::property(b"cpu_usage:42%");
+/// 
 /// ```
 ///
 /// Every property will relate to a span. Logically properties are a sequence
 /// of (span id, property) pairs:
-/// ```
+/// ```ignore
 /// span id -> property
 /// 10      -> b"123"
 /// 10      -> b"!@$#$%"
@@ -78,13 +78,15 @@ pub enum Link {
 /// ```
 ///
 /// and will be stored into `Properties` struct as:
-/// ```
-/// span_id_to_len: [(10, 3), (10, 6), (12, 4), (14, 3)]
+/// ```ignore
+/// span_ids:  [10, 10, 12, 14]
+/// span_lens: [ 3,  6,  4,  3]
 /// payload: b"123!@$#$%abcdxyz"
 /// ```
 #[derive(Debug, Clone)]
 pub struct Properties {
-    pub span_id_to_len: Vec<(u64, u64)>,
+    pub span_ids: Vec<u64>,
+    pub span_lens: Vec<u64>,
     pub payload: Vec<u8>,
 }
 

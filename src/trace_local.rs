@@ -9,7 +9,8 @@ thread_local! {
     pub(crate) static TRACE_LOCAL: std::cell::UnsafeCell<TraceLocal> = std::cell::UnsafeCell::new(TraceLocal {
         spans: Vec::with_capacity(INIT_NORMAL_LEN),
         enter_stack: Vec::with_capacity(INIT_NORMAL_LEN),
-        property_id_to_len: Vec::with_capacity(INIT_NORMAL_LEN),
+        property_ids: Vec::with_capacity(INIT_NORMAL_LEN),
+        property_lens: Vec::with_capacity(INIT_NORMAL_LEN),
         property_payload: Vec::with_capacity(INIT_BYTES_LEN),
         id_prefix: next_global_id_prefix(),
         id_suffix: 0,
@@ -25,7 +26,8 @@ pub(crate) struct TraceLocal {
     pub(crate) enter_stack: Vec<SpanId>,
 
     /// local property collector
-    pub(crate) property_id_to_len: Vec<(SpanId, u64)>,
+    pub(crate) property_ids: Vec<SpanId>,
+    pub(crate) property_lens: Vec<u64>,
     pub(crate) property_payload: Vec<u8>,
 
     /// for id contruction
@@ -86,7 +88,7 @@ impl LocalTraceGuard {
 
         tl.enter_stack.push(id);
         let span_start_index = tl.spans.len();
-        let property_start_index = tl.property_id_to_len.len();
+        let property_start_index = tl.property_ids.len();
         let property_payload_start_index = tl.property_payload.len();
 
         tl.spans.push(crate::Span {
@@ -130,7 +132,8 @@ impl Drop for LocalTraceGuard {
             .load(std::sync::atomic::Ordering::SeqCst)
         {
             let spans = tl.spans.split_off(self.span_start_index);
-            let property_id_to_len = tl.property_id_to_len.split_off(self.property_start_index);
+            let property_ids = tl.property_ids.split_off(self.property_start_index);
+            let property_lens = tl.property_lens.split_off(self.property_start_index);
             let property_payload = tl
                 .property_payload
                 .split_off(self.property_payload_start_index);
@@ -140,13 +143,15 @@ impl Drop for LocalTraceGuard {
                 start_time_ns: self.start_time_ns,
                 spans,
                 properties: crate::Properties {
-                    span_id_to_len: property_id_to_len,
+                    span_ids: property_ids,
+                    span_lens: property_lens,
                     payload: property_payload,
                 },
             });
         } else {
             tl.spans.truncate(self.span_start_index);
-            tl.property_id_to_len.truncate(self.property_start_index);
+            tl.property_ids.truncate(self.property_start_index);
+            tl.property_lens.truncate(self.property_start_index);
             tl.property_payload
                 .truncate(self.property_payload_start_index);
         }
@@ -159,10 +164,11 @@ impl Drop for LocalTraceGuard {
         {
             tl.enter_stack.shrink_to(INIT_NORMAL_LEN);
         }
-        if tl.property_id_to_len.capacity() > INIT_NORMAL_LEN
-            && tl.property_id_to_len.len() < INIT_NORMAL_LEN / 2
+        if tl.property_ids.capacity() > INIT_NORMAL_LEN
+            && tl.property_ids.len() < INIT_NORMAL_LEN / 2
         {
-            tl.property_id_to_len.shrink_to(INIT_NORMAL_LEN);
+            tl.property_ids.shrink_to(INIT_NORMAL_LEN);
+            tl.property_lens.shrink_to(INIT_NORMAL_LEN);
         }
         if tl.property_payload.capacity() > INIT_BYTES_LEN
             && tl.property_payload.len() < INIT_BYTES_LEN / 2
@@ -238,7 +244,7 @@ pub(crate) fn append_property(payload: &[u8]) {
     let cur_span_id = *tl.enter_stack.last().unwrap();
     let payload_len = payload.len();
 
-    tl.property_id_to_len
-        .push((cur_span_id, payload_len as u64));
+    tl.property_ids.push(cur_span_id);
+    tl.property_lens.push(payload_len as u64);
     tl.property_payload.extend_from_slice(payload);
 }
