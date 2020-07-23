@@ -58,7 +58,8 @@ fn check_clear() {
         tl.spans.is_empty()
             && tl.enter_stack.is_empty()
             && tl.cur_collector.is_none()
-            && tl.property_id_to_len.is_empty()
+            && tl.property_ids.is_empty()
+            && tl.property_lens.is_empty()
             && tl.property_payload.is_empty()
     });
 }
@@ -284,19 +285,23 @@ fn test_property_sync() {
 
     let span_set = trace_details.span_sets[0].clone();
     assert_eq!(span_set.spans.len(), 4);
-    assert_eq!(span_set.properties.span_id_to_len.len(), 4);
+    assert_eq!(span_set.properties.span_ids.len(), 4);
+    assert_eq!(span_set.properties.span_lens.len(), 4);
     assert_eq!(span_set.properties.payload.len(), 9);
     assert_eq!(span_set.properties.payload, b"123abcedf");
 
     for (x, y) in [
-        (span_set.spans[0].id, 3),
-        (span_set.spans[2].id, 3),
-        (span_set.spans[2].id, 0),
-        (span_set.spans[3].id, 3),
+        span_set.spans[0].id,
+        span_set.spans[2].id,
+        span_set.spans[2].id,
+        span_set.spans[3].id,
     ]
     .iter()
-    .zip(span_set.properties.span_id_to_len)
+    .zip(span_set.properties.span_ids)
     {
+        assert_eq!(*x, y);
+    }
+    for (x, y) in [3, 3, 0, 3].iter().zip(span_set.properties.span_lens) {
         assert_eq!(*x, y);
     }
 
@@ -338,8 +343,10 @@ fn test_property_async() {
         let id = span_set.spans[0].id;
         let event = span_set.spans[0].event;
 
-        assert_eq!(span_set.properties.span_id_to_len.len(), 1);
-        assert_eq!(span_set.properties.span_id_to_len[0], (id, 4));
+        assert_eq!(span_set.properties.span_ids.len(), 1);
+        assert_eq!(span_set.properties.span_ids[0], id);
+        assert_eq!(span_set.properties.span_lens.len(), 1);
+        assert_eq!(span_set.properties.span_lens[0], 4);
         assert_eq!(span_set.properties.payload, event.to_be_bytes());
     }
 
