@@ -39,7 +39,7 @@ let task = async {
     // current future ...
 
     // should drop here or it would fail compilation
-    // because local guards cannot across thread.
+    // because local guards cannot across threads.
     drop(guard);
 
     async {

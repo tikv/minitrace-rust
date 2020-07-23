@@ -64,7 +64,6 @@ pub enum Link {
 /// let _guard = minitrace::new_span(event_id);
 /// minitrace::property(b"host:127.0.0.1");
 /// minitrace::property(b"cpu_usage:42%");
-/// 
 /// ```
 ///
 /// Every property will relate to a span. Logically properties are a sequence
