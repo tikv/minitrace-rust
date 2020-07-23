@@ -2,7 +2,7 @@
 
 const BAR_LEN: usize = 70;
 
-pub fn draw_stdout(trace_details: minitrace::TraceDetails) {
+pub fn draw_stdout(_trace_details: minitrace::TraceDetails) {
     // let span_sets = trace_details.span_sets;
     // let cycles_per_sec = trace_details.cycles_per_second;
     // let mut children = std::collections::HashMap::new();
@@ -90,6 +90,7 @@ pub fn draw_stdout(trace_details: minitrace::TraceDetails) {
     // );
 }
 
+#[allow(dead_code)]
 fn draw_rec(
     cur_id: u64,
     factor: f64,
