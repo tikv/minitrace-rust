@@ -3,82 +3,91 @@
 const BAR_LEN: usize = 70;
 
 pub fn draw_stdout(trace_details: minitrace::TraceDetails) {
-    let spans = trace_details.span_sets;
-    let cycles_per_sec = trace_details.cycles_per_second;
-    let mut children = std::collections::HashMap::new();
-    let mut following = std::collections::HashMap::new();
-    let mut follower_to_header = std::collections::HashMap::new();
-    let mut spans_map = std::collections::HashMap::new();
+    // let span_sets = trace_details.span_sets;
+    // let cycles_per_sec = trace_details.cycles_per_second;
+    // let mut children = std::collections::HashMap::new();
+    // let mut following = std::collections::HashMap::new();
+    // let mut follower_to_header = std::collections::HashMap::new();
+    // let mut spans_map = std::collections::HashMap::new();
 
-    let mut root = None;
-    let mut root_cycles = None;
-    let mut max_end = 0;
+    // let mut root = None;
+    // let mut root_cycles = None;
+    // let mut max_end = 0;
 
-    let spans = spans
-        .into_iter()
-        .map(|s| s.spans.into_iter())
-        .flatten()
-        .collect::<Vec<_>>();
+    // for span_set in span_sets {
+    //     let mut span_set = span_set;
+    //     let spans = if span_set.spans.first().unwrap().state != minitrace::State::Root {
+    //         span_set.spans[1].related_id = span_set.spans[0].related_id;
+    //         &span_set.spans[1..]
+    //     } else {
+    //         &span_set.spans[..]
+    //     };
+    //     for span in spans {
+    //         let start = span.begin_cycles;
+    //         let end = start + span.elapsed_cycles;
 
-    for span in spans {
-        let start = span.begin_cycles;
-        let end = start + span.elapsed_cycles;
+    //         if end > max_end {
+    //             max_end = end;
+    //         }
 
-        if end > max_end {
-            max_end = end;
-        }
+    //         assert_eq!(
+    //             spans_map.insert(span.id, (start, span.elapsed_cycles)),
+    //             None,
+    //             "duplicated id {:#?}",
+    //             span.id
+    //         );
 
-        assert_eq!(
-            spans_map.insert(span.id, (start, span.elapsed_cycles)),
-            None,
-            "duplicated id {:#?}",
-            span.id
-        );
+    //         follower_to_header.insert(span.id, span.id);
 
-        follower_to_header.insert(span.id, span.id);
+    //         match span.state {
+    //             minitrace::State::Root => {
+    //                 root = Some(span.id);
+    //                 root_cycles = Some(span.begin_cycles);
+    //             }
+    //             minitrace::State::Local => {
+    //                 children
+    //                     .entry(span.related_id)
+    //                     .or_insert_with(Vec::new)
+    //                     .push(span.id);
+    //             }
+    //             minitrace::State::Settle => {
+    //                 dbg!(&span.related_id);
+    //                 dbg!(&follower_to_header);
+    //                 let header = follower_to_header[&span.related_id];
+    //                 follower_to_header.insert(span.id, header);
 
-        match span.link {
-            minitrace::Link::Root => {
-                root = Some(span.id);
-                root_cycles = Some(span.begin_cycles);
-            }
-            minitrace::Link::Parent { id } => {
-                children.entry(id).or_insert_with(Vec::new).push(span.id);
-            }
-            minitrace::Link::Continue { id } => {
-                let header = follower_to_header[&id];
-                follower_to_header.insert(span.id, header);
+    //                 following
+    //                     .entry(header)
+    //                     .or_insert_with(Vec::new)
+    //                     .push(span.id);
+    //             }
+    //             _ => unreachable!(),
+    //         }
+    //     }
+    // }
 
-                following
-                    .entry(header)
-                    .or_insert_with(Vec::new)
-                    .push(span.id);
-            }
-        }
-    }
+    // let root = root.expect("can not find root");
+    // let root_cycles = root_cycles.unwrap();
 
-    let root = root.expect("can not find root");
-    let root_cycles = root_cycles.unwrap();
+    // for (_, (start, _)) in spans_map.iter_mut() {
+    //     *start -= root_cycles;
+    // }
+    // max_end -= root_cycles;
 
-    for (_, (start, _)) in spans_map.iter_mut() {
-        *start -= root_cycles;
-    }
-    max_end -= root_cycles;
+    // if max_end == 0 {
+    //     panic!("Insufficient precision");
+    // }
 
-    if max_end == 0 {
-        panic!("Insufficient precision");
-    }
+    // let factor = BAR_LEN as f64 / max_end as f64;
 
-    let factor = BAR_LEN as f64 / max_end as f64;
-
-    draw_rec(
-        root,
-        factor,
-        cycles_per_sec,
-        &following,
-        &children,
-        &spans_map,
-    );
+    // draw_rec(
+    //     root,
+    //     factor,
+    //     cycles_per_sec,
+    //     &following,
+    //     &children,
+    //     &spans_map,
+    // );
 }
 
 fn draw_rec(

@@ -8,17 +8,11 @@ pub fn trace_enable<T: Into<u32>>(
     crate::trace_local::LocalTraceGuard,
     crate::collector::Collector,
 ) {
-    let now = crate::time::real_time_ns();
-    let collector = crate::collector::Collector::new(now);
+    let collector = crate::collector::Collector::new(crate::time::real_time_ns());
 
-    let (trace_guard, _) = crate::trace_local::LocalTraceGuard::new(
-        collector.inner.clone(),
-        event,
-        crate::Link::Root,
-        now,
-        now,
-    )
-    .unwrap();
+    let (trace_guard, _) =
+        crate::trace_local::LocalTraceGuard::new(collector.inner.clone(), event.into(), None)
+            .unwrap();
 
     (trace_guard, collector)
 }
