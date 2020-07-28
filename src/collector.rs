@@ -46,6 +46,6 @@ impl Drop for Collector {
     fn drop(&mut self) {
         self.inner
             .closed
-            .store(true, std::sync::atomic::Ordering::SeqCst);
+            .store(true, std::sync::atomic::Ordering::Relaxed);
     }
 }

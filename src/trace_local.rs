@@ -42,14 +42,13 @@ static GLOBAL_ID_COUNTER: std::sync::atomic::AtomicU32 = std::sync::atomic::Atom
 
 #[inline]
 fn next_global_id_prefix() -> u32 {
-    GLOBAL_ID_COUNTER.fetch_add(1, std::sync::atomic::Ordering::SeqCst)
+    GLOBAL_ID_COUNTER.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
 }
 
 pub struct LocalTraceGuard {
     collector: std::sync::Arc<crate::collector::CollectorInner>,
     trace_local: *mut TraceLocal,
 
-    has_leading_span: bool,
     span_start_index: usize,
     property_start_index: usize,
     property_payload_start_index: usize,
@@ -58,7 +57,7 @@ pub struct LocalTraceGuard {
 impl !Sync for LocalTraceGuard {}
 impl !Send for LocalTraceGuard {}
 
-pub(crate) struct LeadingSpanArg {
+pub(crate) struct LeadingSpan {
     pub(crate) state: crate::State,
     pub(crate) related_id: SpanId,
     pub(crate) begin_cycles: u64,
@@ -69,10 +68,10 @@ pub(crate) struct LeadingSpanArg {
 impl LocalTraceGuard {
     pub(crate) fn new(
         collector: std::sync::Arc<crate::collector::CollectorInner>,
-        event: u32,
-        leading_span: Option<LeadingSpanArg>,
+        now_cycles: u64,
+        leading_span: LeadingSpan,
     ) -> Option<(Self, SpanId)> {
-        if collector.closed.load(std::sync::atomic::Ordering::SeqCst) {
+        if collector.closed.load(std::sync::atomic::Ordering::Relaxed) {
             return None;
         }
 
@@ -89,54 +88,39 @@ impl LocalTraceGuard {
             } else {
                 tl.id_suffix += 2;
             }
-            (
-                ((tl.id_prefix as u64) << 32) | tl.id_suffix as u64,
-                ((tl.id_prefix as u64) << 32) | (tl.id_suffix - 1) as u64,
-            )
+            let id0 = ((tl.id_prefix as u64) << 32) | tl.id_suffix as u64;
+            (id0, id0 - 1)
         };
 
-        let span_start_index = tl.spans.len();
-        let property_start_index = tl.property_ids.len();
-        let property_payload_start_index = tl.property_payload.len();
-
-        if let Some(LeadingSpanArg {
+        let LeadingSpan {
             state,
             related_id,
             begin_cycles,
             elapsed_cycles,
             event,
-        }) = leading_span
-        {
-            tl.spans.extend_from_slice(&[
-                crate::Span {
-                    id: id0,
-                    state,
-                    related_id,
-                    begin_cycles,
-                    elapsed_cycles,
-                    event,
-                },
-                crate::Span {
-                    id: id1,
-                    state: crate::State::Settle,
-                    related_id: id0,
-                    begin_cycles: minstant::now(),
-                    elapsed_cycles: 0,
-                    event,
-                },
-            ]);
-            tl.enter_stack.push(id1);
-        } else {
-            tl.spans.push(crate::Span {
-                id: id0,
-                state: crate::State::Root,
-                related_id: 0,
-                begin_cycles: minstant::now(),
-                elapsed_cycles: 0,
-                event,
-            });
-            tl.enter_stack.push(id0);
-        }
+        } = leading_span;
+
+        tl.spans.push(crate::Span {
+            id: id0,
+            state,
+            related_id,
+            begin_cycles,
+            elapsed_cycles,
+            event,
+        });
+        tl.spans.push(crate::Span {
+            id: id1,
+            state: crate::State::Settle,
+            related_id: id0,
+            begin_cycles: now_cycles,
+            elapsed_cycles: 0,
+            event,
+        });
+        tl.enter_stack.push(id1);
+
+        let span_start_index = tl.spans.len() - 2;
+        let property_start_index = tl.property_ids.len();
+        let property_payload_start_index = tl.property_payload.len();
 
         Some((
             Self {
@@ -145,7 +129,6 @@ impl LocalTraceGuard {
                 span_start_index,
                 property_start_index,
                 property_payload_start_index,
-                has_leading_span: leading_span.is_some(),
             },
             id0,
         ))
@@ -156,18 +139,18 @@ impl Drop for LocalTraceGuard {
     fn drop(&mut self) {
         let tl = unsafe { &mut *self.trace_local };
 
-        // fill the elapsed cycles of the first span
-        tl.spans[self.span_start_index + self.has_leading_span as usize].elapsed_cycles =
+        // fill the elapsed cycles of the first span (except the leading span)
+        tl.spans[self.span_start_index + 1].elapsed_cycles =
             minstant::now().saturating_sub(tl.spans[self.span_start_index].begin_cycles);
 
         // check if the enter stack is corrupted
-        let id = tl.spans[self.span_start_index + self.has_leading_span as usize].id;
+        let id = tl.spans[self.span_start_index + 1].id;
         assert_eq!(tl.enter_stack.pop().unwrap(), id, "corrupted stack");
 
         if !self
             .collector
             .closed
-            .load(std::sync::atomic::Ordering::SeqCst)
+            .load(std::sync::atomic::Ordering::Relaxed)
         {
             let spans = tl.spans.split_off(self.span_start_index);
             let property_ids = tl.property_ids.split_off(self.property_start_index);

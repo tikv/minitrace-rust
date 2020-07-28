@@ -2,9 +2,9 @@
 
 struct CrossthreadTraceInner {
     collector: std::sync::Arc<crate::collector::CollectorInner>,
-    state: crate::State,
-    related_id: u64,
-    begin_cycles: u64,
+    next_state: crate::State,
+    next_related_id: u64,
+    waiting_begin_cycles: u64,
 }
 
 pub struct CrossthreadTrace {
@@ -22,12 +22,12 @@ pub struct LocalTraceGuard<'a> {
     // is started, the gap time is the wait time of the next local-tracing.
     //
     // Here is the mutable reference for this purpose.
-    begin_cycles: &'a mut u64,
+    handle: &'a mut CrossthreadTraceInner,
 }
 
 impl Drop for LocalTraceGuard<'_> {
     fn drop(&mut self) {
-        *self.begin_cycles = minstant::now();
+        self.handle.waiting_begin_cycles = minstant::now();
     }
 }
 
@@ -45,9 +45,9 @@ impl CrossthreadTrace {
         Self {
             inner: Some(CrossthreadTraceInner {
                 collector,
-                state: crate::State::Spawning,
-                related_id,
-                begin_cycles: minstant::now(),
+                next_state: crate::State::Spawning,
+                next_related_id: related_id,
+                waiting_begin_cycles: minstant::now(),
             }),
         }
     }
@@ -55,28 +55,25 @@ impl CrossthreadTrace {
     pub fn trace_enable<T: Into<u32>>(&mut self, event: T) -> Option<LocalTraceGuard> {
         let event = event.into();
         if let Some(inner) = &mut self.inner {
+            let now_cycles = minstant::now();
             if let Some((trace_guard, self_id)) = crate::trace_local::LocalTraceGuard::new(
                 inner.collector.clone(),
-                event,
-                if inner.state == crate::State::Root {
-                    None
-                } else {
-                    Some(crate::LeadingSpanArg {
-                        state: inner.state,
-                        related_id: inner.related_id,
-                        begin_cycles: inner.begin_cycles,
-                        elapsed_cycles: minstant::now().saturating_sub(inner.begin_cycles),
-                        event,
-                    })
+                now_cycles,
+                crate::LeadingSpan {
+                    state: inner.next_state,
+                    related_id: inner.next_related_id,
+                    begin_cycles: inner.waiting_begin_cycles,
+                    elapsed_cycles: now_cycles.saturating_sub(inner.waiting_begin_cycles),
+                    event,
                 },
             ) {
                 // for next scheduling time
-                inner.state = crate::State::Scheduling;
-                inner.related_id = self_id;
+                inner.next_state = crate::State::Scheduling;
+                inner.next_related_id = self_id;
 
                 Some(LocalTraceGuard {
                     _local: trace_guard,
-                    begin_cycles: &mut inner.begin_cycles,
+                    handle: inner,
                 })
             } else {
                 None
@@ -90,9 +87,9 @@ impl CrossthreadTrace {
         Self {
             inner: Some(CrossthreadTraceInner {
                 collector,
-                state: crate::State::Root,
-                begin_cycles: 0,
-                related_id: 0,
+                next_state: crate::State::Root,
+                next_related_id: 0,
+                waiting_begin_cycles: minstant::now(),
             }),
         }
     }
