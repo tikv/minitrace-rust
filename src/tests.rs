@@ -179,7 +179,7 @@ macro_rules! leading {
 }
 
 macro_rules! normal {
-    ($event:expr, normals: [$($normal:expr,)*], leadings: [$($leading:expr,)*]) => {
+    ($event:expr, normals: [$($normal:expr),*], leadings: [$($leading:expr),*]) => {
         Rc::new(RefCell::new(NormalNode {
             span: crate::Span {
                 id: 0,
@@ -189,18 +189,18 @@ macro_rules! normal {
                 elapsed_cycles: 0,
                 event: $event,
             },
-            normal_children: vec![$($normal),*],
-            leading_children: vec![$($leading),*],
+            normal_children: vec![$($normal,)*],
+            leading_children: vec![$($leading,)*],
         }))
     };
     ($event:expr) => {
         normal!($event, normals: [], leadings: [])
     };
-    ($event:expr, normals: [$($normal:expr,)*]) => {
-        normal!($event, normals: [$($normal,)*], leadings: [])
+    ($event:expr, normals: [$($normal:expr),*]) => {
+        normal!($event, normals: [$($normal),*], leadings: [])
     };
-    ($event:expr, leadings: [$($leading:expr,)*]) => {
-        normal!($event, normals: [], leadings: [$($leading,)*])
+    ($event:expr, leadings: [$($leading:expr),*]) => {
+        normal!($event, normals: [], leadings: [$($leading),*])
     };
 }
 
@@ -276,7 +276,7 @@ fn trace_basic() {
     let trace_details = collector.collect();
 
     let real_tree = build_tree(&trace_details);
-    let shape = leading!(0, child: normal!(0, normals: [normal!(1),]));
+    let shape = leading!(0, child: normal!(0, normals: [normal!(1)]));
     compare_relation(&real_tree, &shape);
     check_time_included(&real_tree);
     check_clear();
@@ -348,7 +348,7 @@ fn trace_async_basic() {
                         leading!(7, child: normal!(7)),
                         leading!(8, child: normal!(8)),
                         leading!(9, child: normal!(9)),
-                        leading!(10, child: normal!(10)),
+                        leading!(10, child: normal!(10))
                     ]
             )
     );
@@ -387,7 +387,7 @@ fn trace_wide_function() {
                         normal!(7),
                         normal!(8),
                         normal!(9),
-                        normal!(10),
+                        normal!(10)
                     ]
             )
     );
@@ -419,27 +419,49 @@ fn trace_deep_function() {
     let shape = leading!(
         0,
         child:
-            normal!(0,
-            normals: [
-            normal!(10,
-            normals: [
-            normal!(9,
-            normals: [
-            normal!(8,
-            normals: [
-            normal!(7,
-            normals: [
-            normal!(6,
-            normals: [
-            normal!(5,
-            normals: [
-            normal!(4,
-            normals: [
-            normal!(3,
-            normals: [
-            normal!(2,
-            normals: [
-            normal!(1),]),]),]),]),]),]),]),]),]),])
+            normal!(
+                0,
+                normals:
+                    [normal!(
+                        10,
+                        normals:
+                            [normal!(
+                                9,
+                                normals:
+                                    [normal!(
+                                        8,
+                                        normals:
+                                            [normal!(
+                                                7,
+                                                normals:
+                                                    [normal!(
+                                                        6,
+                                                        normals:
+                                                            [normal!(
+                                                                5,
+                                                                normals:
+                                                                    [normal!(
+                                                                        4,
+                                                                        normals:
+                                                                            [normal!(
+                                                                                3,
+                                                                                normals:
+                                                                                    [normal!(
+                                                                                        2,
+                                                                                        normals:
+                                                                                            [normal!(
+                                                                                                1
+                                                                                            )]
+                                                                                    )]
+                                                                            )]
+                                                                    )]
+                                                            )]
+                                                    )]
+                                            )]
+                                    )]
+                            )]
+                    )]
+            )
     );
     compare_relation(&real_tree, &shape);
     check_time_included(&real_tree);
@@ -472,7 +494,7 @@ fn trace_collect_ahead() {
     drop(wg);
 
     let real_tree = build_tree(&trace_details);
-    let shape = leading!(0, child: normal!(0, normals: [normal!(1),]));
+    let shape = leading!(0, child: normal!(0, normals: [normal!(1)]));
     compare_relation(&real_tree, &shape);
     check_time_included(&real_tree);
 
@@ -502,7 +524,11 @@ fn test_property_sync() {
     let real_tree = build_tree(&trace_details);
     let shape = leading!(
         0,
-        child: normal!(0, normals: [normal!(1, normals: [normal!(2, normals: [normal!(3),]),]),])
+        child:
+            normal!(
+                0,
+                normals: [normal!(1, normals: [normal!(2, normals: [normal!(3)])])]
+            )
     );
     compare_relation(&real_tree, &shape);
     check_time_included(&real_tree);
@@ -569,7 +595,7 @@ fn test_property_async() {
                 leading!(2, child: normal!(2)),
                 leading!(3, child: normal!(3)),
                 leading!(4, child: normal!(4)),
-                leading!(5, child: normal!(5)),
+                leading!(5, child: normal!(5))
             ])
     );
     compare_relation(&real_tree, &shape);
