@@ -9,7 +9,7 @@ use std::rc::Rc;
 #[derive(Debug)]
 struct LeadingNode {
     span: crate::Span,
-    child: Rc<RefCell<NormalNode>>,
+    child: Option<Rc<RefCell<NormalNode>>>,
     next: Option<Rc<RefCell<LeadingNode>>>,
 }
 
@@ -27,63 +27,80 @@ enum Node {
 }
 
 fn build_tree(trace_details: &crate::TraceDetails) -> Rc<RefCell<LeadingNode>> {
-    let mut span_sets = trace_details.span_sets.clone();
-    span_sets.sort_by(|a, b| a.spans[0].begin_cycles.cmp(&b.spans[0].begin_cycles));
+    let mut spans = trace_details.spans.clone();
+    spans.sort_by(|a, b| a.begin_cycles.cmp(&b.begin_cycles));
     let mut id_to_node: HashMap<u64, Node> = HashMap::new();
 
     let mut root = None;
-    for span_set in span_sets {
-        let leading_span = span_set.spans[0];
-        let next_span = span_set.spans[1];
-        assert_eq!(next_span.state, crate::State::Settle);
-
-        let next_node = Rc::new(RefCell::new(NormalNode {
-            span: next_span,
-            normal_children: vec![],
-            leading_children: vec![],
-        }));
-        let leading_node = Rc::new(RefCell::new(LeadingNode {
-            span: leading_span,
-            child: next_node.clone(),
-            next: None,
-        }));
-        id_to_node.insert(next_span.id, Node::NormalNode(next_node.clone()));
-        id_to_node.insert(leading_span.id, Node::LeadingNode(leading_node.clone()));
-
-        if leading_span.state == crate::State::Root {
-            root = Some(leading_node.clone());
-        } else {
-            assert!(
-                leading_span.state == crate::State::Spawning
-                    || leading_span.state == crate::State::Scheduling
-            );
-            match &id_to_node[&leading_span.related_id] {
-                Node::LeadingNode(prev) => {
-                    let node_ref = &mut *prev.borrow_mut();
-                    node_ref.next = Some(leading_node);
-                }
-                Node::NormalNode(normal_node) => {
-                    let node_ref = &mut *normal_node.borrow_mut();
-                    node_ref.leading_children.push(leading_node);
-                }
+    for span in spans {
+        match span.state {
+            crate::State::Root => {
+                let leading_node = Rc::new(RefCell::new(LeadingNode {
+                    span,
+                    child: None,
+                    next: None,
+                }));
+                id_to_node.insert(span.id, Node::LeadingNode(leading_node.clone()));
+                root = Some(leading_node);
             }
-        }
-
-        for span in &span_set.spans[2..] {
-            let node = Rc::new(RefCell::new(NormalNode {
-                span: *span,
-                normal_children: vec![],
-                leading_children: vec![],
-            }));
-            {
-                if let Node::NormalNode(normal_node) = &id_to_node[&span.related_id] {
-                    let node_ref = &mut *normal_node.borrow_mut();
-                    node_ref.normal_children.push(node.clone());
+            crate::State::Local => {
+                if let Node::NormalNode(parent) = &id_to_node[&span.related_id] {
+                    let normal_node = Rc::new(RefCell::new(NormalNode {
+                        span,
+                        normal_children: vec![],
+                        leading_children: vec![],
+                    }));
+                    parent
+                        .borrow_mut()
+                        .normal_children
+                        .push(normal_node.clone());
+                    id_to_node.insert(span.id, Node::NormalNode(normal_node));
                 } else {
-                    panic!("related span of {} isn't existing", span.related_id);
+                    unreachable!();
                 }
             }
-            id_to_node.insert(span.id, Node::NormalNode(node));
+            crate::State::Spawning => {
+                if let Node::NormalNode(parent) = &id_to_node[&span.related_id] {
+                    let leading_node = Rc::new(RefCell::new(LeadingNode {
+                        span,
+                        child: None,
+                        next: None,
+                    }));
+                    parent
+                        .borrow_mut()
+                        .leading_children
+                        .push(leading_node.clone());
+                    id_to_node.insert(span.id, Node::LeadingNode(leading_node));
+                } else {
+                    unreachable!();
+                }
+            }
+            crate::State::Scheduling => {
+                if let Node::LeadingNode(prev) = &id_to_node[&span.related_id] {
+                    let leading_node = Rc::new(RefCell::new(LeadingNode {
+                        span,
+                        child: None,
+                        next: None,
+                    }));
+                    prev.borrow_mut().next = Some(leading_node.clone());
+                    id_to_node.insert(span.id, Node::LeadingNode(leading_node));
+                } else {
+                    unreachable!();
+                }
+            }
+            crate::State::Settle => {
+                if let Node::LeadingNode(prev) = &id_to_node[&span.related_id] {
+                    let normal_node = Rc::new(RefCell::new(NormalNode {
+                        span,
+                        normal_children: vec![],
+                        leading_children: vec![],
+                    }));
+                    prev.borrow_mut().child = Some(normal_node.clone());
+                    id_to_node.insert(span.id, Node::NormalNode(normal_node));
+                } else {
+                    unreachable!();
+                }
+            }
         }
     }
 
@@ -100,14 +117,17 @@ fn compare_leading(real_tree: &Rc<RefCell<LeadingNode>>, approx_tree: &Rc<RefCel
         approx_tree.borrow().span.event
     );
 
-    if real_tree.borrow().next.is_some() {
+    if real_tree.borrow().next.is_some() || approx_tree.borrow().next.is_some() {
         compare_leading(
             real_tree.borrow().next.as_ref().unwrap(),
             approx_tree.borrow().next.as_ref().unwrap(),
         );
     }
 
-    compare_normal(&real_tree.borrow().child, &approx_tree.borrow().child);
+    compare_normal(
+        &real_tree.borrow().child.as_ref().unwrap(),
+        &approx_tree.borrow().child.as_ref().unwrap(),
+    );
 }
 
 fn compare_normal(real_tree: &Rc<RefCell<NormalNode>>, approx_tree: &Rc<RefCell<NormalNode>>) {
@@ -166,7 +186,7 @@ macro_rules! leading {
                 elapsed_cycles: 0,
                 event: $event,
             },
-            child: $child,
+            child: Some($child),
             next: $next,
         }))
     };
@@ -230,11 +250,11 @@ fn check_time_included(tree: &Rc<RefCell<LeadingNode>>) {
     let leading = &*tree.borrow();
     assert_eq!(
         leading.span.begin_cycles + leading.span.elapsed_cycles,
-        leading.child.borrow().span.begin_cycles
+        leading.child.as_ref().unwrap().borrow().span.begin_cycles
     );
-    check_normal(&leading.child);
+    check_normal(leading.child.as_ref().unwrap());
 
-    let prev_span = &leading.child.borrow().span;
+    let prev_span = &leading.child.as_ref().unwrap().borrow().span;
     let prev_end_cycles = prev_span.begin_cycles + prev_span.elapsed_cycles;
     if let Some(next) = &leading.next {
         assert!(prev_end_cycles <= next.borrow().span.begin_cycles);
@@ -534,24 +554,26 @@ fn test_property_sync() {
     check_time_included(&real_tree);
     check_clear();
 
-    let span_set = trace_details.span_sets[0].clone();
-    assert_eq!(span_set.properties.span_ids.len(), 4);
-    assert_eq!(span_set.properties.span_lens.len(), 4);
-    assert_eq!(span_set.properties.payload.len(), 9);
-    assert_eq!(span_set.properties.payload, b"123abcedf");
+    assert_eq!(trace_details.properties.span_ids.len(), 4);
+    assert_eq!(trace_details.properties.property_lens.len(), 4);
+    assert_eq!(trace_details.properties.payload.len(), 9);
+    assert_eq!(trace_details.properties.payload, b"123abcedf");
 
     for (x, y) in [
-        span_set.spans[1].id,
-        span_set.spans[3].id,
-        span_set.spans[3].id,
-        span_set.spans[4].id,
+        trace_details.spans[1].id,
+        trace_details.spans[3].id,
+        trace_details.spans[3].id,
+        trace_details.spans[4].id,
     ]
     .iter()
-    .zip(span_set.properties.span_ids)
+    .zip(trace_details.properties.span_ids)
     {
         assert_eq!(*x, y);
     }
-    for (x, y) in [3, 3, 0, 3].iter().zip(span_set.properties.span_lens) {
+    for (x, y) in [3, 3, 0, 3]
+        .iter()
+        .zip(trace_details.properties.property_lens)
+    {
         assert_eq!(*x, y);
     }
 }
@@ -603,17 +625,26 @@ fn test_property_async() {
     check_clear();
     join_handles.into_iter().for_each(|jh| jh.join().unwrap());
 
-    for span_set in trace_details.span_sets {
-        let (id, event) = match span_set.spans.len() {
-            2 => (span_set.spans[1].id, span_set.spans[1].event),
-            1 => (span_set.spans[0].id, span_set.spans[0].event),
-            _ => panic!("unexpected len: {}", span_set.spans.len()),
-        };
+    assert_eq!(trace_details.properties.span_ids.len(), 6);
+    assert_eq!(trace_details.properties.property_lens.len(), 6);
+    let u32_size = std::mem::size_of::<u32>();
+    assert_eq!(trace_details.properties.payload.len(), 6 * u32_size);
 
-        assert_eq!(span_set.properties.span_ids.len(), 1);
-        assert_eq!(span_set.properties.span_ids[0], id);
-        assert_eq!(span_set.properties.span_lens.len(), 1);
-        assert_eq!(span_set.properties.span_lens[0], 4);
-        assert_eq!(span_set.properties.payload, event.to_be_bytes());
+    for property_len in trace_details.properties.property_lens {
+        assert_eq!(property_len, std::mem::size_of::<u32>() as u64);
+    }
+
+    for i in 0..6 {
+        let id = trace_details.properties.span_ids[i];
+        let mut event = 0;
+        for span in &trace_details.spans {
+            if span.id == id {
+                event = span.event;
+            }
+        }
+        assert_eq!(
+            trace_details.properties.payload[i * u32_size..(i + 1) * u32_size],
+            event.to_be_bytes()
+        );
     }
 }

@@ -163,7 +163,7 @@ impl Drop for LocalTraceGuard {
                 spans,
                 properties: crate::Properties {
                     span_ids: property_ids,
-                    span_lens: property_lens,
+                    property_lens,
                     payload: property_payload,
                 },
             });

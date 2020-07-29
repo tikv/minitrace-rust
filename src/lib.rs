@@ -34,8 +34,11 @@ pub struct TraceDetails {
     /// For conversion of cycles -> ns
     pub cycles_per_second: u64,
 
-    /// Spanset collection
-    pub span_sets: Vec<SpanSet>,
+    /// Span collection
+    pub spans: Vec<Span>,
+
+    /// Properties
+    pub properties: Properties,
 }
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
@@ -138,13 +141,13 @@ pub enum State {
 /// and will be stored into `Properties` struct as:
 /// ```text
 /// span_ids:  [10, 10, 12, 14]
-/// span_lens: [ 3,  6,  4,  3]
+/// property_lens: [ 3,  6,  4,  3]
 /// payload: b"123!@$#$%abcdxyz"
 /// ```
 #[derive(Debug, Clone)]
 pub struct Properties {
     pub span_ids: Vec<u64>,
-    pub span_lens: Vec<u64>,
+    pub property_lens: Vec<u64>,
     pub payload: Vec<u8>,
 }
 

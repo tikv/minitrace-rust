@@ -31,92 +31,78 @@ fn build_tree(
     u64, /* min begin */
     u64, /* max end*/
 ) {
-    let mut span_sets = trace_details.span_sets.clone();
-    span_sets.sort_by(|a, b| a.spans[0].begin_cycles.cmp(&b.spans[0].begin_cycles));
+    let mut spans = trace_details.spans.clone();
+    spans.sort_by(|a, b| a.begin_cycles.cmp(&b.begin_cycles));
     let mut id_to_node: HashMap<u64, Node> = HashMap::new();
 
     let mut root = None;
-    let mut min_begin = None;
+    let mut min_begin = 0;
     let mut max_end = 0;
-    for span_set in span_sets {
-        let leading_span = span_set.spans[0];
-        let next_span = span_set.spans[1];
-        assert_eq!(next_span.state, minitrace::State::Settle);
-
-        let next_node = Rc::new(RefCell::new(NormalNode {
-            span: next_span,
-            normal_children: vec![],
-            leading_children: vec![],
-        }));
-        id_to_node.insert(next_span.id, Node::NormalNode(next_node.clone()));
-        let end = next_span.begin_cycles + next_span.elapsed_cycles;
+    for span in spans {
+        let end = span.begin_cycles + span.elapsed_cycles;
         if end > max_end {
             max_end = end;
         }
-
-        if leading_span.state == minitrace::State::Root {
-            let leading_node = Rc::new(RefCell::new(LeadingNode {
-                children: vec![next_node.clone()],
-            }));
-            min_begin = Some(leading_span.begin_cycles);
-            root = Some(leading_node.clone());
-            id_to_node.insert(leading_span.id, Node::LeadingNode(leading_node));
-        } else {
-            assert!(
-                leading_span.state == minitrace::State::Spawning
-                    || leading_span.state == minitrace::State::Scheduling
-            );
-            match id_to_node.get(&leading_span.related_id) {
-                Some(Node::LeadingNode(prev)) => {
-                    let node = {
-                        let node_ref = &mut *prev.borrow_mut();
-                        node_ref.children.push(next_node.clone());
-                        prev.clone()
-                    };
-                    id_to_node.insert(leading_span.id, Node::LeadingNode(node));
-                }
-                Some(Node::NormalNode(normal_node)) => {
-                    let leading_node = {
-                        let leading_node = Rc::new(RefCell::new(LeadingNode {
-                            children: vec![next_node.clone()],
-                        }));
-                        let node_ref = &mut *normal_node.borrow_mut();
-                        node_ref.leading_children.push(leading_node.clone());
-                        leading_node
-                    };
-                    id_to_node.insert(leading_span.id, Node::LeadingNode(leading_node));
-                }
-                None => unreachable!("{}", leading_span.related_id),
+        match span.state {
+            minitrace::State::Root => {
+                min_begin = span.begin_cycles;
+                let leading_node = Rc::new(RefCell::new(LeadingNode { children: vec![] }));
+                id_to_node.insert(span.id, Node::LeadingNode(leading_node.clone()));
+                root = Some(leading_node);
             }
-        }
-
-        for span in &span_set.spans[2..] {
-            let node = Rc::new(RefCell::new(NormalNode {
-                span: *span,
-                normal_children: vec![],
-                leading_children: vec![],
-            }));
-            {
-                let end = span.begin_cycles + span.elapsed_cycles;
-                if end > max_end {
-                    max_end = end;
-                }
-                if let Node::NormalNode(normal_node) = &id_to_node[&span.related_id] {
-                    let node_ref = &mut *normal_node.borrow_mut();
-                    node_ref.normal_children.push(node.clone());
+            minitrace::State::Local => {
+                if let Node::NormalNode(parent) = &id_to_node[&span.related_id] {
+                    let normal_node = Rc::new(RefCell::new(NormalNode {
+                        span,
+                        normal_children: vec![],
+                        leading_children: vec![],
+                    }));
+                    parent
+                        .borrow_mut()
+                        .normal_children
+                        .push(normal_node.clone());
+                    id_to_node.insert(span.id, Node::NormalNode(normal_node));
                 } else {
-                    panic!("related span of {} isn't existing", span.related_id);
+                    unreachable!();
                 }
             }
-            id_to_node.insert(span.id, Node::NormalNode(node));
+            minitrace::State::Spawning => {
+                if let Node::NormalNode(parent) = &id_to_node[&span.related_id] {
+                    let leading_node = Rc::new(RefCell::new(LeadingNode { children: vec![] }));
+                    parent
+                        .borrow_mut()
+                        .leading_children
+                        .push(leading_node.clone());
+                    id_to_node.insert(span.id, Node::LeadingNode(leading_node));
+                } else {
+                    unreachable!();
+                }
+            }
+            minitrace::State::Scheduling => {
+                if let Node::LeadingNode(prev) = &id_to_node[&span.related_id] {
+                    let prev = prev.clone();
+                    id_to_node.insert(span.id, Node::LeadingNode(prev));
+                } else {
+                    unreachable!();
+                }
+            }
+            minitrace::State::Settle => {
+                if let Node::LeadingNode(prev) = &id_to_node[&span.related_id] {
+                    let normal_node = Rc::new(RefCell::new(NormalNode {
+                        span,
+                        normal_children: vec![],
+                        leading_children: vec![],
+                    }));
+                    prev.borrow_mut().children.push(normal_node.clone());
+                    id_to_node.insert(span.id, Node::NormalNode(normal_node));
+                } else {
+                    unreachable!();
+                }
+            }
         }
     }
 
-    (
-        root.expect("root span isn't existing"),
-        min_begin.unwrap(),
-        max_end,
-    )
+    (root.expect("root span isn't existing"), min_begin, max_end)
 }
 
 pub fn draw_stdout(trace_details: minitrace::TraceDetails) {
