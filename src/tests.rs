@@ -32,77 +32,86 @@ fn build_tree(trace_details: &crate::TraceDetails) -> Rc<RefCell<LeadingNode>> {
     let mut id_to_node: HashMap<u64, Node> = HashMap::new();
 
     let mut root = None;
+    let mut idle = vec![];
     for span in spans {
-        match span.state {
-            crate::State::Root => {
-                let leading_node = Rc::new(RefCell::new(LeadingNode {
-                    span,
-                    child: None,
-                    next: None,
-                }));
-                id_to_node.insert(span.id, Node::LeadingNode(leading_node.clone()));
-                root = Some(leading_node);
-            }
-            crate::State::Local => {
-                if let Node::NormalNode(parent) = &id_to_node[&span.related_id] {
-                    let normal_node = Rc::new(RefCell::new(NormalNode {
-                        span,
-                        normal_children: vec![],
-                        leading_children: vec![],
-                    }));
-                    parent
-                        .borrow_mut()
-                        .normal_children
-                        .push(normal_node.clone());
-                    id_to_node.insert(span.id, Node::NormalNode(normal_node));
-                } else {
-                    unreachable!();
-                }
-            }
-            crate::State::Spawning => {
-                if let Node::NormalNode(parent) = &id_to_node[&span.related_id] {
+        let mut process = idle.clone();
+        process.push(span);
+        idle.clear();
+        for span in process {
+            match span.state {
+                crate::State::Root => {
                     let leading_node = Rc::new(RefCell::new(LeadingNode {
                         span,
                         child: None,
                         next: None,
                     }));
-                    parent
-                        .borrow_mut()
-                        .leading_children
-                        .push(leading_node.clone());
-                    id_to_node.insert(span.id, Node::LeadingNode(leading_node));
-                } else {
-                    unreachable!();
+                    id_to_node.insert(span.id, Node::LeadingNode(leading_node.clone()));
+                    root = Some(leading_node);
                 }
-            }
-            crate::State::Scheduling => {
-                if let Node::LeadingNode(prev) = &id_to_node[&span.related_id] {
-                    let leading_node = Rc::new(RefCell::new(LeadingNode {
-                        span,
-                        child: None,
-                        next: None,
-                    }));
-                    prev.borrow_mut().next = Some(leading_node.clone());
-                    id_to_node.insert(span.id, Node::LeadingNode(leading_node));
-                } else {
-                    unreachable!();
-                }
-            }
-            crate::State::Settle => {
-                if let Node::LeadingNode(prev) = &id_to_node[&span.related_id] {
-                    let normal_node = Rc::new(RefCell::new(NormalNode {
-                        span,
-                        normal_children: vec![],
-                        leading_children: vec![],
-                    }));
-                    prev.borrow_mut().child = Some(normal_node.clone());
-                    id_to_node.insert(span.id, Node::NormalNode(normal_node));
-                } else {
-                    unreachable!();
-                }
+                crate::State::Local => match id_to_node.get(&span.related_id) {
+                    Some(Node::NormalNode(parent)) => {
+                        let normal_node = Rc::new(RefCell::new(NormalNode {
+                            span,
+                            normal_children: vec![],
+                            leading_children: vec![],
+                        }));
+                        parent
+                            .borrow_mut()
+                            .normal_children
+                            .push(normal_node.clone());
+                        id_to_node.insert(span.id, Node::NormalNode(normal_node));
+                    }
+                    Some(_) => unreachable!(),
+                    None => {
+                        idle.push(span);
+                    }
+                },
+                crate::State::Spawning => match id_to_node.get(&span.related_id) {
+                    Some(Node::NormalNode(parent)) => {
+                        let leading_node = Rc::new(RefCell::new(LeadingNode {
+                            span,
+                            child: None,
+                            next: None,
+                        }));
+                        parent
+                            .borrow_mut()
+                            .leading_children
+                            .push(leading_node.clone());
+                        id_to_node.insert(span.id, Node::LeadingNode(leading_node));
+                    }
+                    Some(_) => unreachable!(),
+                    None => idle.push(span),
+                },
+                crate::State::Scheduling => match id_to_node.get(&span.related_id) {
+                    Some(Node::LeadingNode(prev)) => {
+                        let leading_node = Rc::new(RefCell::new(LeadingNode {
+                            span,
+                            child: None,
+                            next: None,
+                        }));
+                        prev.borrow_mut().next = Some(leading_node.clone());
+                        id_to_node.insert(span.id, Node::LeadingNode(leading_node));
+                    }
+                    Some(_) => unreachable!(),
+                    None => idle.push(span),
+                },
+                crate::State::Settle => match id_to_node.get(&span.related_id) {
+                    Some(Node::LeadingNode(prev)) => {
+                        let normal_node = Rc::new(RefCell::new(NormalNode {
+                            span,
+                            normal_children: vec![],
+                            leading_children: vec![],
+                        }));
+                        prev.borrow_mut().child = Some(normal_node.clone());
+                        id_to_node.insert(span.id, Node::NormalNode(normal_node));
+                    }
+                    Some(_) => unreachable!(),
+                    None => idle.push(span),
+                },
             }
         }
     }
+    assert!(idle.is_empty());
 
     root.expect("root span isn't existing")
 }
@@ -608,7 +617,6 @@ fn test_property_async() {
     wg.wait();
 
     let trace_details = collector.collect();
-    dbg!(&trace_details);
     let real_tree = build_tree(&trace_details);
     let shape = leading!(
         0,
