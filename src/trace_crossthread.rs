@@ -56,7 +56,7 @@ impl CrossthreadTrace {
         let event = event.into();
         if let Some(inner) = &mut self.inner {
             let now_cycles = minstant::now();
-            if let Some((trace_guard, self_id)) = crate::trace_local::LocalTraceGuard::new(
+            if let Some((local_guard, self_id)) = crate::trace_local::LocalTraceGuard::new(
                 inner.collector.clone(),
                 now_cycles,
                 crate::LeadingSpan {
@@ -72,7 +72,7 @@ impl CrossthreadTrace {
                 inner.next_related_id = self_id;
 
                 Some(LocalTraceGuard {
-                    _local: trace_guard,
+                    _local: local_guard,
                     handle: inner,
                 })
             } else {

@@ -141,7 +141,7 @@ impl Drop for LocalTraceGuard {
 
         // fill the elapsed cycles of the first span (except the leading span)
         tl.spans[self.span_start_index + 1].elapsed_cycles =
-            minstant::now().saturating_sub(tl.spans[self.span_start_index].begin_cycles);
+            minstant::now().saturating_sub(tl.spans[self.span_start_index + 1].begin_cycles);
 
         // check if the enter stack is corrupted
         let id = tl.spans[self.span_start_index + 1].id;
