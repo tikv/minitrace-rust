@@ -608,6 +608,7 @@ fn test_property_async() {
     wg.wait();
 
     let trace_details = collector.collect();
+    dbg!(&trace_details);
     let real_tree = build_tree(&trace_details);
     let shape = leading!(
         0,
