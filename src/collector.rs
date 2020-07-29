@@ -33,7 +33,7 @@ impl Collector {
                 cycles_per_second: minstant::cycles_per_second(),
                 spans: span_set.spans,
                 properties: span_set.properties,
-            }
+            };
         }
 
         let mut spans_len = 0;
