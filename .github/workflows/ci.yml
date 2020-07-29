@@ -34,7 +34,6 @@ jobs:
       run: cargo build --workspace --all-targets
     - name: Run tests
       run: cargo test --workspace --all-targets
-
     - name: Run benches
       run: cargo bench --workspace --all-targets
     - name: Run examples
