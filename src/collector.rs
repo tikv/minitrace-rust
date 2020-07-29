@@ -25,6 +25,17 @@ impl Collector {
     pub fn collect(self) -> crate::TraceDetails {
         let span_sets = self.collect_once();
 
+        if span_sets.len() == 1 {
+            let span_set = span_sets.into_iter().next().unwrap();
+            return crate::TraceDetails {
+                start_time_ns: self.inner.start_time_ns,
+                elapsed_ns: crate::time::real_time_ns().saturating_sub(self.inner.start_time_ns),
+                cycles_per_second: minstant::cycles_per_second(),
+                spans: span_set.spans,
+                properties: span_set.properties,
+            }
+        }
+
         let mut spans_len = 0;
         let mut span_ids_len = 0;
         let mut property_lens_len = 0;
