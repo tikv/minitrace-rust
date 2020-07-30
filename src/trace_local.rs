@@ -66,10 +66,20 @@ pub(crate) struct LeadingSpan {
 }
 
 impl LocalTraceGuard {
+    /// The `state` of a leading span is `Root` or `Spawning` or `Scheduling` which indicates
+    /// the origin of the tracing context. 
+    /// The `elapsed_cycles` of a leading span is sorts of waiting time not executing time.
+    /// Following a leading span, it's a span of `Settle` state, meaning traced execution is started.
     pub(crate) fn new(
         collector: std::sync::Arc<crate::collector::CollectorInner>,
         now_cycles: u64,
-        leading_span: LeadingSpan,
+        LeadingSpan {
+            state,
+            related_id,
+            begin_cycles,
+            elapsed_cycles,
+            event,
+        }: LeadingSpan,
     ) -> Option<(Self, SpanId)> {
         if collector.closed.load(std::sync::atomic::Ordering::Relaxed) {
             return None;
@@ -91,14 +101,6 @@ impl LocalTraceGuard {
             let id0 = ((tl.id_prefix as u64) << 32) | tl.id_suffix as u64;
             (id0, id0 - 1)
         };
-
-        let LeadingSpan {
-            state,
-            related_id,
-            begin_cycles,
-            elapsed_cycles,
-            event,
-        } = leading_span;
 
         tl.spans.push(crate::Span {
             id: id0,
