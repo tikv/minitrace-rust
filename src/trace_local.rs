@@ -67,7 +67,7 @@ pub(crate) struct LeadingSpan {
 
 impl LocalTraceGuard {
     /// The `state` of a leading span is `Root` or `Spawning` or `Scheduling` which indicates
-    /// the origin of the tracing context. 
+    /// the origin of the tracing context.
     /// The `elapsed_cycles` of a leading span is sorts of waiting time not executing time.
     /// Following a leading span, it's a span of `Settle` state, meaning traced execution is started.
     pub(crate) fn new(

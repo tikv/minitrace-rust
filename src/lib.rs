@@ -140,8 +140,8 @@ pub enum State {
 ///
 /// and will be stored into `Properties` struct as:
 /// ```text
-/// span_ids:  [10, 10, 12, 14]
-/// property_lens: [ 3,  6,  4,  3]
+/// span_ids: [10, 10, 12, 14]
+/// property_lens: [3, 6, 4, 3]
 /// payload: b"123!@$#$%abcdxyz"
 /// ```
 #[derive(Debug, Clone)]
