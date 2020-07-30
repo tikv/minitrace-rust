@@ -11,7 +11,7 @@ pub(crate) struct SpanSet {
 
 pub(crate) struct CollectorInner {
     start_time_ns: u64,
-    pub(crate) queue: crossbeam::queue::SegQueue<crate::SpanSet>,
+    pub(crate) queue: crossbeam::queue::SegQueue<SpanSet>,
     pub(crate) closed: std::sync::atomic::AtomicBool,
 }
 
@@ -84,7 +84,7 @@ impl Collector {
     }
 
     #[inline]
-    fn collect_spanset(&self) -> Vec<crate::SpanSet> {
+    fn collect_spanset(&self) -> Vec<SpanSet> {
         let len = self.inner.queue.len();
         let mut res = Vec::with_capacity(len);
         while let Ok(spans) = self.inner.queue.pop() {
