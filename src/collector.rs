@@ -23,8 +23,9 @@ impl Collector {
 
     #[inline]
     pub fn collect(self) -> crate::TraceDetails {
-        let span_sets = self.collect_once();
+        let span_sets = self.collect_spanset();
 
+        // Fast path to save memory allocation.
         if span_sets.len() == 1 {
             let span_set = span_sets.into_iter().next().unwrap();
             return crate::TraceDetails {
@@ -74,7 +75,7 @@ impl Collector {
     }
 
     #[inline]
-    pub fn collect_once(&self) -> Vec<crate::SpanSet> {
+    fn collect_spanset(&self) -> Vec<crate::SpanSet> {
         let len = self.inner.queue.len();
         let mut res = Vec::with_capacity(len);
         while let Ok(spans) = self.inner.queue.pop() {
