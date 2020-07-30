@@ -1,5 +1,14 @@
 // Copyright 2020 TiKV Project Authors. Licensed under Apache-2.0.
 
+#[derive(Debug, Clone)]
+pub(crate) struct SpanSet {
+    /// Span collection
+    pub spans: Vec<crate::Span>,
+
+    /// Property collection
+    pub properties: crate::Properties,
+}
+
 pub(crate) struct CollectorInner {
     start_time_ns: u64,
     pub(crate) queue: crossbeam::queue::SegQueue<crate::SpanSet>,

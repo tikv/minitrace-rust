@@ -150,12 +150,3 @@ pub struct Properties {
     pub property_lens: Vec<u64>,
     pub payload: Vec<u8>,
 }
-
-#[derive(Debug, Clone)]
-pub struct SpanSet {
-    /// Span collection
-    pub spans: Vec<Span>,
-
-    /// Property collection
-    pub properties: Properties,
-}

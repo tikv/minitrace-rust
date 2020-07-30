@@ -214,7 +214,10 @@ impl<T: std::future::Future> std::future::Future for TraceRootFuture<T> {
         };
 
         drop(guard);
-        std::task::Poll::Ready((this.collector.take().expect("poll twice").collect(), r))
+
+        // mute rust-analyzer
+        let oc: &mut Option<_> = this.collector;
+        std::task::Poll::Ready((oc.take().expect("poll twice").collect(), r))
     }
 }
 
