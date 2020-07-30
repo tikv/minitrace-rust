@@ -42,14 +42,12 @@ static GLOBAL_ID_COUNTER: std::sync::atomic::AtomicU32 = std::sync::atomic::Atom
 
 #[inline]
 fn next_global_id_prefix() -> u32 {
-    GLOBAL_ID_COUNTER.fetch_add(1, std::sync::atomic::Ordering::SeqCst)
+    GLOBAL_ID_COUNTER.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
 }
 
 pub struct LocalTraceGuard {
     collector: std::sync::Arc<crate::collector::CollectorInner>,
     trace_local: *mut TraceLocal,
-    create_time_ns: u64,
-    start_time_ns: u64,
 
     span_start_index: usize,
     property_start_index: usize,
@@ -59,15 +57,31 @@ pub struct LocalTraceGuard {
 impl !Sync for LocalTraceGuard {}
 impl !Send for LocalTraceGuard {}
 
+pub(crate) struct LeadingSpan {
+    pub(crate) state: crate::State,
+    pub(crate) related_id: SpanId,
+    pub(crate) begin_cycles: u64,
+    pub(crate) elapsed_cycles: u64,
+    pub(crate) event: u32,
+}
+
 impl LocalTraceGuard {
-    pub(crate) fn new<T: Into<u32>>(
+    /// The `state` of a leading span is `Root` or `Spawning` or `Scheduling` which indicates
+    /// the origin of the tracing context.
+    /// The `elapsed_cycles` of a leading span is sorts of waiting time not executing time.
+    /// Following a leading span, it's a span of `Settle` state, meaning traced execution is started.
+    pub(crate) fn new(
         collector: std::sync::Arc<crate::collector::CollectorInner>,
-        event: T,
-        link: crate::Link,
-        create_time_ns: u64,
-        start_time_ns: u64,
+        now_cycles: u64,
+        LeadingSpan {
+            state,
+            related_id,
+            begin_cycles,
+            elapsed_cycles,
+            event,
+        }: LeadingSpan,
     ) -> Option<(Self, SpanId)> {
-        if collector.closed.load(std::sync::atomic::Ordering::SeqCst) {
+        if collector.closed.load(std::sync::atomic::Ordering::Relaxed) {
             return None;
         }
 
@@ -76,28 +90,39 @@ impl LocalTraceGuard {
 
         tl.cur_collector = Some(collector.clone());
 
-        let id = {
-            if tl.id_suffix == std::u32::MAX {
+        // fetch two ids, one for leading span, one for new span
+        let (id0, id1) = {
+            if tl.id_suffix >= std::u32::MAX - 1 {
                 tl.id_suffix = 0;
                 tl.id_prefix = next_global_id_prefix();
             } else {
-                tl.id_suffix += 1;
+                tl.id_suffix += 2;
             }
-            ((tl.id_prefix as u64) << 32) | tl.id_suffix as u64
+            let id0 = ((tl.id_prefix as u64) << 32) | tl.id_suffix as u64;
+            (id0, id0 - 1)
         };
 
-        tl.enter_stack.push(id);
-        let span_start_index = tl.spans.len();
+        tl.spans.push(crate::Span {
+            id: id0,
+            state,
+            related_id,
+            begin_cycles,
+            elapsed_cycles,
+            event,
+        });
+        tl.spans.push(crate::Span {
+            id: id1,
+            state: crate::State::Settle,
+            related_id: id0,
+            begin_cycles: now_cycles,
+            elapsed_cycles: 0,
+            event,
+        });
+        tl.enter_stack.push(id1);
+
+        let span_start_index = tl.spans.len() - 2;
         let property_start_index = tl.property_ids.len();
         let property_payload_start_index = tl.property_payload.len();
-
-        tl.spans.push(crate::Span {
-            id,
-            link,
-            begin_cycles: minstant::now(),
-            elapsed_cycles: 0,
-            event: event.into(),
-        });
 
         Some((
             Self {
@@ -106,10 +131,8 @@ impl LocalTraceGuard {
                 span_start_index,
                 property_start_index,
                 property_payload_start_index,
-                create_time_ns,
-                start_time_ns,
             },
-            id,
+            id0,
         ))
     }
 }
@@ -118,18 +141,18 @@ impl Drop for LocalTraceGuard {
     fn drop(&mut self) {
         let tl = unsafe { &mut *self.trace_local };
 
-        // fill the elapsed cycles of the first span
-        tl.spans[self.span_start_index].elapsed_cycles =
-            minstant::now().saturating_sub(tl.spans[self.span_start_index].begin_cycles);
+        // fill the elapsed cycles of the first span (except the leading span)
+        tl.spans[self.span_start_index + 1].elapsed_cycles =
+            minstant::now().saturating_sub(tl.spans[self.span_start_index + 1].begin_cycles);
 
         // check if the enter stack is corrupted
-        let id = tl.spans[self.span_start_index].id;
+        let id = tl.spans[self.span_start_index + 1].id;
         assert_eq!(tl.enter_stack.pop().unwrap(), id, "corrupted stack");
 
         if !self
             .collector
             .closed
-            .load(std::sync::atomic::Ordering::SeqCst)
+            .load(std::sync::atomic::Ordering::Relaxed)
         {
             let spans = tl.spans.split_off(self.span_start_index);
             let property_ids = tl.property_ids.split_off(self.property_start_index);
@@ -139,12 +162,10 @@ impl Drop for LocalTraceGuard {
                 .split_off(self.property_payload_start_index);
 
             self.collector.queue.push(crate::SpanSet {
-                create_time_ns: self.create_time_ns,
-                start_time_ns: self.start_time_ns,
                 spans,
                 properties: crate::Properties {
                     span_ids: property_ids,
-                    span_lens: property_lens,
+                    property_lens,
                     payload: property_payload,
                 },
             });
@@ -198,7 +219,7 @@ impl SpanGuard {
         }
 
         let index = tl.spans.len();
-        let parent = *tl.enter_stack.last().unwrap();
+        let parent_id = *tl.enter_stack.last().unwrap();
 
         let id = {
             if tl.id_suffix == std::u32::MAX {
@@ -214,7 +235,8 @@ impl SpanGuard {
 
         tl.spans.push(crate::Span {
             id,
-            link: crate::Link::Parent { id: parent },
+            state: crate::State::Local,
+            related_id: parent_id,
             begin_cycles: minstant::now(),
             elapsed_cycles: 0,
             event,

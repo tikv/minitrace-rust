@@ -34,25 +34,87 @@ pub struct TraceDetails {
     /// For conversion of cycles -> ns
     pub cycles_per_second: u64,
 
-    /// Spanset collection
-    pub span_sets: Vec<SpanSet>,
+    /// Span collection
+    pub spans: Vec<Span>,
+
+    /// Properties
+    pub properties: Properties,
 }
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub struct Span {
     pub id: u64,
-    pub link: Link,
-    // TODO: add cargo feature to allow altering to ns
+    pub state: State,
+    pub related_id: u64,
     pub begin_cycles: u64,
     pub elapsed_cycles: u64,
     pub event: u32,
 }
 
+/// `State` represents the attributes of a span and how the span relates to
+/// another span with `related_id`.
+///
+/// ## Root
+/// ```text
+/// ------------------------------- TIME LINE -------------------------------------->
+///
+/// | <- enable trace
+/// +------------------------------------+-------------------------------+
+/// | state: Root, related_id: 0, id: 88 | state: Settle, related_id: 88 |
+/// +------------------------------------+-------------------------------+
+/// ```
+///
+/// ## Local
+/// ```text
+/// ------------------------------- TIME LINE -------------------------------------->
+///
+/// +--------------------------------------+
+/// |          A span with id 42           |
+/// +--------------------------------------+
+///       | <- new_span()
+///       +------------------------------+
+///       | state: Local, related_id: 42 |
+///       +------------------------------+
+/// ```
+///
+/// ## Spawning & Settle
+/// ```text
+/// ------------------------------- TIME LINE -------------------------------------->
+///
+/// +--------------------------------------+
+/// |          A span with id 42           |
+/// +--------------------------------------+
+///       | let handle = trace_crossthread();
+///       | <- thread::spawn()
+///       +-----------------------------------------+-------------------------------+
+///       | state: Spawning, related_id: 42, id: 77 | state: Settle, related_id: 77 |
+///       +-----------------------------------------+-------------------------------+
+///                                                 | <- handle.trace_enable()
+/// ```
+///
+/// ## Scheduling & Settle
+/// ```text
+/// ------------------------------- TIME LINE -------------------------------------->
+///
+/// +--------------------------------------+
+/// |          A span with id 42           |
+/// +--------------------------------------+
+///   | <- runtime::spawn(future)
+///   +-----------------------------------------+-------------------------------+
+///   | state: Spawning, related_id: 42, id: 77 | state: Settle, related_id: 77 |
+///   +-----------------------------------------+-------------------------------+
+///                                             | <- future.poll()              | <- poll() return                          | <- future.poll()
+///                                                                             +-------------------------------------------+-------------------------------+
+///                                                                             | state: Scheduling, related_id: 77, id: 23 | state: Settle, related_id: 23 |
+///                                                                             +-------------------------------------------+-------------------------------+
+/// ```
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
-pub enum Link {
+pub enum State {
     Root,
-    Parent { id: u64 },
-    Continue { id: u64 },
+    Local,
+    Spawning,
+    Scheduling,
+    Settle,
 }
 
 /// Properties can used to attach some information about tracing context
@@ -68,7 +130,7 @@ pub enum Link {
 ///
 /// Every property will relate to a span. Logically properties are a sequence
 /// of (span id, property) pairs:
-/// ```ignore
+/// ```text
 /// span id -> property
 /// 10      -> b"123"
 /// 10      -> b"!@$#$%"
@@ -77,27 +139,20 @@ pub enum Link {
 /// ```
 ///
 /// and will be stored into `Properties` struct as:
-/// ```ignore
-/// span_ids:  [10, 10, 12, 14]
-/// span_lens: [ 3,  6,  4,  3]
+/// ```text
+/// span_ids: [10, 10, 12, 14]
+/// property_lens: [3, 6, 4, 3]
 /// payload: b"123!@$#$%abcdxyz"
 /// ```
 #[derive(Debug, Clone)]
 pub struct Properties {
     pub span_ids: Vec<u64>,
-    pub span_lens: Vec<u64>,
+    pub property_lens: Vec<u64>,
     pub payload: Vec<u8>,
 }
 
 #[derive(Debug, Clone)]
 pub struct SpanSet {
-    /// The create time of the span set. Used to calculate
-    /// the waiting time of async task.
-    pub create_time_ns: u64,
-
-    /// The time corresponding to the `begin_cycles` of the first span
-    pub start_time_ns: u64,
-
     /// Span collection
     pub spans: Vec<Span>,
 

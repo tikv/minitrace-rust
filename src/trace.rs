@@ -8,17 +8,21 @@ pub fn trace_enable<T: Into<u32>>(
     crate::trace_local::LocalTraceGuard,
     crate::collector::Collector,
 ) {
-    let now = crate::time::real_time_ns();
-    let collector = crate::collector::Collector::new(now);
+    let collector = crate::collector::Collector::new(crate::time::real_time_ns());
 
+    let now_cycles = minstant::now();
     let (trace_guard, _) = crate::trace_local::LocalTraceGuard::new(
         collector.inner.clone(),
-        event,
-        crate::Link::Root,
-        now,
-        now,
+        now_cycles,
+        crate::LeadingSpan {
+            state: crate::State::Root,
+            related_id: 0,
+            begin_cycles: now_cycles,
+            elapsed_cycles: 0,
+            event: event.into(),
+        },
     )
-    .unwrap();
+    .unwrap(); // It's safe to unwrap because the collector always exists at present.
 
     (trace_guard, collector)
 }

@@ -2,45 +2,273 @@
 
 use crate::prelude::*;
 
-// An auxiliary function for checking relations of spans.
-// Note that the events of each spans cannot be the same.
-//
-// Return: [(event, Option<parent_event>)], sorted by event
-fn rebuild_relation_by_event(spans: Vec<crate::SpanSet>) -> Vec<(u32, Option<u32>)> {
-    let spans = spans
-        .into_iter()
-        .map(|s| s.spans.into_iter())
-        .flatten()
-        .collect::<Vec<_>>();
-    let infos: std::collections::HashMap<u64, (Option<u64>, u32)> = spans
-        .into_iter()
-        .map(|s| {
-            (
-                s.id,
-                (
-                    match s.link {
-                        crate::Link::Root => None,
-                        crate::Link::Parent { id } => Some(id),
-                        crate::Link::Continue { .. } => unreachable!(),
-                    },
-                    s.event,
-                ),
-            )
-        })
-        .collect();
+use std::cell::RefCell;
+use std::collections::HashMap;
+use std::rc::Rc;
 
-    let mut res = Vec::with_capacity(infos.len());
+#[derive(Debug)]
+struct LeadingNode {
+    span: crate::Span,
+    child: Option<Rc<RefCell<NormalNode>>>,
+    next: Option<Rc<RefCell<LeadingNode>>>,
+}
 
-    for (_id, (parent_id, event)) in infos.iter() {
-        if let Some(p) = parent_id {
-            res.push((*event, Some(infos[&p].1)));
-        } else {
-            res.push((*event, None));
+#[derive(Debug)]
+struct NormalNode {
+    span: crate::Span,
+    normal_children: Vec<Rc<RefCell<NormalNode>>>,
+    leading_children: Vec<Rc<RefCell<LeadingNode>>>,
+}
+
+#[derive(Debug)]
+enum Node {
+    LeadingNode(Rc<RefCell<LeadingNode>>),
+    NormalNode(Rc<RefCell<NormalNode>>),
+}
+
+fn build_tree(trace_details: &crate::TraceDetails) -> Rc<RefCell<LeadingNode>> {
+    let mut spans = trace_details.spans.clone();
+    spans.sort_by(|a, b| a.begin_cycles.cmp(&b.begin_cycles));
+    let mut id_to_node: HashMap<u64, Node> = HashMap::new();
+
+    let mut root = None;
+    let mut idle = vec![];
+    for span in spans {
+        let mut process = idle.clone();
+        process.push(span);
+        idle.clear();
+        for span in process {
+            match span.state {
+                crate::State::Root => {
+                    let leading_node = Rc::new(RefCell::new(LeadingNode {
+                        span,
+                        child: None,
+                        next: None,
+                    }));
+                    id_to_node.insert(span.id, Node::LeadingNode(leading_node.clone()));
+                    root = Some(leading_node);
+                }
+                crate::State::Local => match id_to_node.get(&span.related_id) {
+                    Some(Node::NormalNode(parent)) => {
+                        let normal_node = Rc::new(RefCell::new(NormalNode {
+                            span,
+                            normal_children: vec![],
+                            leading_children: vec![],
+                        }));
+                        parent
+                            .borrow_mut()
+                            .normal_children
+                            .push(normal_node.clone());
+                        id_to_node.insert(span.id, Node::NormalNode(normal_node));
+                    }
+                    Some(_) => unreachable!(),
+                    None => {
+                        idle.push(span);
+                    }
+                },
+                crate::State::Spawning => match id_to_node.get(&span.related_id) {
+                    Some(Node::NormalNode(parent)) => {
+                        let leading_node = Rc::new(RefCell::new(LeadingNode {
+                            span,
+                            child: None,
+                            next: None,
+                        }));
+                        parent
+                            .borrow_mut()
+                            .leading_children
+                            .push(leading_node.clone());
+                        id_to_node.insert(span.id, Node::LeadingNode(leading_node));
+                    }
+                    Some(_) => unreachable!(),
+                    None => idle.push(span),
+                },
+                crate::State::Scheduling => match id_to_node.get(&span.related_id) {
+                    Some(Node::LeadingNode(prev)) => {
+                        let leading_node = Rc::new(RefCell::new(LeadingNode {
+                            span,
+                            child: None,
+                            next: None,
+                        }));
+                        prev.borrow_mut().next = Some(leading_node.clone());
+                        id_to_node.insert(span.id, Node::LeadingNode(leading_node));
+                    }
+                    Some(_) => unreachable!(),
+                    None => idle.push(span),
+                },
+                crate::State::Settle => match id_to_node.get(&span.related_id) {
+                    Some(Node::LeadingNode(prev)) => {
+                        let normal_node = Rc::new(RefCell::new(NormalNode {
+                            span,
+                            normal_children: vec![],
+                            leading_children: vec![],
+                        }));
+                        prev.borrow_mut().child = Some(normal_node.clone());
+                        id_to_node.insert(span.id, Node::NormalNode(normal_node));
+                    }
+                    Some(_) => unreachable!(),
+                    None => idle.push(span),
+                },
+            }
         }
     }
+    assert!(idle.is_empty());
 
-    res.sort();
-    res
+    root.expect("root span isn't existing")
+}
+
+fn compare_relation(real_tree: &Rc<RefCell<LeadingNode>>, shape: &Rc<RefCell<LeadingNode>>) {
+    compare_leading(real_tree, shape);
+}
+
+fn compare_leading(real_tree: &Rc<RefCell<LeadingNode>>, approx_tree: &Rc<RefCell<LeadingNode>>) {
+    assert_eq!(
+        real_tree.borrow().span.event,
+        approx_tree.borrow().span.event
+    );
+
+    if real_tree.borrow().next.is_some() || approx_tree.borrow().next.is_some() {
+        compare_leading(
+            real_tree.borrow().next.as_ref().unwrap(),
+            approx_tree.borrow().next.as_ref().unwrap(),
+        );
+    }
+
+    compare_normal(
+        &real_tree.borrow().child.as_ref().unwrap(),
+        &approx_tree.borrow().child.as_ref().unwrap(),
+    );
+}
+
+fn compare_normal(real_tree: &Rc<RefCell<NormalNode>>, approx_tree: &Rc<RefCell<NormalNode>>) {
+    assert_eq!(
+        real_tree.borrow().span.event,
+        approx_tree.borrow().span.event
+    );
+    {
+        assert_eq!(
+            real_tree.borrow().normal_children.len(),
+            approx_tree.borrow().normal_children.len()
+        );
+        for (real, approc) in real_tree
+            .borrow()
+            .normal_children
+            .iter()
+            .zip(approx_tree.borrow().normal_children.iter())
+        {
+            compare_normal(real, approc);
+        }
+    }
+    {
+        real_tree
+            .borrow_mut()
+            .leading_children
+            .sort_by(|a, b| a.borrow().span.event.cmp(&b.borrow().span.event));
+
+        approx_tree
+            .borrow_mut()
+            .leading_children
+            .sort_by(|a, b| a.borrow().span.event.cmp(&b.borrow().span.event));
+    }
+
+    assert_eq!(
+        real_tree.borrow().leading_children.len(),
+        approx_tree.borrow().leading_children.len()
+    );
+    for (real, approc) in real_tree
+        .borrow()
+        .leading_children
+        .iter()
+        .zip(approx_tree.borrow().leading_children.iter())
+    {
+        compare_leading(real, approc);
+    }
+}
+
+macro_rules! leading {
+    ($event:expr, $child:expr, $next:expr) => {
+        Rc::new(RefCell::new(LeadingNode {
+            span: crate::Span {
+                id: 0,
+                state: crate::State::Root,
+                related_id: 0,
+                begin_cycles: 0,
+                elapsed_cycles: 0,
+                event: $event,
+            },
+            child: Some($child),
+            next: $next,
+        }))
+    };
+    ($event:expr, child: $child:expr, next: $next:expr) => {
+        leading!($event, $child, Some($next))
+    };
+    ($event:expr, child: $child:expr) => {
+        leading!($event, $child, None)
+    };
+}
+
+macro_rules! normal {
+    ($event:expr, normals: [$($normal:expr),*], leadings: [$($leading:expr),*]) => {
+        Rc::new(RefCell::new(NormalNode {
+            span: crate::Span {
+                id: 0,
+                state: crate::State::Root,
+                related_id: 0,
+                begin_cycles: 0,
+                elapsed_cycles: 0,
+                event: $event,
+            },
+            normal_children: vec![$($normal,)*],
+            leading_children: vec![$($leading,)*],
+        }))
+    };
+    ($event:expr) => {
+        normal!($event, normals: [], leadings: [])
+    };
+    ($event:expr, normals: [$($normal:expr),*]) => {
+        normal!($event, normals: [$($normal),*], leadings: [])
+    };
+    ($event:expr, leadings: [$($leading:expr),*]) => {
+        normal!($event, normals: [], leadings: [$($leading),*])
+    };
+}
+
+fn check_time_included(tree: &Rc<RefCell<LeadingNode>>) {
+    fn check_normal(tree: &Rc<RefCell<NormalNode>>) {
+        let node = &*tree.borrow();
+        let begin_cycles = node.span.begin_cycles;
+        let end_cycles = node.span.begin_cycles + node.span.elapsed_cycles;
+
+        let mut prev_end_cycles = 0;
+        for normal in &node.normal_children {
+            let span = &normal.borrow().span;
+            assert!(prev_end_cycles <= span.begin_cycles);
+            assert!(begin_cycles <= span.begin_cycles);
+            assert!(span.begin_cycles + span.elapsed_cycles <= end_cycles);
+            prev_end_cycles = span.begin_cycles + span.elapsed_cycles;
+            check_normal(normal);
+        }
+
+        for leading in &node.leading_children {
+            let span = &leading.borrow().span;
+            assert!(begin_cycles <= span.begin_cycles);
+            assert!(span.begin_cycles <= end_cycles);
+            check_time_included(leading);
+        }
+    }
+    let leading = &*tree.borrow();
+    assert_eq!(
+        leading.span.begin_cycles + leading.span.elapsed_cycles,
+        leading.child.as_ref().unwrap().borrow().span.begin_cycles
+    );
+    check_normal(leading.child.as_ref().unwrap());
+
+    let prev_span = &leading.child.as_ref().unwrap().borrow().span;
+    let prev_end_cycles = prev_span.begin_cycles + prev_span.elapsed_cycles;
+    if let Some(next) = &leading.next {
+        assert!(prev_end_cycles <= next.borrow().span.begin_cycles);
+        check_time_included(next);
+    }
 }
 
 fn check_trace_local<F>(f: F)
@@ -75,10 +303,11 @@ fn trace_basic() {
     }
 
     let trace_details = collector.collect();
-    let spans = rebuild_relation_by_event(trace_details.span_sets);
 
-    assert_eq!(spans.len(), 2);
-    assert_eq!(&spans, &[(0, None), (1, Some(0))]);
+    let real_tree = build_tree(&trace_details);
+    let shape = leading!(0, child: normal!(0, normals: [normal!(1)]));
+    compare_relation(&real_tree, &shape);
+    check_time_included(&real_tree);
     check_clear();
 }
 
@@ -131,26 +360,29 @@ fn trace_async_basic() {
 
     wg.wait();
     let trace_details = collector.collect();
-    let spans = rebuild_relation_by_event(trace_details.span_sets);
 
-    assert_eq!(spans.len(), 11);
-    assert_eq!(
-        &spans,
-        &[
-            (0, None),
-            (1, Some(0)),
-            (2, Some(0)),
-            (3, Some(0)),
-            (4, Some(0)),
-            (5, Some(0)),
-            (6, Some(0)),
-            (7, Some(0)),
-            (8, Some(0)),
-            (9, Some(0)),
-            (10, Some(0))
-        ]
+    let real_tree = build_tree(&trace_details);
+    let shape = leading!(
+        0,
+        child:
+            normal!(0,
+                leadings:
+                    [
+                        leading!(1, child: normal!(1)),
+                        leading!(2, child: normal!(2)),
+                        leading!(3, child: normal!(3)),
+                        leading!(4, child: normal!(4)),
+                        leading!(5, child: normal!(5)),
+                        leading!(6, child: normal!(6)),
+                        leading!(7, child: normal!(7)),
+                        leading!(8, child: normal!(8)),
+                        leading!(9, child: normal!(9)),
+                        leading!(10, child: normal!(10))
+                    ]
+            )
     );
-
+    compare_relation(&real_tree, &shape);
+    check_time_included(&real_tree);
     check_clear();
     join_handles.into_iter().for_each(|jh| jh.join().unwrap());
 }
@@ -167,25 +399,29 @@ fn trace_wide_function() {
     }
 
     let trace_details = collector.collect();
-    let spans = rebuild_relation_by_event(trace_details.span_sets);
 
-    assert_eq!(spans.len(), 11);
-    assert_eq!(
-        &spans,
-        &[
-            (0, None),
-            (1, Some(0)),
-            (2, Some(0)),
-            (3, Some(0)),
-            (4, Some(0)),
-            (5, Some(0)),
-            (6, Some(0)),
-            (7, Some(0)),
-            (8, Some(0)),
-            (9, Some(0)),
-            (10, Some(0))
-        ]
+    let real_tree = build_tree(&trace_details);
+    let shape = leading!(
+        0,
+        child:
+            normal!(0,
+                normals:
+                    [
+                        normal!(1),
+                        normal!(2),
+                        normal!(3),
+                        normal!(4),
+                        normal!(5),
+                        normal!(6),
+                        normal!(7),
+                        normal!(8),
+                        normal!(9),
+                        normal!(10)
+                    ]
+            )
     );
+    compare_relation(&real_tree, &shape);
+    check_time_included(&real_tree);
     check_clear();
 }
 
@@ -207,25 +443,57 @@ fn trace_deep_function() {
     }
 
     let trace_details = collector.collect();
-    let spans = rebuild_relation_by_event(trace_details.span_sets);
 
-    assert_eq!(spans.len(), 11);
-    assert_eq!(
-        &spans,
-        &[
-            (0, None),
-            (1, Some(2)),
-            (2, Some(3)),
-            (3, Some(4)),
-            (4, Some(5)),
-            (5, Some(6)),
-            (6, Some(7)),
-            (7, Some(8)),
-            (8, Some(9)),
-            (9, Some(10)),
-            (10, Some(0))
-        ]
+    let real_tree = build_tree(&trace_details);
+    let shape = leading!(
+        0,
+        child:
+            normal!(
+                0,
+                normals:
+                    [normal!(
+                        10,
+                        normals:
+                            [normal!(
+                                9,
+                                normals:
+                                    [normal!(
+                                        8,
+                                        normals:
+                                            [normal!(
+                                                7,
+                                                normals:
+                                                    [normal!(
+                                                        6,
+                                                        normals:
+                                                            [normal!(
+                                                                5,
+                                                                normals:
+                                                                    [normal!(
+                                                                        4,
+                                                                        normals:
+                                                                            [normal!(
+                                                                                3,
+                                                                                normals:
+                                                                                    [normal!(
+                                                                                        2,
+                                                                                        normals:
+                                                                                            [normal!(
+                                                                                                1
+                                                                                            )]
+                                                                                    )]
+                                                                            )]
+                                                                    )]
+                                                            )]
+                                                    )]
+                                            )]
+                                    )]
+                            )]
+                    )]
+            )
     );
+    compare_relation(&real_tree, &shape);
+    check_time_included(&real_tree);
     check_clear();
 }
 
@@ -254,10 +522,10 @@ fn trace_collect_ahead() {
     let trace_details = collector.collect();
     drop(wg);
 
-    let spans = rebuild_relation_by_event(trace_details.span_sets);
-    assert_eq!(spans.len(), 2);
-    assert_eq!(&spans, &[(0, None), (1, Some(0)),]);
-    check_clear();
+    let real_tree = build_tree(&trace_details);
+    let shape = leading!(0, child: normal!(0, normals: [normal!(1)]));
+    compare_relation(&real_tree, &shape);
+    check_time_included(&real_tree);
 
     jh.join().unwrap();
 }
@@ -272,7 +540,7 @@ fn test_property_sync() {
     crate::property(b"abc");
     crate::property(b"");
 
-    let g3 = crate::new_span(2u32);
+    let g3 = crate::new_span(3u32);
     crate::property(b"edf");
 
     drop(g3);
@@ -281,31 +549,42 @@ fn test_property_sync() {
     drop(root);
 
     let trace_details = collector.collect();
-    assert_eq!(trace_details.span_sets.len(), 1);
 
-    let span_set = trace_details.span_sets[0].clone();
-    assert_eq!(span_set.spans.len(), 4);
-    assert_eq!(span_set.properties.span_ids.len(), 4);
-    assert_eq!(span_set.properties.span_lens.len(), 4);
-    assert_eq!(span_set.properties.payload.len(), 9);
-    assert_eq!(span_set.properties.payload, b"123abcedf");
+    let real_tree = build_tree(&trace_details);
+    let shape = leading!(
+        0,
+        child:
+            normal!(
+                0,
+                normals: [normal!(1, normals: [normal!(2, normals: [normal!(3)])])]
+            )
+    );
+    compare_relation(&real_tree, &shape);
+    check_time_included(&real_tree);
+    check_clear();
+
+    assert_eq!(trace_details.properties.span_ids.len(), 4);
+    assert_eq!(trace_details.properties.property_lens.len(), 4);
+    assert_eq!(trace_details.properties.payload.len(), 9);
+    assert_eq!(trace_details.properties.payload, b"123abcedf");
 
     for (x, y) in [
-        span_set.spans[0].id,
-        span_set.spans[2].id,
-        span_set.spans[2].id,
-        span_set.spans[3].id,
+        trace_details.spans[1].id,
+        trace_details.spans[3].id,
+        trace_details.spans[3].id,
+        trace_details.spans[4].id,
     ]
     .iter()
-    .zip(span_set.properties.span_ids)
+    .zip(trace_details.properties.span_ids)
     {
         assert_eq!(*x, y);
     }
-    for (x, y) in [3, 3, 0, 3].iter().zip(span_set.properties.span_lens) {
+    for (x, y) in [3, 3, 0, 3]
+        .iter()
+        .zip(trace_details.properties.property_lens)
+    {
         assert_eq!(*x, y);
     }
-
-    check_clear();
 }
 
 #[test]
@@ -338,18 +617,43 @@ fn test_property_async() {
     wg.wait();
 
     let trace_details = collector.collect();
-    for span_set in trace_details.span_sets {
-        assert_eq!(span_set.spans.len(), 1);
-        let id = span_set.spans[0].id;
-        let event = span_set.spans[0].event;
-
-        assert_eq!(span_set.properties.span_ids.len(), 1);
-        assert_eq!(span_set.properties.span_ids[0], id);
-        assert_eq!(span_set.properties.span_lens.len(), 1);
-        assert_eq!(span_set.properties.span_lens[0], 4);
-        assert_eq!(span_set.properties.payload, event.to_be_bytes());
-    }
-
+    let real_tree = build_tree(&trace_details);
+    let shape = leading!(
+        0,
+        child:
+            normal!(0, leadings: [
+                leading!(1, child: normal!(1)),
+                leading!(2, child: normal!(2)),
+                leading!(3, child: normal!(3)),
+                leading!(4, child: normal!(4)),
+                leading!(5, child: normal!(5))
+            ])
+    );
+    compare_relation(&real_tree, &shape);
+    check_time_included(&real_tree);
     check_clear();
     join_handles.into_iter().for_each(|jh| jh.join().unwrap());
+
+    assert_eq!(trace_details.properties.span_ids.len(), 6);
+    assert_eq!(trace_details.properties.property_lens.len(), 6);
+    let u32_size = std::mem::size_of::<u32>();
+    assert_eq!(trace_details.properties.payload.len(), 6 * u32_size);
+
+    for property_len in trace_details.properties.property_lens {
+        assert_eq!(property_len, std::mem::size_of::<u32>() as u64);
+    }
+
+    for i in 0..6 {
+        let id = trace_details.properties.span_ids[i];
+        let mut event = 0;
+        for span in &trace_details.spans {
+            if span.id == id {
+                event = span.event;
+            }
+        }
+        assert_eq!(
+            trace_details.properties.payload[i * u32_size..(i + 1) * u32_size],
+            event.to_be_bytes()
+        );
+    }
 }

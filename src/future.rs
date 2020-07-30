@@ -28,7 +28,6 @@ pub trait Instrument: Sized {
             inner: self,
             event: event.into(),
             crossthread_trace: crate::trace_crossthread::CrossthreadTrace::new_root(
-                now,
                 collector.inner.clone(),
             ),
             collector: Some(collector),
@@ -48,7 +47,6 @@ pub trait Instrument: Sized {
                 inner: self,
                 event: event.into(),
                 crossthread_trace: Some(crate::trace_crossthread::CrossthreadTrace::new_root(
-                    now,
                     collector.inner.clone(),
                 )),
                 collector: Some(collector),
