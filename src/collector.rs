@@ -1,8 +1,17 @@
 // Copyright 2020 TiKV Project Authors. Licensed under Apache-2.0.
 
+#[derive(Debug, Clone)]
+pub(crate) struct SpanSet {
+    /// Span collection
+    pub spans: Vec<crate::Span>,
+
+    /// Property collection
+    pub properties: crate::Properties,
+}
+
 pub(crate) struct CollectorInner {
     start_time_ns: u64,
-    pub(crate) queue: crossbeam::queue::SegQueue<crate::SpanSet>,
+    pub(crate) queue: crossbeam::queue::SegQueue<SpanSet>,
     pub(crate) closed: std::sync::atomic::AtomicBool,
 }
 
@@ -75,7 +84,7 @@ impl Collector {
     }
 
     #[inline]
-    fn collect_spanset(&self) -> Vec<crate::SpanSet> {
+    fn collect_spanset(&self) -> Vec<SpanSet> {
         let len = self.inner.queue.len();
         let mut res = Vec::with_capacity(len);
         while let Ok(spans) = self.inner.queue.pop() {
