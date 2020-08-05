@@ -20,7 +20,7 @@ jobs:
       RUST_BACKTRACE: 1
     steps:
     - uses: actions/checkout@v2
-    - name: Set up toolchains	
+    - name: Set up toolchains
       run: |
         rustup component add rustfmt	
         rustup component add clippy
