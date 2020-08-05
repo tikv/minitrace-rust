@@ -20,6 +20,10 @@ jobs:
       RUST_BACKTRACE: 1
     steps:
     - uses: actions/checkout@v2
+    - name: Set up toolchains	
+      run: |
+        rustup component add rustfmt	
+        rustup component add clippy
     - name: Check format
       run: cargo fmt --all -- --check
     - name: Lints
