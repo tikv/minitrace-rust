@@ -11,6 +11,9 @@ pub(crate) mod trace;
 pub(crate) mod trace_crossthread;
 pub(crate) mod trace_local;
 
+#[cfg(feature = "jaeger")]
+pub mod jaeger;
+
 pub use collector::*;
 pub use trace::*;
 pub use trace_crossthread::*;

@@ -15,6 +15,7 @@ fn func2(i: u64) {
 
 fn main() {
     let (root, collector) = minitrace::trace_enable(0u32);
+    minitrace::property(b"sample property:it works");
     {
         let _guard = root;
         for i in 1..=10 {
@@ -22,5 +23,19 @@ fn main() {
         }
     }
 
-    crate::common::draw_stdout(collector.collect());
+    let s = collector.collect();
+
+    #[cfg(feature = "jaeger")]
+    {
+        let mut buf = Vec::with_capacity(2048);
+        minitrace::jaeger::thrift_encode(&mut buf, "synchronous_example", &s, |e| e.to_string());
+        let agent = std::net::SocketAddr::from(([127, 0, 0, 1], 6831));
+        let _ = std::net::UdpSocket::bind(std::net::SocketAddr::new(
+            std::net::IpAddr::V4(std::net::Ipv4Addr::new(0, 0, 0, 0)),
+            0,
+        ))
+        .and_then(move |s| s.send_to(&buf, agent));
+    }
+
+    crate::common::draw_stdout(s);
 }

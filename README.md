@@ -84,8 +84,15 @@ let trace_details = collector.collect();
 
 ## Timeline Examples
 
+
+### Setup JaegerUI
 ```sh
-$ cargo +nightly run --example synchronous
+$ docker run --rm -d -p6831:6831/udp -p6832:6832/udp -p16686:16686 jaegertracing/all-in-one:latest
+```
+
+### Run Synchronous Example
+```sh
+$ cargo run --features "jaeger" --example synchronous
 ====================================================================== 111.69 ms
 =                                                                        2.13 ms
                                                                          1.06 ms
@@ -108,9 +115,11 @@ $ cargo +nightly run --example synchronous
                                                          ============   20.17 ms
                                                                ======   10.08 ms
 ```
+![Jaeger Synchronous](img/jaeger-synchronous.png)
 
+### Run Asynchronous Example
 ```sh
-$ cargo +nightly run --example asynchronous
+$ cargo run --features "jaeger" --example asynchronous
 ============================                                            21.81 ms
 ==============                                                          10.84 ms
 ============================                                            21.67 ms
@@ -127,3 +136,4 @@ $ cargo +nightly run --example asynchronous
                                                        ==============   10.61 ms
               ==============                                            10.74 ms
 ```
+![Jaeger Asynchronous](img/jaeger-asynchronous.png)
