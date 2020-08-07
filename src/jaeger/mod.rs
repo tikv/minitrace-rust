@@ -54,8 +54,8 @@ fn reorder_properties(p: &Properties) -> (Vec<(u64, &[u8])>, HashMap<u64, (usize
 /// Thrift components defined in [jaeger.thrift].
 /// Thrift compact protocol encoding described in [thrift spec]
 ///
-/// [jaeger.thrift]: https://github.com/uber/jaeger-idl/blob/master/thrift/jaeger.thrift
-/// [thrift spec]: https://erikvanoosten.github.io/thrift-missing-specification/#_thrift_compact_protocol_encoding
+/// [jaeger.thrift]: https://github.com/jaegertracing/jaeger-idl/blob/52fb4c9440/thrift/jaeger.thrift
+/// [thrift spec]: https://github.com/apache/thrift/blob/01d53f483a/doc/specs/thrift-compact-protocol.md
 pub fn thrift_encode(
     buf: &mut Vec<u8>,
     service_name: &str,
