@@ -467,7 +467,7 @@ mod tests {
         .collect();
 
         let mut buf = Vec::with_capacity(1024);
-        thrift_encode(&mut buf, "test_minitrace".into(), &res, |s| {
+        thrift_encode(&mut buf, "test_minitrace", &res, |s| {
             if s == 0 {
                 "Parent".into()
             } else {
