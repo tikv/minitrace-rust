@@ -8,7 +8,7 @@ thread_local! {
    static TRACE_ID_LOW: RefCell<i64> = RefCell::new(0);
 }
 
-// return ([bytes], id -> &[bytes])
+// return ([property], id -> &[property])
 #[allow(clippy::type_complexity)]
 fn reorder_properties(p: &Properties) -> (Vec<(u64, &[u8])>, HashMap<u64, (usize, usize)>) {
     if p.span_ids.is_empty() || p.property_lens.is_empty() {
@@ -51,6 +51,11 @@ fn reorder_properties(p: &Properties) -> (Vec<(u64, &[u8])>, HashMap<u64, (usize
     (id_bytes_pairs, id_to_bytes_slice)
 }
 
+/// Thrift components defined in [jaeger.thrift].
+/// Thrift compact protocol encoding described in [thrift spec]
+///
+/// [jaeger.thrift]: https://github.com/uber/jaeger-idl/blob/master/thrift/jaeger.thrift
+/// [thrift spec]: https://erikvanoosten.github.io/thrift-missing-specification/#_thrift_compact_protocol_encoding
 pub fn thrift_encode(
     buf: &mut Vec<u8>,
     service_name: &str,
@@ -126,7 +131,7 @@ pub fn thrift_encode(
     ]);
 
     // service name string
-    service_name.as_bytes().encode(buf);
+    encode::bytes(buf, service_name.as_bytes());
 
     // process tail
     //
@@ -150,7 +155,7 @@ pub fn thrift_encode(
         buf.push((len << 4) as u8 | STRUCT_TYPE as u8);
     } else {
         buf.push(0b1111_0000 | STRUCT_TYPE as u8);
-        write_varint(buf, len as _);
+        encode::varint(buf, len as _);
     }
 
     let anchor_cycles = spans
@@ -178,18 +183,18 @@ pub fn thrift_encode(
         // ```
         buf.push(0x16);
         // trace id low data
-        write_varint(buf, zigzag_from_i64(trace_id_low));
+        encode::varint(buf, zigzag::from_i64(trace_id_low));
 
         // trace id high field header
         // ```ref_kind
         // const TRACE_ID_HIGH_DELTA: i16 = 1;
         // const I64_TYPE: u8 = 6;
         // const TRACE_ID_HIGH_TYPE: u8 = (TRACE_ID_HIGH_DELTA << 4) as u8 | I64_TYPE;
-        // buf.push(TRACE_ID_HIGH_TYPE);operation_name
+        // buf.push(TRACE_ID_HIGH_TYPE);
         // ```
         buf.push(0x16);
         // trace id high data
-        write_varint(buf, zigzag_from_i64(trace_id_high));
+        encode::varint(buf, zigzag::from_i64(trace_id_high));
 
         // span id field header
         // ```
@@ -200,7 +205,7 @@ pub fn thrift_encode(
         // ```
         buf.push(0x16);
         // span id data
-        write_varint(buf, zigzag_from_i64(*id as _));
+        encode::varint(buf, zigzag::from_i64(*id as _));
 
         // parent span id field header
         // ```
@@ -211,7 +216,7 @@ pub fn thrift_encode(
         // ```property_lens
         buf.push(0x16);
         // parent span id data
-        write_varint(buf, zigzag_from_i64(*related_id as _));
+        encode::varint(buf, zigzag::from_i64(*related_id as _));
 
         // operation name field header
         // ```
@@ -222,18 +227,21 @@ pub fn thrift_encode(
         // ```
         buf.push(0x18);
         // operation name data
-        format!(
-            "{}{}",
-            event_to_operation_name(*event),
-            match *state {
-                State::Root => " (Root spawning)",
-                State::Spawning => " (Spawning)",
-                State::Scheduling => " (Scheduling)",
-                _ => "",
-            }
-        )
-        .as_bytes()
-        .encode(buf);
+
+        encode::bytes(
+            buf,
+            format!(
+                "{}{}",
+                event_to_operation_name(*event),
+                match *state {
+                    State::Root => " (Root spawning)",
+                    State::Spawning => " (Spawning)",
+                    State::Scheduling => " (Scheduling)",
+                    _ => "",
+                }
+            )
+            .as_bytes(),
+        );
 
         if *state != State::Root {
             // references field header
@@ -260,9 +268,9 @@ pub fn thrift_encode(
             // ```
             buf.push(0x15);
             // reference kind data
-            write_varint(
+            encode::varint(
                 buf,
-                zigzag_from_i32(match state {
+                zigzag::from_i32(match state {
                     State::Local => 0,      // Child of
                     State::Spawning => 1,   // Follows from
                     State::Scheduling => 1, // Follows from
@@ -278,7 +286,7 @@ pub fn thrift_encode(
             // ```
             buf.push(0x16);
             // reference trace id low data
-            write_varint(buf, zigzag_from_i64(trace_id_low));
+            encode::varint(buf, zigzag::from_i64(trace_id_low));
             // reference trace id high header
             // ```
             // const REF_TRACE_ID_HIGH_DELTA: i16 = 1;
@@ -287,7 +295,7 @@ pub fn thrift_encode(
             // ```
             buf.push(0x16);
             // reference trace id high data
-            write_varint(buf, zigzag_from_i64(trace_id_high));
+            encode::varint(buf, zigzag::from_i64(trace_id_high));
             // reference span id header
             // ```
             // const SPAN_ID_HIGH_DELTA: i16 = 1;
@@ -296,15 +304,14 @@ pub fn thrift_encode(
             // ```
             buf.push(0x16);
             // reference span id data
-            write_varint(buf, zigzag_from_i64(*related_id as _));
+            encode::varint(buf, zigzag::from_i64(*related_id as _));
             // reference struce tail
             buf.push(0x00);
         }
 
         // flags header
         //
-        // If it's Root, the references field is not set.
-        // Then, DELTA is 2.
+        // If it's Root, the references field is not set so that DELTA is 2.
         //
         // ```
         // const FLAGS_DELTA: i16 = if *state != State::Root {1} else {2};
@@ -317,8 +324,8 @@ pub fn thrift_encode(
             buf.push(0x25);
         }
 
-        // flags data, `1` signifies a SAMPLED span, `2` signifies a DEBUG span.
-        write_varint(buf, zigzag_from_i32(1) as _);
+        // flags data: `1` signifies a SAMPLED span, `2` signifies a DEBUG span.
+        encode::varint(buf, zigzag::from_i32(1) as _);
 
         // start time header
         // ```
@@ -328,7 +335,10 @@ pub fn thrift_encode(
         // start time data
         let delta_cycles = begin_cycles - anchor_cycles;
         let delta_us = delta_cycles as f64 / *cycles_per_second as f64 * 1_000_000.0;
-        write_varint(buf, zigzag_from_i64((start_time_us + delta_us as u64) as _));
+        encode::varint(
+            buf,
+            zigzag::from_i64((start_time_us + delta_us as u64) as _),
+        );
 
         // duration header
         // ```
@@ -339,7 +349,7 @@ pub fn thrift_encode(
         buf.push(0x16);
         // duration data
         let duration_us = *elapsed_cycles as f64 / *cycles_per_second as f64 * 1_000_000.0;
-        write_varint(buf, zigzag_from_i64(duration_us as _));
+        encode::varint(buf, zigzag::from_i64(duration_us as _));
 
         // tags
         if let Some((from, limit)) = id_to_bytes_slice.get(id) {
@@ -355,7 +365,7 @@ pub fn thrift_encode(
                 buf.push((len << 4) as u8 | STRUCT_TYPE as u8);
             } else {
                 buf.push(0b1111_0000 | STRUCT_TYPE as u8);
-                write_varint(buf, len as _);
+                encode::varint(buf, len as _);
             }
 
             let bytes = &bytes_slices[*from..*from + *limit];
@@ -373,7 +383,7 @@ pub fn thrift_encode(
                 // ```
                 buf.push(0x18);
                 // key dataproperty_lens
-                key.encode(buf);
+                encode::bytes(buf, key);
 
                 // type field header
                 // ```
@@ -393,7 +403,7 @@ pub fn thrift_encode(
                 // ```
                 buf.push(0x18);
                 // value data
-                value.encode(buf);
+                encode::bytes(buf, value);
 
                 // tag struct tail
                 buf.push(0x00);
@@ -410,37 +420,35 @@ pub fn thrift_encode(
     buf.push(0x00);
 }
 
-trait Encode {
-    fn encode(&self, buf: &mut Vec<u8>);
-}
-
-impl<'a> Encode for &'a [u8] {
-    fn encode(&self, buf: &mut Vec<u8>) {
-        write_varint(buf, self.len() as _);
-        buf.extend_from_slice(self);
+mod encode {
+    pub fn bytes(buf: &mut Vec<u8>, bytes: &[u8]) {
+        varint(buf, bytes.len() as _);
+        buf.extend_from_slice(bytes);
     }
-}
 
-fn write_varint(buf: &mut Vec<u8>, mut n: u64) {
-    loop {
-        let mut b = (n & 0b0111_1111) as u8;
-        n >>= 7;
-        if n != 0 {
-            b |= 0b1000_0000;
-        }
-        buf.push(b);
-        if n == 0 {
-            break;
+    pub fn varint(buf: &mut Vec<u8>, mut n: u64) {
+        loop {
+            let mut b = (n & 0b0111_1111) as u8;
+            n >>= 7;
+            if n != 0 {
+                b |= 0b1000_0000;
+            }
+            buf.push(b);
+            if n == 0 {
+                break;
+            }
         }
     }
 }
 
-fn zigzag_from_i32(n: i32) -> u32 {
-    ((n << 1) ^ (n >> 31)) as u32
-}
+mod zigzag {
+    pub fn from_i32(n: i32) -> u32 {
+        ((n << 1) ^ (n >> 31)) as u32
+    }
 
-fn zigzag_from_i64(n: i64) -> u64 {
-    ((n << 1) ^ (n >> 63)) as u64
+    pub fn from_i64(n: i64) -> u64 {
+        ((n << 1) ^ (n >> 63)) as u64
+    }
 }
 
 #[cfg(test)]
