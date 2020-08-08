@@ -8,55 +8,12 @@ thread_local! {
    static TRACE_ID_LOW: RefCell<i64> = RefCell::new(0);
 }
 
-// return ([property], id -> &[property])
-#[allow(clippy::type_complexity)]
-fn reorder_properties(p: &Properties) -> (Vec<(u64, &[u8])>, HashMap<u64, (usize, usize)>) {
-    if p.span_ids.is_empty() || p.property_lens.is_empty() {
-        return (vec![], HashMap::new());
-    }
-    assert_eq!(p.span_ids.len(), p.property_lens.len());
-
-    let mut id_bytes_pairs = Vec::with_capacity(p.span_ids.len());
-    {
-        let mut remainder_bytes = p.payload.as_slice();
-        for (id, len) in p.span_ids.iter().zip(p.property_lens.iter()) {
-            let (bytes, remainder) = remainder_bytes.split_at(*len as _);
-            remainder_bytes = remainder;
-            id_bytes_pairs.push((*id, bytes));
-        }
-
-        id_bytes_pairs.sort_unstable_by_key(|s| s.0);
-    }
-
-    let mut id_to_bytes_slice = HashMap::with_capacity(id_bytes_pairs.len());
-    {
-        let mut current_id = id_bytes_pairs[0].0;
-        let mut current_index = 0;
-        let mut len = 0;
-
-        for (index, &(id, _)) in id_bytes_pairs.iter().enumerate() {
-            if id == current_id {
-                len += 1;
-            } else {
-                id_to_bytes_slice.insert(current_id, (current_index, len));
-
-                current_id = id;
-                current_index = index;
-                len = 1;
-            }
-        }
-        id_to_bytes_slice.insert(current_id, (current_index, len));
-    }
-
-    (id_bytes_pairs, id_to_bytes_slice)
-}
-
 /// Thrift components defined in [jaeger.thrift].
 /// Thrift compact protocol encoding described in [thrift spec]
 ///
 /// [jaeger.thrift]: https://github.com/jaegertracing/jaeger-idl/blob/52fb4c9440/thrift/jaeger.thrift
 /// [thrift spec]: https://github.com/apache/thrift/blob/01d53f483a/doc/specs/thrift-compact-protocol.md
-pub fn thrift_compact_encode(
+pub fn thrift_compact_encode<S: AsRef<str>>(
     buf: &mut Vec<u8>,
     service_name: &str,
     TraceDetails {
@@ -66,7 +23,7 @@ pub fn thrift_compact_encode(
         spans,
         properties,
     }: &TraceDetails,
-    event_to_operation_name: impl Fn(u32) -> String,
+    event_to_operation_name: impl Fn(u32) -> S,
 ) {
     let trace_id_high = TRACE_ID_HIGH.with(|h| *h);
     let trace_id_low = TRACE_ID_LOW.with(|l| {
@@ -226,9 +183,13 @@ pub fn thrift_compact_encode(
         // ```
         buf.push(0x18);
         // operation name data
-        let mut root_name = event_to_operation_name(root_event);
-        root_name.make_ascii_uppercase();
-        encode::bytes(buf, root_name.as_bytes());
+        encode::bytes(
+            buf,
+            event_to_operation_name(root_event)
+                .as_ref()
+                .to_uppercase()
+                .as_bytes(),
+        );
 
         // flags header
         //
@@ -333,19 +294,17 @@ pub fn thrift_compact_encode(
         // ```
         buf.push(0x18);
         // operation name data
-        encode::bytes(
-            buf,
-            format!(
-                "{}{}",
-                match *state {
-                    State::Root | State::Spawning => "[SPAWNING] ",
-                    State::Scheduling => "[SCHEDULING] ",
-                    _ => "",
-                },
-                event_to_operation_name(*event),
-            )
-            .as_bytes(),
-        );
+        let extra_str = match *state {
+            State::Root | State::Spawning => "[SPAWNING] ",
+            State::Scheduling => "[SCHEDULING] ",
+            _ => "",
+        }
+        .as_bytes();
+        let operation_name = event_to_operation_name(*event);
+        let operation_name = operation_name.as_ref().as_bytes();
+        encode::varint(buf, extra_str.len() as u64 + operation_name.len() as u64);
+        buf.extend_from_slice(extra_str);
+        buf.extend_from_slice(operation_name);
 
         // references field header
         // ```
@@ -514,6 +473,49 @@ pub fn thrift_compact_encode(
     buf.push(0x00);
 }
 
+// Return ([property], id -> &[property])
+#[allow(clippy::type_complexity)]
+fn reorder_properties(p: &Properties) -> (Vec<(u64, &[u8])>, HashMap<u64, (usize, usize)>) {
+    if p.span_ids.is_empty() || p.property_lens.is_empty() {
+        return (vec![], HashMap::new());
+    }
+    assert_eq!(p.span_ids.len(), p.property_lens.len());
+
+    let mut id_bytes_pairs = Vec::with_capacity(p.span_ids.len());
+    {
+        let mut remainder_bytes = p.payload.as_slice();
+        for (id, len) in p.span_ids.iter().zip(p.property_lens.iter()) {
+            let (bytes, remainder) = remainder_bytes.split_at(*len as _);
+            remainder_bytes = remainder;
+            id_bytes_pairs.push((*id, bytes));
+        }
+
+        id_bytes_pairs.sort_unstable_by_key(|s| s.0);
+    }
+
+    let mut id_to_bytes_slice = HashMap::with_capacity(id_bytes_pairs.len());
+    {
+        let mut current_id = id_bytes_pairs[0].0;
+        let mut current_index = 0;
+        let mut len = 0;
+
+        for (index, &(id, _)) in id_bytes_pairs.iter().enumerate() {
+            if id == current_id {
+                len += 1;
+            } else {
+                id_to_bytes_slice.insert(current_id, (current_index, len));
+
+                current_id = id;
+                current_index = index;
+                len = 1;
+            }
+        }
+        id_to_bytes_slice.insert(current_id, (current_index, len));
+    }
+
+    (id_bytes_pairs, id_to_bytes_slice)
+}
+
 mod encode {
     pub fn bytes(buf: &mut Vec<u8>, bytes: &[u8]) {
         varint(buf, bytes.len() as _);
@@ -571,9 +573,9 @@ mod tests {
         let mut buf = Vec::with_capacity(1024);
         thrift_compact_encode(&mut buf, "test_minitrace", &res, |s| {
             if s == 0 {
-                "Parent".into()
+                "Parent"
             } else {
-                "Child".into()
+                "Child"
             }
         });
 
