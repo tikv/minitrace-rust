@@ -98,8 +98,8 @@ impl LocalTraceGuard {
             } else {
                 tl.id_suffix += 2;
             }
-            let id0 = ((tl.id_prefix as u64) << 32) | tl.id_suffix as u64;
-            (id0, id0 - 1)
+            let id = ((tl.id_prefix as u64) << 32) | tl.id_suffix as u64;
+            (id - 1, id)
         };
 
         tl.spans.push(crate::Span {
