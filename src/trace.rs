@@ -44,6 +44,12 @@ pub fn trace_may_enable<T: Into<u32>>(
     }
 }
 
+/// Initialize time measuring infra. It's enough to call once.
+#[inline]
+pub fn init() {
+    minstant::now();
+}
+
 #[must_use]
 #[inline]
 pub fn new_span<T: Into<u32>>(event: T) -> Option<crate::trace_local::SpanGuard> {
