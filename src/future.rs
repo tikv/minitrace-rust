@@ -21,6 +21,7 @@ pub trait Instrument: Sized {
 
     #[inline]
     fn future_trace_enable<T: Into<u32>>(self, event: T) -> TraceRootFuture<Self> {
+        let now_cycles = minstant::now();
         let now = crate::time::real_time_ns();
         let collector = crate::collector::Collector::new(now);
 
@@ -29,6 +30,7 @@ pub trait Instrument: Sized {
             event: event.into(),
             crossthread_trace: crate::trace_crossthread::CrossthreadTrace::new_root(
                 collector.inner.clone(),
+                now_cycles,
             ),
             collector: Some(collector),
         }
@@ -41,6 +43,8 @@ pub trait Instrument: Sized {
         event: T,
     ) -> MayTraceRootFuture<Self> {
         if enable {
+            let now_cycles = minstant::now();
+
             let now = crate::time::real_time_ns();
             let collector = crate::collector::Collector::new(now);
             MayTraceRootFuture {
@@ -48,6 +52,7 @@ pub trait Instrument: Sized {
                 event: event.into(),
                 crossthread_trace: Some(crate::trace_crossthread::CrossthreadTrace::new_root(
                     collector.inner.clone(),
+                    now_cycles,
                 )),
                 collector: Some(collector),
             }

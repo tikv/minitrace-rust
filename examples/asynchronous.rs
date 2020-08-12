@@ -2,6 +2,7 @@
 
 mod common;
 use minitrace::prelude::*;
+use std::net::SocketAddr;
 
 #[derive(Debug)]
 enum AsyncJob {
@@ -44,8 +45,6 @@ async fn other_job() {
 
 #[tokio::main]
 async fn main() {
-    minitrace::init();
-
     let (trace_results, _) = async {
         minitrace::property(b"sample property:it works");
         let jhs = parallel_job();
@@ -67,12 +66,10 @@ async fn main() {
             })
         });
 
-        let agent = std::net::SocketAddr::from(([127, 0, 0, 1], 6831));
-        let _ = std::net::UdpSocket::bind(std::net::SocketAddr::new(
-            std::net::IpAddr::V4(std::net::Ipv4Addr::new(0, 0, 0, 0)),
-            0,
-        ))
-        .and_then(move |s| s.send_to(&buf, agent));
+        let local_addr: SocketAddr = "0.0.0.0:0".parse().unwrap();
+        if let Ok(mut socket) = tokio::net::UdpSocket::bind(local_addr).await {
+            let _ = socket.send_to(&buf, "127.0.0.1:6831").await;
+        }
     }
 
     crate::common::draw_stdout(trace_results);
