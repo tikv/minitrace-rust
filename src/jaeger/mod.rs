@@ -551,8 +551,8 @@ mod zigzag {
 mod tests {
     use super::*;
 
-    #[tokio::test]
-    async fn it_works() {
+    #[test]
+    fn it_works() {
         let res = {
             let (_g, collector) = crate::trace_enable(0u32);
             crate::property(b"test property:a root span");
