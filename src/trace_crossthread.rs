@@ -74,7 +74,7 @@ impl CrossthreadTrace {
                 inner.next_suspending_state = crate::State::Scheduling;
                 inner.next_related_id = self_id;
 
-                // Obviously, the begin cycles of the next suspending is impossible to predict, and it should 
+                // Obviously, the begin cycles of the next suspending is impossible to predict, and it should
                 // be recorded when `local_guard` is dropping. Here `LocalTraceGuard` is for this purpose.
                 // See `impl Drop for LocalTraceGuard`.
                 Some(LocalTraceGuard {
