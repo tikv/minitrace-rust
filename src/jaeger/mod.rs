@@ -550,7 +550,6 @@ mod zigzag {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::net::SocketAddr;
 
     #[tokio::test]
     async fn it_works() {
@@ -580,16 +579,11 @@ mod tests {
             }
         });
 
-        let local_addr: SocketAddr = "0.0.0.0:0".parse().unwrap();
-        let socket_std = std::net::UdpSocket::bind(local_addr).unwrap();
-        let mut socket = tokio::net::UdpSocket::from_std(socket_std).unwrap();
-        socket.send_to(&buf, "127.0.0.1:6831").await.unwrap();
-
-        // let agent = std::net::SocketAddr::from(([127, 0, 0, 1], 6831));
-        // let _ = std::net::UdpSocket::bind(std::net::SocketAddr::new(
-        //     std::net::IpAddr::V4(std::net::Ipv4Addr::new(0, 0, 0, 0)),
-        //     0,
-        // ))
-        // .and_then(move |s| s.send_to(&buf, agent));
+        let agent = std::net::SocketAddr::from(([127, 0, 0, 1], 6831));
+        let _ = std::net::UdpSocket::bind(std::net::SocketAddr::new(
+            std::net::IpAddr::V4(std::net::Ipv4Addr::new(0, 0, 0, 0)),
+            0,
+        ))
+        .and_then(move |s| s.send_to(&buf, agent));
     }
 }
