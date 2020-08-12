@@ -44,8 +44,6 @@ async fn other_job() {
 
 #[tokio::main]
 async fn main() {
-    minitrace::init();
-
     let (trace_results, _) = async {
         minitrace::property(b"sample property:it works");
         let jhs = parallel_job();

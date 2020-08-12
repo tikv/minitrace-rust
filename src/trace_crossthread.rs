@@ -2,9 +2,9 @@
 
 struct CrossthreadTraceInner {
     collector: std::sync::Arc<crate::collector::CollectorInner>,
-    next_state: crate::State,
+    next_suspending_state: crate::State,
     next_related_id: u64,
-    waiting_begin_cycles: u64,
+    suspending_begin_cycles: u64,
 }
 
 pub struct CrossthreadTrace {
@@ -27,7 +27,7 @@ pub struct LocalTraceGuard<'a> {
 
 impl Drop for LocalTraceGuard<'_> {
     fn drop(&mut self) {
-        self.handle.waiting_begin_cycles = minstant::now();
+        self.handle.suspending_begin_cycles = minstant::now();
     }
 }
 
@@ -45,9 +45,9 @@ impl CrossthreadTrace {
         Self {
             inner: Some(CrossthreadTraceInner {
                 collector,
-                next_state: crate::State::Spawning,
+                next_suspending_state: crate::State::Spawning,
                 next_related_id: related_id,
-                waiting_begin_cycles: minstant::now(),
+                suspending_begin_cycles: minstant::now(),
             }),
         }
     }
@@ -60,17 +60,23 @@ impl CrossthreadTrace {
                 inner.collector.clone(),
                 now_cycles,
                 crate::LeadingSpan {
-                    state: inner.next_state,
+                    // At this restoring time, fill this leading span the previously reserved suspending state,
+                    // related id, begin cycles and ...
+                    state: inner.next_suspending_state,
                     related_id: inner.next_related_id,
-                    begin_cycles: inner.waiting_begin_cycles,
-                    elapsed_cycles: now_cycles.saturating_sub(inner.waiting_begin_cycles),
+                    begin_cycles: inner.suspending_begin_cycles,
+                    // ... other fields calculating via them.
+                    elapsed_cycles: now_cycles.saturating_sub(inner.suspending_begin_cycles),
                     event,
                 },
             ) {
-                // for next scheduling time
-                inner.next_state = crate::State::Scheduling;
+                // Reserve these for the next suspending process
+                inner.next_suspending_state = crate::State::Scheduling;
                 inner.next_related_id = self_id;
 
+                // Obviously, the begin cycles of the next suspending is impossible to predict, and it should 
+                // be recorded when `local_guard` is dropping. Here `LocalTraceGuard` is for this purpose.
+                // See `impl Drop for LocalTraceGuard`.
                 Some(LocalTraceGuard {
                     _local: local_guard,
                     handle: inner,
@@ -83,13 +89,16 @@ impl CrossthreadTrace {
         }
     }
 
-    pub(crate) fn new_root(collector: std::sync::Arc<crate::collector::CollectorInner>) -> Self {
+    pub(crate) fn new_root(
+        collector: std::sync::Arc<crate::collector::CollectorInner>,
+        now_cycles: u64,
+    ) -> Self {
         Self {
             inner: Some(CrossthreadTraceInner {
                 collector,
-                next_state: crate::State::Root,
+                next_suspending_state: crate::State::Root,
                 next_related_id: 0,
-                waiting_begin_cycles: minstant::now(),
+                suspending_begin_cycles: now_cycles,
             }),
         }
     }

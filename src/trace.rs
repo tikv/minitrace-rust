@@ -8,9 +8,9 @@ pub fn trace_enable<T: Into<u32>>(
     crate::trace_local::LocalTraceGuard,
     crate::collector::Collector,
 ) {
+    let now_cycles = minstant::now();
     let collector = crate::collector::Collector::new(crate::time::real_time_ns());
 
-    let now_cycles = minstant::now();
     let (trace_guard, _) = crate::trace_local::LocalTraceGuard::new(
         collector.inner.clone(),
         now_cycles,
@@ -42,12 +42,6 @@ pub fn trace_may_enable<T: Into<u32>>(
     } else {
         (None, None)
     }
-}
-
-/// Initialize time measuring infra. It's enough to call once.
-#[inline]
-pub fn init() {
-    minstant::now();
 }
 
 #[must_use]
