@@ -255,7 +255,11 @@ impl Drop for SpanGuard {
     }
 }
 
-pub(crate) fn append_property(payload: &[u8]) {
+pub(crate) fn append_property<F, B>(f: F)
+where
+    B: AsRef<[u8]>,
+    F: FnOnce() -> B,
+{
     let trace_local = TRACE_LOCAL.with(|trace_local| trace_local.get());
     let tl = unsafe { &mut *trace_local };
 
@@ -264,6 +268,8 @@ pub(crate) fn append_property(payload: &[u8]) {
     }
 
     let cur_span_id = *tl.enter_stack.last().unwrap();
+    let payload = f();
+    let payload = payload.as_ref();
     let payload_len = payload.len();
 
     tl.property_ids.push(cur_span_id);
