@@ -43,11 +43,22 @@ fn main() {
     #[cfg(feature = "jaeger")]
     {
         let mut buf = Vec::with_capacity(2048);
-        minitrace::jaeger::thrift_compact_encode(&mut buf, "Sync Example", &s, |e| {
-            format!("{:?}", unsafe {
-                std::mem::transmute::<_, SyncJob>(e as u8)
-            })
-        });
+        minitrace::jaeger::thrift_compact_encode(
+            &mut buf,
+            "Sync Example",
+            &s,
+            |e| {
+                format!("{:?}", unsafe {
+                    std::mem::transmute::<_, SyncJob>(e as u8)
+                })
+            },
+            |property| {
+                let mut split = property.splitn(2, |b| *b == b':');
+                let key = String::from_utf8_lossy(split.next().unwrap()).to_owned();
+                let value = String::from_utf8_lossy(split.next().unwrap()).to_owned();
+                (key, value)
+            },
+        );
         let agent = std::net::SocketAddr::from(([127, 0, 0, 1], 6831));
         let _ = std::net::UdpSocket::bind(std::net::SocketAddr::new(
             std::net::IpAddr::V4(std::net::Ipv4Addr::new(0, 0, 0, 0)),
