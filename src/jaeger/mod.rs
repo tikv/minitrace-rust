@@ -13,7 +13,7 @@ thread_local! {
 ///
 /// [jaeger.thrift]: https://github.com/jaegertracing/jaeger-idl/blob/52fb4c9440/thrift/jaeger.thrift
 /// [thrift spec]: https://github.com/apache/thrift/blob/01d53f483a/doc/specs/thrift-compact-protocol.md
-pub fn thrift_compact_encode<S: AsRef<str>>(
+pub fn thrift_compact_encode<'a, S0: AsRef<str>, S1: AsRef<str> + 'a, S2: AsRef<str> + 'a>(
     buf: &mut Vec<u8>,
     service_name: &str,
     TraceDetails {
@@ -22,8 +22,9 @@ pub fn thrift_compact_encode<S: AsRef<str>>(
         cycles_per_second,
         spans,
         properties,
-    }: &TraceDetails,
-    event_to_operation_name: impl Fn(u32) -> S,
+    }: &'a TraceDetails,
+    event_to_operation_name: impl Fn(u32) -> S0,
+    property_to_kv: impl Fn(&'a [u8]) -> (S1, S2),
 ) {
     let trace_id_high = TRACE_ID_HIGH.with(|h| *h);
     let trace_id_low = TRACE_ID_LOW.with(|l| {
@@ -183,13 +184,7 @@ pub fn thrift_compact_encode<S: AsRef<str>>(
         // ```
         buf.push(0x18);
         // operation name data
-        encode::bytes(
-            buf,
-            event_to_operation_name(root_event)
-                .as_ref()
-                .to_uppercase()
-                .as_bytes(),
-        );
+        encode::bytes(buf, event_to_operation_name(root_event).as_ref().as_bytes());
 
         // flags header
         //
@@ -424,9 +419,9 @@ pub fn thrift_compact_encode<S: AsRef<str>>(
             let bytes = &bytes_slices[*from..*from + *limit];
 
             for (_, bytes) in bytes {
-                let mut split = bytes.splitn(2, |b| *b == b':');
-                let key = split.next().unwrap_or(&[]);
-                let value = split.next().unwrap_or(&[]);
+                let (key, value) = property_to_kv(*bytes);
+                let key = key.as_ref().as_bytes();
+                let value = value.as_ref().as_bytes();
 
                 // key field header
                 // ```
@@ -571,13 +566,24 @@ mod tests {
         .collect();
 
         let mut buf = Vec::with_capacity(1024);
-        thrift_compact_encode(&mut buf, "test_minitrace", &res, |s| {
-            if s == 0 {
-                "Parent"
-            } else {
-                "Child"
-            }
-        });
+        thrift_compact_encode(
+            &mut buf,
+            "test_minitrace",
+            &res,
+            |s| {
+                if s == 0 {
+                    "Parent"
+                } else {
+                    "Child"
+                }
+            },
+            |property| {
+                let mut split = property.splitn(2, |b| *b == b':');
+                let key = String::from_utf8_lossy(split.next().unwrap()).to_owned();
+                let value = String::from_utf8_lossy(split.next().unwrap()).to_owned();
+                (key, value)
+            },
+        );
 
         let agent = std::net::SocketAddr::from(([127, 0, 0, 1], 6831));
         let _ = std::net::UdpSocket::bind(std::net::SocketAddr::new(
