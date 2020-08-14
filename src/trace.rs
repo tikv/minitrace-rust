@@ -57,9 +57,19 @@ pub fn trace_crossthread() -> crate::trace_crossthread::CrossthreadTrace {
 }
 
 /// The property is in bytes format, so it is not limited to be a key-value pair but
-/// anything intended. However, the downside of flexibility is that encoding and decoding
-/// should be handled handly.
+/// anything intended. However, the downside of flexibility is that manual encoding
+/// and manual decoding need to consider.
 #[inline]
-pub fn property(p: &[u8]) {
-    crate::trace_local::append_property(p);
+pub fn property<B: AsRef<[u8]>>(p: B) {
+    crate::trace_local::append_property(|| p);
+}
+
+/// `property` of closure version
+#[inline]
+pub fn property_closure<F, B>(f: F)
+where
+    B: AsRef<[u8]>,
+    F: FnOnce() -> B,
+{
+    crate::trace_local::append_property(f);
 }
