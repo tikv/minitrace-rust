@@ -56,7 +56,8 @@ let task = async {
     }.trace_async(4u32).await;
 };
 
-let (trace_details, value) = runtime::block_on(task.future_trace_enable(0u32));
+let (collector, value) = runtime::block_on(task.future_trace_enable(0u32));
+let trace_details = collector.collect();
 ```
 
 Threads:

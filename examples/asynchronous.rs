@@ -2,7 +2,6 @@
 
 mod common;
 use minitrace::prelude::*;
-use std::net::SocketAddr;
 
 #[derive(Debug)]
 enum AsyncJob {
@@ -45,7 +44,7 @@ async fn other_job() {
 
 #[tokio::main]
 async fn main() {
-    let (trace_results, _) = async {
+    let (collector, _) = async {
         minitrace::property(b"sample property:it works");
         let jhs = parallel_job();
         other_job().await;
@@ -57,13 +56,16 @@ async fn main() {
     .future_trace_enable(AsyncJob::Root)
     .await;
 
+    let trace_details = collector.collect();
+
     #[cfg(feature = "jaeger")]
     {
+        use std::net::SocketAddr;
         let mut buf = Vec::with_capacity(2048);
         minitrace::jaeger::thrift_compact_encode(
             &mut buf,
             "Async Example",
-            &trace_results,
+            &trace_details,
             |e| {
                 format!("{:?}", unsafe {
                     std::mem::transmute::<_, AsyncJob>(e as u8)
@@ -83,5 +85,5 @@ async fn main() {
         }
     }
 
-    crate::common::draw_stdout(trace_results);
+    crate::common::draw_stdout(trace_details);
 }

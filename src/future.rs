@@ -138,7 +138,7 @@ pub struct MayTraceRootFuture<T> {
 }
 
 impl<T: std::future::Future> std::future::Future for MayTraceRootFuture<T> {
-    type Output = (Option<crate::TraceDetails>, T::Output);
+    type Output = (Option<crate::Collector>, T::Output);
 
     fn poll(
         self: std::pin::Pin<&mut Self>,
@@ -158,12 +158,12 @@ impl<T: std::future::Future> std::future::Future for MayTraceRootFuture<T> {
         };
 
         drop(guard);
-        std::task::Poll::Ready((this.collector.take().map(|c| c.collect()), r))
+        std::task::Poll::Ready((this.collector.take(), r))
     }
 }
 
 impl<T: futures_01::Future> futures_01::Future for MayTraceRootFuture<T> {
-    type Item = (Option<crate::TraceDetails>, T::Item);
+    type Item = (Option<crate::Collector>, T::Item);
     type Error = T::Error;
 
     fn poll(&mut self) -> futures_01::Poll<Self::Item, Self::Error> {
@@ -186,10 +186,7 @@ impl<T: futures_01::Future> futures_01::Future for MayTraceRootFuture<T> {
         };
 
         drop(guard);
-        Ok(futures_01::Async::Ready((
-            self.collector.take().map(|c| c.collect()),
-            r,
-        )))
+        Ok(futures_01::Async::Ready((self.collector.take(), r)))
     }
 }
 
@@ -203,7 +200,7 @@ pub struct TraceRootFuture<T> {
 }
 
 impl<T: std::future::Future> std::future::Future for TraceRootFuture<T> {
-    type Output = (crate::TraceDetails, T::Output);
+    type Output = (crate::Collector, T::Output);
 
     fn poll(
         self: std::pin::Pin<&mut Self>,
@@ -222,12 +219,12 @@ impl<T: std::future::Future> std::future::Future for TraceRootFuture<T> {
 
         // mute rust-analyzer
         let oc: &mut Option<_> = this.collector;
-        std::task::Poll::Ready((oc.take().expect("poll twice").collect(), r))
+        std::task::Poll::Ready((oc.take().expect("poll twice"), r))
     }
 }
 
 impl<T: futures_01::Future> futures_01::Future for TraceRootFuture<T> {
-    type Item = (crate::TraceDetails, T::Item);
+    type Item = (crate::Collector, T::Item);
     type Error = T::Error;
 
     fn poll(&mut self) -> futures_01::Poll<Self::Item, Self::Error> {
@@ -247,7 +244,7 @@ impl<T: futures_01::Future> futures_01::Future for TraceRootFuture<T> {
 
         drop(guard);
         Ok(futures_01::Async::Ready((
-            self.collector.take().expect("poll twice").collect(),
+            self.collector.take().expect("poll twice"),
             r,
         )))
     }
