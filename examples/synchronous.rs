@@ -38,7 +38,7 @@ fn main() {
         }
     }
 
-    let s = collector.collect();
+    let trace_details = collector.collect();
 
     #[cfg(feature = "jaeger")]
     {
@@ -46,7 +46,7 @@ fn main() {
         minitrace::jaeger::thrift_compact_encode(
             &mut buf,
             "Sync Example",
-            &s,
+            &trace_details,
             |e| {
                 format!("{:?}", unsafe {
                     std::mem::transmute::<_, SyncJob>(e as u8)
@@ -67,5 +67,5 @@ fn main() {
         .and_then(move |s| s.send_to(&buf, agent));
     }
 
-    crate::common::draw_stdout(s);
+    crate::common::draw_stdout(trace_details);
 }
