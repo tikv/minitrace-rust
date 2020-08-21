@@ -8,6 +8,19 @@ pub fn trace_enable<T: Into<u32>>(
     crate::trace_local::LocalTraceGuard,
     crate::collector::Collector,
 ) {
+    let event = event.into();
+    trace_enable_fine(event, event)
+}
+
+#[must_use]
+#[inline]
+pub fn trace_enable_fine<E1: Into<u32>, E2: Into<u32>>(
+    waiting_event: E1,
+    settle_event: E2,
+) -> (
+    crate::trace_local::LocalTraceGuard,
+    crate::collector::Collector,
+) {
     let now_cycles = minstant::now();
     let collector = crate::collector::Collector::new(crate::time::real_time_ns());
 
@@ -19,8 +32,9 @@ pub fn trace_enable<T: Into<u32>>(
             related_id: 0,
             begin_cycles: now_cycles,
             elapsed_cycles: 0,
-            event: event.into(),
+            event: waiting_event.into(),
         },
+        settle_event.into(),
     )
     .unwrap(); // It's safe to unwrap because the collector always exists at present.
 
@@ -36,8 +50,22 @@ pub fn trace_may_enable<T: Into<u32>>(
     Option<crate::trace_local::LocalTraceGuard>,
     Option<crate::collector::Collector>,
 ) {
+    let event = event.into();
+    trace_may_enable_fine(enable, event, event)
+}
+
+#[must_use]
+#[inline]
+pub fn trace_may_enable_fine<E1: Into<u32>, E2: Into<u32>>(
+    enable: bool,
+    waiting_event: E1,
+    settle_event: E2,
+) -> (
+    Option<crate::trace_local::LocalTraceGuard>,
+    Option<crate::collector::Collector>,
+) {
     if enable {
-        let (guard, collector) = trace_enable(event);
+        let (guard, collector) = trace_enable_fine(waiting_event, settle_event);
         (Some(guard), Some(collector))
     } else {
         (None, None)
@@ -50,10 +78,28 @@ pub fn new_span<T: Into<u32>>(event: T) -> Option<crate::trace_local::SpanGuard>
     crate::trace_local::SpanGuard::new(event.into())
 }
 
+/// Bind the current tracing context to another executing context (e.g. a closure).
+///
+/// ```no_run
+/// # use minitrace::trace_binder;
+/// # use std::thread;
+/// #
+/// let handle = trace_binder();
+/// thread::spawn(move || {
+///     let mut handle = handle;
+///     let _g = handle.trace_enable(EVENT);
+/// });
+/// ```
 #[must_use]
 #[inline]
-pub fn trace_crossthread() -> crate::trace_crossthread::CrossthreadTrace {
-    crate::trace_crossthread::CrossthreadTrace::new()
+pub fn trace_binder() -> crate::trace_crossthread::TraceHandle {
+    crate::trace_crossthread::TraceHandle::new(None)
+}
+
+#[must_use]
+#[inline]
+pub fn trace_binder_fine<E: Into<u32>>(waiting_event: E) -> crate::trace_crossthread::TraceHandle {
+    crate::trace_crossthread::TraceHandle::new(Some(waiting_event.into()))
 }
 
 /// The property is in bytes format, so it is not limited to be a key-value pair but

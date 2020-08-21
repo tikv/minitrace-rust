@@ -22,7 +22,7 @@ pub(crate) struct TraceLocal {
     /// local span collector
     pub(crate) spans: Vec<crate::Span>,
 
-    /// for parent-child relation contruction
+    /// for parent-child relation construction
     pub(crate) enter_stack: Vec<SpanId>,
 
     /// local property collector
@@ -30,7 +30,7 @@ pub(crate) struct TraceLocal {
     pub(crate) property_lens: Vec<u64>,
     pub(crate) property_payload: Vec<u8>,
 
-    /// for id contruction
+    /// for id construction
     pub(crate) id_prefix: u32,
     pub(crate) id_suffix: u32,
 
@@ -78,8 +78,9 @@ impl LocalTraceGuard {
             related_id,
             begin_cycles,
             elapsed_cycles,
-            event,
+            event: spawning_event,
         }: LeadingSpan,
+        settle_event: u32,
     ) -> Option<(Self, SpanId)> {
         if collector.closed.load(std::sync::atomic::Ordering::Relaxed) {
             return None;
@@ -108,7 +109,7 @@ impl LocalTraceGuard {
             related_id,
             begin_cycles,
             elapsed_cycles,
-            event,
+            event: spawning_event,
         });
         tl.spans.push(crate::Span {
             id: id1,
@@ -116,7 +117,7 @@ impl LocalTraceGuard {
             related_id: id0,
             begin_cycles: now_cycles,
             elapsed_cycles: 0,
-            event,
+            event: settle_event,
         });
         tl.enter_stack.push(id1);
 

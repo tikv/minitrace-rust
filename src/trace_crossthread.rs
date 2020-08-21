@@ -5,9 +5,10 @@ struct CrossthreadTraceInner {
     next_suspending_state: crate::State,
     next_related_id: u64,
     suspending_begin_cycles: u64,
+    waiting_event: Option<u32>,
 }
 
-pub struct CrossthreadTrace {
+pub struct TraceHandle {
     inner: Option<CrossthreadTraceInner>,
 }
 
@@ -31,8 +32,8 @@ impl Drop for LocalTraceGuard<'_> {
     }
 }
 
-impl CrossthreadTrace {
-    pub(crate) fn new() -> Self {
+impl TraceHandle {
+    pub(crate) fn new(waiting_event: Option<u32>) -> Self {
         let trace_local = crate::trace_local::TRACE_LOCAL.with(|trace_local| trace_local.get());
         let tl = unsafe { &mut *trace_local };
 
@@ -48,13 +49,16 @@ impl CrossthreadTrace {
                 next_suspending_state: crate::State::Spawning,
                 next_related_id: related_id,
                 suspending_begin_cycles: minstant::now(),
+                waiting_event,
             }),
         }
     }
 
-    pub fn trace_enable<T: Into<u32>>(&mut self, event: T) -> Option<LocalTraceGuard> {
-        let event = event.into();
+    pub fn trace_enable<E: Into<u32>>(&mut self, event: E) -> Option<LocalTraceGuard> {
         if let Some(inner) = &mut self.inner {
+            let settle_event = event.into();
+            let waiting = inner.waiting_event.unwrap_or(settle_event);
+
             let now_cycles = minstant::now();
             if let Some((local_guard, self_id)) = crate::trace_local::LocalTraceGuard::new(
                 inner.collector.clone(),
@@ -67,8 +71,9 @@ impl CrossthreadTrace {
                     begin_cycles: inner.suspending_begin_cycles,
                     // ... other fields calculating via them.
                     elapsed_cycles: now_cycles.saturating_sub(inner.suspending_begin_cycles),
-                    event,
+                    event: waiting,
                 },
+                settle_event,
             ) {
                 // Reserve these for the next suspending process
                 inner.next_suspending_state = crate::State::Scheduling;
@@ -92,6 +97,7 @@ impl CrossthreadTrace {
     pub(crate) fn new_root(
         collector: std::sync::Arc<crate::collector::CollectorInner>,
         now_cycles: u64,
+        waiting_event: Option<u32>,
     ) -> Self {
         Self {
             inner: Some(CrossthreadTraceInner {
@@ -99,6 +105,7 @@ impl CrossthreadTrace {
                 next_suspending_state: crate::State::Root,
                 next_related_id: 0,
                 suspending_begin_cycles: now_cycles,
+                waiting_event,
             }),
         }
     }
