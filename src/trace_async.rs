@@ -1,6 +1,6 @@
 // Copyright 2020 TiKV Project Authors. Licensed under Apache-2.0.
 
-struct CrossthreadTraceInner {
+struct AsyncTraceInner {
     collector: std::sync::Arc<crate::collector::CollectorInner>,
     next_suspending_state: crate::State,
     next_related_id: u64,
@@ -9,13 +9,13 @@ struct CrossthreadTraceInner {
 }
 
 pub struct TraceHandle {
-    inner: Option<CrossthreadTraceInner>,
+    inner: Option<AsyncTraceInner>,
 }
 
 pub struct LocalTraceGuard<'a> {
     _local: crate::trace_local::LocalTraceGuard,
 
-    // `CrossthreadTrace` may be used to trace a `Future` task which
+    // `TraceHandle` may be used to trace a `Future` task which
     // consists of a sequence of local-tracings.
     //
     // We can treat the end of current local-tracing as the creation of
@@ -23,7 +23,7 @@ pub struct LocalTraceGuard<'a> {
     // is started, the gap time is the wait time of the next local-tracing.
     //
     // Here is the mutable reference for this purpose.
-    handle: &'a mut CrossthreadTraceInner,
+    handle: &'a mut AsyncTraceInner,
 }
 
 impl Drop for LocalTraceGuard<'_> {
@@ -44,7 +44,7 @@ impl TraceHandle {
         let collector = tl.cur_collector.as_ref().unwrap().clone();
         let related_id = *tl.enter_stack.last().unwrap();
         Self {
-            inner: Some(CrossthreadTraceInner {
+            inner: Some(AsyncTraceInner {
                 collector,
                 next_suspending_state: crate::State::Spawning,
                 next_related_id: related_id,
@@ -100,7 +100,7 @@ impl TraceHandle {
         pending_event: Option<u32>,
     ) -> Self {
         Self {
-            inner: Some(CrossthreadTraceInner {
+            inner: Some(AsyncTraceInner {
                 collector,
                 next_suspending_state: crate::State::Root,
                 next_related_id: 0,
