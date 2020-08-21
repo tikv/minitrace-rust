@@ -1,20 +1,21 @@
 // Copyright 2020 TiKV Project Authors. Licensed under Apache-2.0.
 
-struct CrossthreadTraceInner {
+struct AsyncTraceInner {
     collector: std::sync::Arc<crate::collector::CollectorInner>,
     next_suspending_state: crate::State,
     next_related_id: u64,
     suspending_begin_cycles: u64,
+    pending_event: Option<u32>,
 }
 
-pub struct CrossthreadTrace {
-    inner: Option<CrossthreadTraceInner>,
+pub struct TraceHandle {
+    inner: Option<AsyncTraceInner>,
 }
 
 pub struct LocalTraceGuard<'a> {
     _local: crate::trace_local::LocalTraceGuard,
 
-    // `CrossthreadTrace` may be used to trace a `Future` task which
+    // `TraceHandle` may be used to trace a `Future` task which
     // consists of a sequence of local-tracings.
     //
     // We can treat the end of current local-tracing as the creation of
@@ -22,7 +23,7 @@ pub struct LocalTraceGuard<'a> {
     // is started, the gap time is the wait time of the next local-tracing.
     //
     // Here is the mutable reference for this purpose.
-    handle: &'a mut CrossthreadTraceInner,
+    handle: &'a mut AsyncTraceInner,
 }
 
 impl Drop for LocalTraceGuard<'_> {
@@ -31,8 +32,8 @@ impl Drop for LocalTraceGuard<'_> {
     }
 }
 
-impl CrossthreadTrace {
-    pub(crate) fn new() -> Self {
+impl TraceHandle {
+    pub(crate) fn new(pending_event: Option<u32>) -> Self {
         let trace_local = crate::trace_local::TRACE_LOCAL.with(|trace_local| trace_local.get());
         let tl = unsafe { &mut *trace_local };
 
@@ -43,18 +44,21 @@ impl CrossthreadTrace {
         let collector = tl.cur_collector.as_ref().unwrap().clone();
         let related_id = *tl.enter_stack.last().unwrap();
         Self {
-            inner: Some(CrossthreadTraceInner {
+            inner: Some(AsyncTraceInner {
                 collector,
                 next_suspending_state: crate::State::Spawning,
                 next_related_id: related_id,
                 suspending_begin_cycles: minstant::now(),
+                pending_event,
             }),
         }
     }
 
-    pub fn trace_enable<T: Into<u32>>(&mut self, event: T) -> Option<LocalTraceGuard> {
-        let event = event.into();
+    pub fn trace_enable<E: Into<u32>>(&mut self, event: E) -> Option<LocalTraceGuard> {
         if let Some(inner) = &mut self.inner {
+            let settle_event = event.into();
+            let pending_event = inner.pending_event.unwrap_or(settle_event);
+
             let now_cycles = minstant::now();
             if let Some((local_guard, self_id)) = crate::trace_local::LocalTraceGuard::new(
                 inner.collector.clone(),
@@ -67,8 +71,9 @@ impl CrossthreadTrace {
                     begin_cycles: inner.suspending_begin_cycles,
                     // ... other fields calculating via them.
                     elapsed_cycles: now_cycles.saturating_sub(inner.suspending_begin_cycles),
-                    event,
+                    event: pending_event,
                 },
+                settle_event,
             ) {
                 // Reserve these for the next suspending process
                 inner.next_suspending_state = crate::State::Scheduling;
@@ -92,13 +97,15 @@ impl CrossthreadTrace {
     pub(crate) fn new_root(
         collector: std::sync::Arc<crate::collector::CollectorInner>,
         now_cycles: u64,
+        pending_event: Option<u32>,
     ) -> Self {
         Self {
-            inner: Some(CrossthreadTraceInner {
+            inner: Some(AsyncTraceInner {
                 collector,
                 next_suspending_state: crate::State::Root,
                 next_related_id: 0,
                 suspending_begin_cycles: now_cycles,
+                pending_event,
             }),
         }
     }

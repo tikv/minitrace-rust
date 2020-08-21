@@ -8,7 +8,7 @@ pub mod future;
 pub mod prelude;
 pub(crate) mod time;
 pub(crate) mod trace;
-pub(crate) mod trace_crossthread;
+pub(crate) mod trace_async;
 pub(crate) mod trace_local;
 
 #[cfg(feature = "jaeger")]
@@ -16,7 +16,7 @@ pub mod jaeger;
 
 pub use collector::*;
 pub use trace::*;
-pub use trace_crossthread::*;
+pub use trace_async::*;
 pub use trace_local::*;
 
 #[cfg(test)]

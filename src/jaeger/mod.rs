@@ -290,8 +290,7 @@ pub fn thrift_compact_encode<'a, S0: AsRef<str>, S1: AsRef<str> + 'a, S2: AsRef<
         buf.push(0x18);
         // operation name data
         let extra_str = match *state {
-            State::Root | State::Spawning => "[SPAWNING] ",
-            State::Scheduling => "[SCHEDULING] ",
+            State::Root | State::Spawning | State::Scheduling => "[PENDING] ",
             _ => "",
         }
         .as_bytes();

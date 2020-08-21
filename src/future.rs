@@ -1,13 +1,24 @@
 // Copyright 2020 TiKV Project Authors. Licensed under Apache-2.0.
 
 impl<T: Sized> Instrument for T {}
+
 pub trait Instrument: Sized {
     #[inline]
-    fn trace_task<T: Into<u32>>(self, event: T) -> TraceSpawned<Self> {
+    fn trace_task<E: Into<u32>>(self, event: E) -> TraceSpawned<Self> {
+        let event = event.into();
+        self.trace_task_fine(event, event)
+    }
+
+    #[inline]
+    fn trace_task_fine<E1: Into<u32>, E2: Into<u32>>(
+        self,
+        pending_event: E1,
+        settle_event: E2,
+    ) -> TraceSpawned<Self> {
         TraceSpawned {
             inner: self,
-            event: event.into(),
-            crossthread_trace: crate::trace::trace_crossthread(),
+            event: settle_event.into(),
+            trace_handle: crate::trace::trace_binder_fine(pending_event),
         }
     }
 
@@ -20,27 +31,49 @@ pub trait Instrument: Sized {
     }
 
     #[inline]
-    fn future_trace_enable<T: Into<u32>>(self, event: T) -> TraceRootFuture<Self> {
+    fn future_trace_enable<E: Into<u32>>(self, event: E) -> TraceRootFuture<Self> {
+        let event = event.into();
+        self.future_trace_enable_fine(event, event)
+    }
+
+    #[inline]
+    fn future_trace_enable_fine<E1: Into<u32>, E2: Into<u32>>(
+        self,
+        pending_event: E1,
+        settle_event: E2,
+    ) -> TraceRootFuture<Self> {
         let now_cycles = minstant::now();
         let now = crate::time::real_time_ns();
         let collector = crate::collector::Collector::new(now);
 
         TraceRootFuture {
             inner: self,
-            event: event.into(),
-            crossthread_trace: crate::trace_crossthread::CrossthreadTrace::new_root(
+            event: settle_event.into(),
+            trace_handle: crate::trace_async::TraceHandle::new_root(
                 collector.inner.clone(),
                 now_cycles,
+                Some(pending_event.into()),
             ),
             collector: Some(collector),
         }
     }
 
     #[inline]
-    fn future_trace_may_enable<T: Into<u32>>(
+    fn future_trace_may_enable<E: Into<u32>>(
         self,
         enable: bool,
-        event: T,
+        event: E,
+    ) -> MayTraceRootFuture<Self> {
+        let event = event.into();
+        self.future_trace_may_enable_fine(enable, event, event)
+    }
+
+    #[inline]
+    fn future_trace_may_enable_fine<E1: Into<u32>, E2: Into<u32>>(
+        self,
+        enable: bool,
+        pending_event: E1,
+        settle_event: E2,
     ) -> MayTraceRootFuture<Self> {
         if enable {
             let now_cycles = minstant::now();
@@ -49,19 +82,20 @@ pub trait Instrument: Sized {
             let collector = crate::collector::Collector::new(now);
             MayTraceRootFuture {
                 inner: self,
-                event: event.into(),
-                crossthread_trace: Some(crate::trace_crossthread::CrossthreadTrace::new_root(
+                event: settle_event.into(),
+                trace_handle: Some(crate::trace_async::TraceHandle::new_root(
                     collector.inner.clone(),
                     now_cycles,
+                    Some(pending_event.into()),
                 )),
                 collector: Some(collector),
             }
         } else {
             MayTraceRootFuture {
                 inner: self,
-                event: event.into(),
+                event: settle_event.into(),
                 collector: None,
-                crossthread_trace: None,
+                trace_handle: None,
             }
         }
     }
@@ -72,7 +106,7 @@ pub struct TraceSpawned<T> {
     #[pin]
     inner: T,
     event: u32,
-    crossthread_trace: crate::trace_crossthread::CrossthreadTrace,
+    trace_handle: crate::trace_async::TraceHandle,
 }
 
 impl<T: std::future::Future> std::future::Future for TraceSpawned<T> {
@@ -83,7 +117,7 @@ impl<T: std::future::Future> std::future::Future for TraceSpawned<T> {
         cx: &mut std::task::Context<'_>,
     ) -> std::task::Poll<Self::Output> {
         let this = self.project();
-        let _guard = this.crossthread_trace.trace_enable(*this.event);
+        let _guard = this.trace_handle.trace_enable(*this.event);
         this.inner.poll(cx)
     }
 }
@@ -93,7 +127,7 @@ impl<T: futures_01::Future> futures_01::Future for TraceSpawned<T> {
     type Error = T::Error;
 
     fn poll(&mut self) -> futures_01::Poll<Self::Item, Self::Error> {
-        let _guard = self.crossthread_trace.trace_enable(self.event);
+        let _guard = self.trace_handle.trace_enable(self.event);
         self.inner.poll()
     }
 }
@@ -134,7 +168,7 @@ pub struct MayTraceRootFuture<T> {
     inner: T,
     event: u32,
     collector: Option<crate::collector::Collector>,
-    crossthread_trace: Option<crate::trace_crossthread::CrossthreadTrace>,
+    trace_handle: Option<crate::trace_async::TraceHandle>,
 }
 
 impl<T: std::future::Future> std::future::Future for MayTraceRootFuture<T> {
@@ -147,7 +181,7 @@ impl<T: std::future::Future> std::future::Future for MayTraceRootFuture<T> {
         let this = self.project();
         let event = *this.event;
         let guard = this
-            .crossthread_trace
+            .trace_handle
             .as_mut()
             .and_then(|a| a.trace_enable(event));
         let r = this.inner.poll(cx);
@@ -169,7 +203,7 @@ impl<T: futures_01::Future> futures_01::Future for MayTraceRootFuture<T> {
     fn poll(&mut self) -> futures_01::Poll<Self::Item, Self::Error> {
         let event = self.event;
         let guard = self
-            .crossthread_trace
+            .trace_handle
             .as_mut()
             .and_then(|a| a.trace_enable(event));
         let r = self.inner.poll();
@@ -196,7 +230,7 @@ pub struct TraceRootFuture<T> {
     inner: T,
     event: u32,
     collector: Option<crate::collector::Collector>,
-    crossthread_trace: crate::trace_crossthread::CrossthreadTrace,
+    trace_handle: crate::trace_async::TraceHandle,
 }
 
 impl<T: std::future::Future> std::future::Future for TraceRootFuture<T> {
@@ -207,7 +241,7 @@ impl<T: std::future::Future> std::future::Future for TraceRootFuture<T> {
         cx: &mut std::task::Context<'_>,
     ) -> std::task::Poll<Self::Output> {
         let this = self.project();
-        let guard = this.crossthread_trace.trace_enable(*this.event);
+        let guard = this.trace_handle.trace_enable(*this.event);
         let r = this.inner.poll(cx);
 
         let r = match r {
@@ -228,7 +262,7 @@ impl<T: futures_01::Future> futures_01::Future for TraceRootFuture<T> {
     type Error = T::Error;
 
     fn poll(&mut self) -> futures_01::Poll<Self::Item, Self::Error> {
-        let guard = self.crossthread_trace.trace_enable(self.event);
+        let guard = self.trace_handle.trace_enable(self.event);
         let r = self.inner.poll();
 
         let r = match r {

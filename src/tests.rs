@@ -344,7 +344,7 @@ fn trace_async_basic() {
         }
 
         for i in 6..=10u32 {
-            let handle = crate::trace_crossthread();
+            let handle = crate::trace_binder();
             let wg = wg.clone();
 
             join_handles.push(std::thread::spawn(move || {
@@ -507,7 +507,7 @@ fn trace_collect_ahead() {
 
     let wg = crossbeam::sync::WaitGroup::new();
     let wg1 = wg.clone();
-    let handle = crate::trace_crossthread();
+    let handle = crate::trace_binder();
     let jh = std::thread::spawn(move || {
         let mut handle = handle;
         let guard = handle.trace_enable(2u32);
@@ -599,7 +599,7 @@ fn test_property_async() {
         crate::property(&0u32.to_be_bytes());
 
         for i in 1..=5u32 {
-            let handle = crate::trace_crossthread();
+            let handle = crate::trace_binder();
             let wg = wg.clone();
 
             join_handles.push(std::thread::spawn(move || {
