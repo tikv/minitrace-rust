@@ -5,7 +5,7 @@ struct CrossthreadTraceInner {
     next_suspending_state: crate::State,
     next_related_id: u64,
     suspending_begin_cycles: u64,
-    waiting_event: Option<u32>,
+    pending_event: Option<u32>,
 }
 
 pub struct TraceHandle {
@@ -33,7 +33,7 @@ impl Drop for LocalTraceGuard<'_> {
 }
 
 impl TraceHandle {
-    pub(crate) fn new(waiting_event: Option<u32>) -> Self {
+    pub(crate) fn new(pending_event: Option<u32>) -> Self {
         let trace_local = crate::trace_local::TRACE_LOCAL.with(|trace_local| trace_local.get());
         let tl = unsafe { &mut *trace_local };
 
@@ -49,7 +49,7 @@ impl TraceHandle {
                 next_suspending_state: crate::State::Spawning,
                 next_related_id: related_id,
                 suspending_begin_cycles: minstant::now(),
-                waiting_event,
+                pending_event,
             }),
         }
     }
@@ -57,7 +57,7 @@ impl TraceHandle {
     pub fn trace_enable<E: Into<u32>>(&mut self, event: E) -> Option<LocalTraceGuard> {
         if let Some(inner) = &mut self.inner {
             let settle_event = event.into();
-            let waiting = inner.waiting_event.unwrap_or(settle_event);
+            let pending_event = inner.pending_event.unwrap_or(settle_event);
 
             let now_cycles = minstant::now();
             if let Some((local_guard, self_id)) = crate::trace_local::LocalTraceGuard::new(
@@ -71,7 +71,7 @@ impl TraceHandle {
                     begin_cycles: inner.suspending_begin_cycles,
                     // ... other fields calculating via them.
                     elapsed_cycles: now_cycles.saturating_sub(inner.suspending_begin_cycles),
-                    event: waiting,
+                    event: pending_event,
                 },
                 settle_event,
             ) {
@@ -97,7 +97,7 @@ impl TraceHandle {
     pub(crate) fn new_root(
         collector: std::sync::Arc<crate::collector::CollectorInner>,
         now_cycles: u64,
-        waiting_event: Option<u32>,
+        pending_event: Option<u32>,
     ) -> Self {
         Self {
             inner: Some(CrossthreadTraceInner {
@@ -105,7 +105,7 @@ impl TraceHandle {
                 next_suspending_state: crate::State::Root,
                 next_related_id: 0,
                 suspending_begin_cycles: now_cycles,
-                waiting_event,
+                pending_event,
             }),
         }
     }

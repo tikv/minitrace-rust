@@ -15,7 +15,7 @@ pub fn trace_enable<T: Into<u32>>(
 #[must_use]
 #[inline]
 pub fn trace_enable_fine<E1: Into<u32>, E2: Into<u32>>(
-    waiting_event: E1,
+    pending_event: E1,
     settle_event: E2,
 ) -> (
     crate::trace_local::LocalTraceGuard,
@@ -32,7 +32,7 @@ pub fn trace_enable_fine<E1: Into<u32>, E2: Into<u32>>(
             related_id: 0,
             begin_cycles: now_cycles,
             elapsed_cycles: 0,
-            event: waiting_event.into(),
+            event: pending_event.into(),
         },
         settle_event.into(),
     )
@@ -58,14 +58,14 @@ pub fn trace_may_enable<T: Into<u32>>(
 #[inline]
 pub fn trace_may_enable_fine<E1: Into<u32>, E2: Into<u32>>(
     enable: bool,
-    waiting_event: E1,
+    pending_event: E1,
     settle_event: E2,
 ) -> (
     Option<crate::trace_local::LocalTraceGuard>,
     Option<crate::collector::Collector>,
 ) {
     if enable {
-        let (guard, collector) = trace_enable_fine(waiting_event, settle_event);
+        let (guard, collector) = trace_enable_fine(pending_event, settle_event);
         (Some(guard), Some(collector))
     } else {
         (None, None)
@@ -92,14 +92,14 @@ pub fn new_span<T: Into<u32>>(event: T) -> Option<crate::trace_local::SpanGuard>
 /// ```
 #[must_use]
 #[inline]
-pub fn trace_binder() -> crate::trace_crossthread::TraceHandle {
-    crate::trace_crossthread::TraceHandle::new(None)
+pub fn trace_binder() -> crate::trace_async::TraceHandle {
+    crate::trace_async::TraceHandle::new(None)
 }
 
 #[must_use]
 #[inline]
-pub fn trace_binder_fine<E: Into<u32>>(waiting_event: E) -> crate::trace_crossthread::TraceHandle {
-    crate::trace_crossthread::TraceHandle::new(Some(waiting_event.into()))
+pub fn trace_binder_fine<E: Into<u32>>(pending_event: E) -> crate::trace_async::TraceHandle {
+    crate::trace_async::TraceHandle::new(Some(pending_event.into()))
 }
 
 /// The property is in bytes format, so it is not limited to be a key-value pair but

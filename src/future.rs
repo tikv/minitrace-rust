@@ -12,13 +12,13 @@ pub trait Instrument: Sized {
     #[inline]
     fn trace_task_fine<E1: Into<u32>, E2: Into<u32>>(
         self,
-        waiting_event: E1,
+        pending_event: E1,
         settle_event: E2,
     ) -> TraceSpawned<Self> {
         TraceSpawned {
             inner: self,
             event: settle_event.into(),
-            trace_handle: crate::trace::trace_binder_fine(waiting_event),
+            trace_handle: crate::trace::trace_binder_fine(pending_event),
         }
     }
 
@@ -39,7 +39,7 @@ pub trait Instrument: Sized {
     #[inline]
     fn future_trace_enable_fine<E1: Into<u32>, E2: Into<u32>>(
         self,
-        waiting_event: E1,
+        pending_event: E1,
         settle_event: E2,
     ) -> TraceRootFuture<Self> {
         let now_cycles = minstant::now();
@@ -49,10 +49,10 @@ pub trait Instrument: Sized {
         TraceRootFuture {
             inner: self,
             event: settle_event.into(),
-            trace_handle: crate::trace_crossthread::TraceHandle::new_root(
+            trace_handle: crate::trace_async::TraceHandle::new_root(
                 collector.inner.clone(),
                 now_cycles,
-                Some(waiting_event.into()),
+                Some(pending_event.into()),
             ),
             collector: Some(collector),
         }
@@ -72,7 +72,7 @@ pub trait Instrument: Sized {
     fn future_trace_may_enable_fine<E1: Into<u32>, E2: Into<u32>>(
         self,
         enable: bool,
-        waiting_event: E1,
+        pending_event: E1,
         settle_event: E2,
     ) -> MayTraceRootFuture<Self> {
         if enable {
@@ -83,10 +83,10 @@ pub trait Instrument: Sized {
             MayTraceRootFuture {
                 inner: self,
                 event: settle_event.into(),
-                trace_handle: Some(crate::trace_crossthread::TraceHandle::new_root(
+                trace_handle: Some(crate::trace_async::TraceHandle::new_root(
                     collector.inner.clone(),
                     now_cycles,
-                    Some(waiting_event.into()),
+                    Some(pending_event.into()),
                 )),
                 collector: Some(collector),
             }
@@ -106,7 +106,7 @@ pub struct TraceSpawned<T> {
     #[pin]
     inner: T,
     event: u32,
-    trace_handle: crate::trace_crossthread::TraceHandle,
+    trace_handle: crate::trace_async::TraceHandle,
 }
 
 impl<T: std::future::Future> std::future::Future for TraceSpawned<T> {
@@ -168,7 +168,7 @@ pub struct MayTraceRootFuture<T> {
     inner: T,
     event: u32,
     collector: Option<crate::collector::Collector>,
-    trace_handle: Option<crate::trace_crossthread::TraceHandle>,
+    trace_handle: Option<crate::trace_async::TraceHandle>,
 }
 
 impl<T: std::future::Future> std::future::Future for MayTraceRootFuture<T> {
@@ -230,7 +230,7 @@ pub struct TraceRootFuture<T> {
     inner: T,
     event: u32,
     collector: Option<crate::collector::Collector>,
-    trace_handle: crate::trace_crossthread::TraceHandle,
+    trace_handle: crate::trace_async::TraceHandle,
 }
 
 impl<T: std::future::Future> std::future::Future for TraceRootFuture<T> {
