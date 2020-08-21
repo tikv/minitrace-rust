@@ -78,7 +78,7 @@ impl LocalTraceGuard {
             related_id,
             begin_cycles,
             elapsed_cycles,
-            event: spawning_event,
+            event: waiting_event,
         }: LeadingSpan,
         settle_event: u32,
     ) -> Option<(Self, SpanId)> {
@@ -109,7 +109,7 @@ impl LocalTraceGuard {
             related_id,
             begin_cycles,
             elapsed_cycles,
-            event: spawning_event,
+            event: waiting_event,
         });
         tl.spans.push(crate::Span {
             id: id1,
