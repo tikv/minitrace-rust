@@ -289,7 +289,16 @@ pub fn thrift_compact_encode<'a, S0: AsRef<str>, S1: AsRef<str> + 'a, S2: AsRef<
         // ```
         buf.push(0x18);
         // operation name data
-        encode::bytes(buf, event_to_operation_name(*event).as_ref().as_bytes());
+        let extra_str = match *state {
+            State::Root | State::Spawning | State::Scheduling  => "[PENDING] ",
+            _ => "",
+        }
+        .as_bytes();
+        let operation_name = event_to_operation_name(*event);
+        let operation_name = operation_name.as_ref().as_bytes();
+        encode::varint(buf, extra_str.len() as u64 + operation_name.len() as u64);
+        buf.extend_from_slice(extra_str);
+        buf.extend_from_slice(operation_name);
 
         // references field header
         // ```
