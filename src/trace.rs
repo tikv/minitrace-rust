@@ -1,6 +1,5 @@
 // Copyright 2020 TiKV Project Authors. Licensed under Apache-2.0.
 
-#[must_use]
 #[inline]
 pub fn trace_enable<T: Into<u32>>(
     event: T,
@@ -12,7 +11,6 @@ pub fn trace_enable<T: Into<u32>>(
     trace_enable_fine(event, event)
 }
 
-#[must_use]
 #[inline]
 pub fn trace_enable_fine<E1: Into<u32>, E2: Into<u32>>(
     pending_event: E1,
@@ -41,7 +39,6 @@ pub fn trace_enable_fine<E1: Into<u32>, E2: Into<u32>>(
     (trace_guard, collector)
 }
 
-#[must_use]
 #[inline]
 pub fn trace_may_enable<T: Into<u32>>(
     enable: bool,
@@ -54,7 +51,6 @@ pub fn trace_may_enable<T: Into<u32>>(
     trace_may_enable_fine(enable, event, event)
 }
 
-#[must_use]
 #[inline]
 pub fn trace_may_enable_fine<E1: Into<u32>, E2: Into<u32>>(
     enable: bool,
@@ -72,7 +68,6 @@ pub fn trace_may_enable_fine<E1: Into<u32>, E2: Into<u32>>(
     }
 }
 
-#[must_use]
 #[inline]
 pub fn new_span<T: Into<u32>>(event: T) -> Option<crate::trace_local::SpanGuard> {
     crate::trace_local::SpanGuard::new(event.into())
@@ -90,13 +85,11 @@ pub fn new_span<T: Into<u32>>(event: T) -> Option<crate::trace_local::SpanGuard>
 ///     let _g = handle.trace_enable(EVENT);
 /// });
 /// ```
-#[must_use]
 #[inline]
 pub fn trace_binder() -> crate::trace_async::TraceHandle {
     crate::trace_async::TraceHandle::new(None)
 }
 
-#[must_use]
 #[inline]
 pub fn trace_binder_fine<E: Into<u32>>(pending_event: E) -> crate::trace_async::TraceHandle {
     crate::trace_async::TraceHandle::new(Some(pending_event.into()))

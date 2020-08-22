@@ -8,6 +8,7 @@ struct AsyncTraceInner {
     pending_event: Option<u32>,
 }
 
+#[must_use]
 pub struct TraceHandle {
     inner: Option<AsyncTraceInner>,
 }

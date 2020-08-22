@@ -45,6 +45,7 @@ fn next_global_id_prefix() -> u32 {
     GLOBAL_ID_COUNTER.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
 }
 
+#[must_use]
 pub struct LocalTraceGuard {
     collector: std::sync::Arc<crate::collector::CollectorInner>,
     trace_local: *mut TraceLocal,
@@ -202,6 +203,7 @@ impl Drop for LocalTraceGuard {
     }
 }
 
+#[must_use]
 pub struct SpanGuard {
     trace_local: *mut TraceLocal,
     index: usize,
