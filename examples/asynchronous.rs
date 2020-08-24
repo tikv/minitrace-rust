@@ -82,7 +82,5 @@ async fn main() {
         let _ = socket.send_to(&buf, "127.0.0.1:6831").await;
     }
 
-    dbg!(&trace_result);
-
     crate::common::draw_stdout(trace_result);
 }

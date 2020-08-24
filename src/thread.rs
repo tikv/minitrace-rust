@@ -106,6 +106,7 @@ impl AsyncScopeHandle {
             ) {
                 // Reserve these for the next suspending process
                 inner.next_related_id = self_id;
+                inner.next_suspending_state = State::Scheduling;
 
                 // Obviously, the begin cycles of the next suspending is impossible to predict, and it should
                 // be recorded when `local_guard` is dropping. Here `AsyncScopeGuard` is for this purpose.
