@@ -58,32 +58,31 @@ async fn main() {
 
     let trace_result = collector.collect();
 
-    #[cfg(feature = "jaeger")]
-    {
-        use std::net::SocketAddr;
-        let mut buf = Vec::with_capacity(2048);
-        minitrace::jaeger::thrift_compact_encode(
-            &mut buf,
-            "Async Example",
-            &trace_result,
-            |e| {
-                format!("{:?}", unsafe {
-                    std::mem::transmute::<_, AsyncJob>(e as u8)
-                })
-            },
-            |property| {
-                let mut split = property.splitn(2, |b| *b == b':');
-                let key = String::from_utf8_lossy(split.next().unwrap()).to_owned();
-                let value = String::from_utf8_lossy(split.next().unwrap()).to_owned();
-                (key, value)
-            },
-        );
+    use std::net::SocketAddr;
+    let mut buf = Vec::with_capacity(2048);
+    minitrace_jaeger::thrift_compact_encode(
+        &mut buf,
+        "Async Example",
+        &trace_result,
+        |e| {
+            format!("{:?}", unsafe {
+                std::mem::transmute::<_, AsyncJob>(e as u8)
+            })
+        },
+        |property| {
+            let mut split = property.splitn(2, |b| *b == b':');
+            let key = String::from_utf8_lossy(split.next().unwrap()).to_owned();
+            let value = String::from_utf8_lossy(split.next().unwrap()).to_owned();
+            (key, value)
+        },
+    );
 
-        let local_addr: SocketAddr = "0.0.0.0:0".parse().unwrap();
-        if let Ok(mut socket) = tokio::net::UdpSocket::bind(local_addr).await {
-            let _ = socket.send_to(&buf, "127.0.0.1:6831").await;
-        }
+    let local_addr: SocketAddr = "0.0.0.0:0".parse().unwrap();
+    if let Ok(mut socket) = tokio::net::UdpSocket::bind(local_addr).await {
+        let _ = socket.send_to(&buf, "127.0.0.1:6831").await;
     }
+
+    dbg!(&trace_result);
 
     crate::common::draw_stdout(trace_result);
 }

@@ -22,6 +22,7 @@ version = "0.3.1"
 package = "futures"
 
 [dev-dependencies]
+minitrace-jaeger = { path = "crates/minitrace-jaeger" }
 tokio = { version = "0.2", features = ["full"] }
 criterion = "0.3"
 rustracing = "0.4"

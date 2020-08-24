@@ -23,7 +23,7 @@ fn trace_wide_bench(c: &mut Criterion) {
         "trace_wide",
         |b, len| {
             b.iter(|| {
-                let (root, collector) = minitrace::start_trace(0u32).unwrap();
+                let (root, collector) = minitrace::start_trace(0u32);
                 {
                     let _guard = root;
 
@@ -32,7 +32,7 @@ fn trace_wide_bench(c: &mut Criterion) {
                     }
                 }
 
-                let _r = black_box(collector.collect());
+                let _r = black_box(collector.unwrap().collect());
             });
         },
         vec![1, 10, 100, 1000, 10000],
@@ -44,7 +44,7 @@ fn trace_deep_bench(c: &mut Criterion) {
         "trace_deep",
         |b, len| {
             b.iter(|| {
-                let (root, collector) = minitrace::start_trace(0u32).unwrap();
+                let (root, collector) = minitrace::start_trace(0u32);
 
                 {
                     let _guard = root;
@@ -54,7 +54,7 @@ fn trace_deep_bench(c: &mut Criterion) {
                     }
                 }
 
-                let _r = black_box(collector.collect());
+                let _r = black_box(collector.unwrap().collect());
             });
         },
         vec![1, 10, 100, 1000, 10000],

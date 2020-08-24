@@ -15,16 +15,16 @@ minitrace = { git = "https://github.com/pingcap-incubator/minitrace-rust.git" }
 ### In Synchronous Code
 
 ```rust
-let (root_guard, collector) = minitrace::trace_enable(0u32);
-minitrace::property(b"tracing started");
+let (root_guard, collector) = minitrace::start_trace(0u32);
+minitrace::new_property(b"tracing started");
 
 {
     let _child_guard = minitrace::new_span(1u32);
-    minitrace::property(b"in child");
+    minitrace::new_property(b"in child");
 }
 
 drop(root_guard);
-let trace_details = collector.collect();
+let trace_results = collector.unwrap().collect();
 ```
 
 ### In Asynchronous Code
@@ -32,7 +32,7 @@ let trace_details = collector.collect();
 Futures:
 
 ```rust
-use minitrace::prelude::*;
+use minitrace::future::FutureExt as _;
 
 let task = async {
     let guard = minitrace::new_span(1u32);
@@ -44,32 +44,31 @@ let task = async {
 
     async {
         // current future ...
-    }.trace_async(2u32).await;
+    }.in_new_span(2u32).await;
 
     runtime::spawn(async {
         // new future ...
-        minitrace::property(b"spawned to some runtime");
-    }.trace_task(3u32));
+        minitrace::new_property(b"spawned to some runtime");
+    }.in_new_span(3u32));
 
     async {
         // current future ...
-    }.trace_async(4u32).await;
+    }.in_new_span(4u32).await;
 };
 
-let (collector, value) = runtime::block_on(task.future_trace_enable(0u32));
-let trace_details = collector.collect();
+let (collector, value) = runtime::block_on(task.collect_trace(0u32));
+let trace_results = collector.unwrap().collect();
 ```
 
 Threads:
 
 ```rust
-let (root, collector) = minitrace::trace_enable(0u32);
+let (root, collector) = minitrace::start_trace(0u32);
 
-let handle = minitrace::trace_binder();
+let mut handle = minitrace::thread::new_async_scope();
 
 let th = std::thread::spawn(move || {
-    let mut handle = handle;
-    let _parent_guard = handle.trace_enable(1u32);
+    let _parent_guard = handle.start_trace(1u32);
 
     {
         let _child_guard = minitrace::new_span(2u32);
@@ -79,7 +78,7 @@ let th = std::thread::spawn(move || {
 drop(root);
 
 th.join().unwrap();
-let trace_details = collector.collect();
+let trace_results = collector.unwrap().collect();
 ```
 
 
