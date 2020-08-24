@@ -23,7 +23,7 @@ fn trace_wide_bench(c: &mut Criterion) {
         "trace_wide",
         |b, len| {
             b.iter(|| {
-                let (root, collector) = minitrace::start_trace(0u32);
+                let (root, collector) = minitrace::start_trace(0u32).unwrap();
                 {
                     let _guard = root;
 
@@ -44,7 +44,7 @@ fn trace_deep_bench(c: &mut Criterion) {
         "trace_deep",
         |b, len| {
             b.iter(|| {
-                let (root, collector) = minitrace::start_trace(0u32);
+                let (root, collector) = minitrace::start_trace(0u32).unwrap();
 
                 {
                     let _guard = root;

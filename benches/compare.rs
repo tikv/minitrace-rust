@@ -56,7 +56,7 @@ fn minitrace_harness() {
         }
     }
 
-    let (root, collector) = minitrace::start_trace(PARENT);
+    let (root, collector) = minitrace::start_trace(PARENT).unwrap();
 
     {
         let _guard = root;

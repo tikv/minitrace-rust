@@ -13,7 +13,7 @@ pub trait FutureExt: Sized {
         let event = event.into();
         NewSpan {
             inner: self,
-            event: event.into(),
+            event,
             trace_handle: new_async_scope(),
         }
     }
