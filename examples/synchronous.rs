@@ -29,8 +29,8 @@ fn func2(i: u64) {
 }
 
 fn main() {
-    let (root, collector) = minitrace::trace_enable(SyncJob::Root);
-    minitrace::property(b"sample property:it works");
+    let (root, collector) = minitrace::start_trace(SyncJob::Root).unwrap();
+    minitrace::new_property(b"sample property:it works");
     {
         let _guard = root;
         for i in 1..=10 {

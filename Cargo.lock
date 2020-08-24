@@ -524,12 +524,11 @@ dependencies = [
  "futures 0.1.29",
  "futures 0.3.4",
  "lazy_static",
- "minitrace-attribute",
+ "minitrace-macro",
  "minstant",
  "opentelemetry",
  "opentelemetry-jaeger",
  "pin-project",
- "rand",
  "rustracing",
  "tokio",
  "tracing",
@@ -539,7 +538,15 @@ dependencies = [
 ]
 
 [[package]]
-name = "minitrace-attribute"
+name = "minitrace-jaeger"
+version = "0.1.0"
+dependencies = [
+ "minitrace",
+ "rand",
+]
+
+[[package]]
+name = "minitrace-macro"
 version = "0.1.0"
 dependencies = [
  "proc-macro-error",

@@ -1,45 +1,53 @@
 // Copyright 2020 TiKV Project Authors. Licensed under Apache-2.0.
 
+use std::sync::atomic::AtomicBool;
+use std::sync::Arc;
+
+use crossbeam::queue::SegQueue;
+
+use crate::utils::real_time_ns;
+use crate::{Properties, Span};
+
 #[derive(Debug, Clone)]
-pub(crate) struct SpanSet {
+pub struct SpanSet {
     /// Span collection
-    pub spans: Vec<crate::Span>,
+    pub spans: Vec<Span>,
 
     /// Property collection
-    pub properties: crate::Properties,
+    pub properties: Properties,
 }
 
-pub(crate) struct CollectorInner {
+pub struct CollectorInner {
     start_time_ns: u64,
-    pub(crate) queue: crossbeam::queue::SegQueue<SpanSet>,
-    pub(crate) closed: std::sync::atomic::AtomicBool,
+    pub queue: SegQueue<SpanSet>,
+    pub closed: AtomicBool,
 }
 
 pub struct Collector {
-    pub(crate) inner: std::sync::Arc<CollectorInner>,
+    pub inner: Arc<CollectorInner>,
 }
 
 impl Collector {
-    pub(crate) fn new(start_time_ns: u64) -> Self {
-        let collector = std::sync::Arc::new(crate::collector::CollectorInner {
-            start_time_ns,
-            queue: crossbeam::queue::SegQueue::new(),
-            closed: std::sync::atomic::AtomicBool::new(false),
-        });
-
-        crate::collector::Collector { inner: collector }
+    pub(crate) fn new() -> Self {
+        let inner = CollectorInner {
+            start_time_ns: real_time_ns(),
+            queue: SegQueue::new(),
+            closed: AtomicBool::new(false),
+        };
+        Collector {
+            inner: Arc::new(inner),
+        }
     }
 
-    #[inline]
-    pub fn collect(self) -> crate::TraceDetails {
+    pub fn collect(self) -> crate::TraceResult {
         let span_sets = self.collect_spanset();
 
         // Fast path to save memory allocation.
         if span_sets.len() == 1 {
             let span_set = span_sets.into_iter().next().unwrap();
-            return crate::TraceDetails {
+            return crate::TraceResult {
                 start_time_ns: self.inner.start_time_ns,
-                elapsed_ns: crate::time::real_time_ns().saturating_sub(self.inner.start_time_ns),
+                elapsed_ns: crate::utils::real_time_ns().saturating_sub(self.inner.start_time_ns),
                 cycles_per_second: minstant::cycles_per_second(),
                 spans: span_set.spans,
                 properties: span_set.properties,
@@ -70,9 +78,9 @@ impl Collector {
             payload.extend_from_slice(&span_set.properties.payload);
         }
 
-        crate::TraceDetails {
+        crate::TraceResult {
             start_time_ns: self.inner.start_time_ns,
-            elapsed_ns: crate::time::real_time_ns().saturating_sub(self.inner.start_time_ns),
+            elapsed_ns: crate::utils::real_time_ns().saturating_sub(self.inner.start_time_ns),
             cycles_per_second: minstant::cycles_per_second(),
             spans,
             properties: crate::Properties {
@@ -83,7 +91,6 @@ impl Collector {
         }
     }
 
-    #[inline]
     fn collect_spanset(&self) -> Vec<SpanSet> {
         let len = self.inner.queue.len();
         let mut res = Vec::with_capacity(len);

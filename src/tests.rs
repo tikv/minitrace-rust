@@ -1,6 +1,6 @@
 // Copyright 2020 TiKV Project Authors. Licensed under Apache-2.0.
 
-use crate::prelude::*;
+use crate::future::FutureExt as _;
 
 use std::cell::RefCell;
 use std::collections::HashMap;
@@ -26,7 +26,7 @@ enum Node {
     NormalNode(Rc<RefCell<NormalNode>>),
 }
 
-fn build_tree(trace_details: &crate::TraceDetails) -> Rc<RefCell<LeadingNode>> {
+fn build_tree(trace_details: &crate::TraceResult) -> Rc<RefCell<LeadingNode>> {
     let mut spans = trace_details.spans.clone();
     spans.sort_by(|a, b| a.begin_cycles.cmp(&b.begin_cycles));
     let mut id_to_node: HashMap<u64, Node> = HashMap::new();
@@ -271,18 +271,18 @@ fn check_time_included(tree: &Rc<RefCell<LeadingNode>>) {
     }
 }
 
-fn check_trace_local<F>(f: F)
+fn check_trace<F>(f: F)
 where
-    F: Fn(&crate::trace_local::TraceLocal) -> bool,
+    F: Fn(&crate::trace::TraceLocal) -> bool,
 {
-    crate::trace_local::TRACE_LOCAL.with(|trace| {
+    crate::trace::TRACE_LOCAL.with(|trace| {
         let tl = unsafe { &*trace.get() };
         assert!(f(tl));
     });
 }
 
 fn check_clear() {
-    check_trace_local(|tl| {
+    check_trace(|tl| {
         tl.spans.is_empty()
             && tl.enter_stack.is_empty()
             && tl.cur_collector.is_none()
@@ -294,7 +294,7 @@ fn check_clear() {
 
 #[test]
 fn trace_basic() {
-    let (root, collector) = crate::trace_enable(0u32);
+    let (root, collector) = crate::start_trace(0u32).unwrap();
     {
         let _guard = root;
         {
@@ -322,7 +322,7 @@ fn trace_not_enable() {
 
 #[test]
 fn trace_async_basic() {
-    let (root, collector) = crate::trace_enable(0u32);
+    let (root, collector) = crate::start_trace(0u32).unwrap();
 
     let wg = crossbeam::sync::WaitGroup::new();
     let mut join_handles = vec![];
@@ -332,7 +332,7 @@ fn trace_async_basic() {
         async fn dummy() {};
 
         for i in 1..=5u32 {
-            let dummy = dummy().trace_task(i);
+            let dummy = dummy().in_new_span(i);
             let wg = wg.clone();
 
             join_handles.push(std::thread::spawn(move || {
@@ -344,12 +344,12 @@ fn trace_async_basic() {
         }
 
         for i in 6..=10u32 {
-            let handle = crate::trace_binder();
+            let handle = crate::thread::new_async_scope();
             let wg = wg.clone();
 
             join_handles.push(std::thread::spawn(move || {
                 let mut handle = handle;
-                let guard = handle.trace_enable(i);
+                let guard = handle.start_trace(i);
                 drop(guard);
                 drop(wg);
 
@@ -389,7 +389,7 @@ fn trace_async_basic() {
 
 #[test]
 fn trace_wide_function() {
-    let (root, collector) = crate::trace_enable(0u32);
+    let (root, collector) = crate::start_trace(0u32).unwrap();
 
     {
         let _guard = root;
@@ -435,7 +435,7 @@ fn trace_deep_function() {
         }
     }
 
-    let (root, collector) = crate::trace_enable(0u32);
+    let (root, collector) = crate::start_trace(0u32).unwrap();
 
     {
         let _guard = root;
@@ -499,7 +499,7 @@ fn trace_deep_function() {
 
 #[test]
 fn trace_collect_ahead() {
-    let (root, collector) = crate::trace_enable(0u32);
+    let (root, collector) = crate::start_trace(0u32).unwrap();
 
     {
         let _guard = crate::new_span(1u32);
@@ -507,10 +507,10 @@ fn trace_collect_ahead() {
 
     let wg = crossbeam::sync::WaitGroup::new();
     let wg1 = wg.clone();
-    let handle = crate::trace_binder();
+    let handle = crate::thread::new_async_scope();
     let jh = std::thread::spawn(move || {
         let mut handle = handle;
-        let guard = handle.trace_enable(2u32);
+        let guard = handle.start_trace(2u32);
 
         wg1.wait();
         drop(guard);
@@ -532,16 +532,16 @@ fn trace_collect_ahead() {
 
 #[test]
 fn test_property_sync() {
-    let (root, collector) = crate::trace_enable(0u32);
-    crate::property(b"123");
+    let (root, collector) = crate::start_trace(0u32).unwrap();
+    crate::new_property(b"123");
 
     let g1 = crate::new_span(1u32);
     let g2 = crate::new_span(2u32);
-    crate::property(b"abc");
-    crate::property(b"");
+    crate::new_property(b"abc");
+    crate::new_property(b"");
 
     let g3 = crate::new_span(3u32);
-    crate::property(b"edf");
+    crate::new_property(b"edf");
 
     drop(g3);
     drop(g2);
@@ -589,23 +589,23 @@ fn test_property_sync() {
 
 #[test]
 fn test_property_async() {
-    let (root, collector) = crate::trace_enable(0u32);
+    let (root, collector) = crate::start_trace(0u32).unwrap();
 
     let wg = crossbeam::sync::WaitGroup::new();
     let mut join_handles = vec![];
 
     {
         let _guard = root;
-        crate::property(&0u32.to_be_bytes());
+        crate::new_property(&0u32.to_be_bytes());
 
         for i in 1..=5u32 {
-            let handle = crate::trace_binder();
+            let handle = crate::thread::new_async_scope();
             let wg = wg.clone();
 
             join_handles.push(std::thread::spawn(move || {
                 let mut handle = handle;
-                let guard = handle.trace_enable(i);
-                crate::property(&i.to_be_bytes());
+                let guard = handle.start_trace(i);
+                crate::new_property(&i.to_be_bytes());
                 drop(guard);
                 drop(wg);
 

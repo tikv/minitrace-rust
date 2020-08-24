@@ -1,7 +1,7 @@
 // Copyright 2020 TiKV Project Authors. Licensed under Apache-2.0.
 
 mod common;
-use minitrace::prelude::*;
+use minitrace::future::FutureExt as _;
 
 #[derive(Debug)]
 enum AsyncJob {
@@ -21,7 +21,7 @@ impl Into<u32> for AsyncJob {
 fn parallel_job() -> Vec<tokio::task::JoinHandle<()>> {
     let mut v = Vec::with_capacity(4);
     for i in 0..4 {
-        v.push(tokio::spawn(iter_job(i).trace_task(AsyncJob::IterJob)));
+        v.push(tokio::spawn(iter_job(i).in_new_span(AsyncJob::IterJob)));
     }
     v
 }
@@ -45,7 +45,7 @@ async fn other_job() {
 #[tokio::main]
 async fn main() {
     let (collector, _) = async {
-        minitrace::property(b"sample property:it works");
+        minitrace::new_property(b"sample property:it works");
         let jhs = parallel_job();
         other_job().await;
 
@@ -53,10 +53,10 @@ async fn main() {
             jh.await.unwrap();
         }
     }
-    .future_trace_enable(AsyncJob::Root)
+    .collect_trace(AsyncJob::Root)
     .await;
 
-    let trace_details = collector.collect();
+    let trace_result = collector.collect();
 
     #[cfg(feature = "jaeger")]
     {
@@ -65,7 +65,7 @@ async fn main() {
         minitrace::jaeger::thrift_compact_encode(
             &mut buf,
             "Async Example",
-            &trace_details,
+            &trace_result,
             |e| {
                 format!("{:?}", unsafe {
                     std::mem::transmute::<_, AsyncJob>(e as u8)
@@ -85,5 +85,5 @@ async fn main() {
         }
     }
 
-    crate::common::draw_stdout(trace_details);
+    crate::common::draw_stdout(trace_result);
 }

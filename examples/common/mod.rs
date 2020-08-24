@@ -25,7 +25,7 @@ enum Node {
 }
 
 fn build_tree(
-    trace_details: &minitrace::TraceDetails,
+    trace_details: &minitrace::TraceResult,
 ) -> (
     Rc<RefCell<LeadingNode>>,
     u64, /* min begin */
@@ -114,7 +114,7 @@ fn build_tree(
     (root.expect("root span isn't existing"), min_begin, max_end)
 }
 
-pub fn draw_stdout(trace_details: minitrace::TraceDetails) {
+pub fn draw_stdout(trace_details: minitrace::TraceResult) {
     let (tree, min_begin, max_end) = build_tree(&trace_details);
     let factor = BAR_LEN as f64 / (max_end - min_begin) as f64;
     draw_leading(factor, min_begin, trace_details.cycles_per_second, &tree);

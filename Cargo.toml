@@ -6,17 +6,12 @@ description = "A high-performance timeline tracing library for Rust, used by TiK
 license = "Apache-2.0"
 edition = "2018"
 
-[features]
-default = []
-jaeger = []
-
 [dependencies]
 pin-project = "0.4"
-minitrace-attribute = { path = "crates/attribute" }
+minitrace-macro = { path = "crates/minitrace-macro" }
 lazy_static = "1.4.0"
 crossbeam = "0.7"
 minstant = { git = "https://github.com/zhongzc/minstant.git" }
-rand = "0.7"
 
 [dependencies.futures_01]
 version = "0.1"

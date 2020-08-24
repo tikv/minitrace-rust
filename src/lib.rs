@@ -1,37 +1,30 @@
 // Copyright 2020 TiKV Project Authors. Licensed under Apache-2.0.
 
-#![feature(negative_impls)]
 #![feature(shrink_to)]
 
-pub(crate) mod collector;
 pub mod future;
-pub mod prelude;
-pub(crate) mod time;
-pub(crate) mod trace;
-pub(crate) mod trace_async;
-pub(crate) mod trace_local;
+pub mod thread;
 
-#[cfg(feature = "jaeger")]
-pub mod jaeger;
+mod collector;
+mod trace;
+mod utils;
 
-pub use collector::*;
-pub use trace::*;
-pub use trace_async::*;
-pub use trace_local::*;
+pub use collector::Collector;
+pub use trace::{ScopeGuard, SpanGuard};
+
+pub use minitrace_macro::{trace, trace_async};
 
 #[cfg(test)]
 mod tests;
 
-pub use minitrace_attribute::{trace, trace_async};
-
 #[derive(Debug, Clone)]
-pub struct TraceDetails {
+pub struct TraceResult {
     /// The start time of the whole tracing process that is the time
-    /// when calling `trace_enable`
+    /// when calling `start_trace`
     pub start_time_ns: u64,
 
     /// The elapsed of the whole tracing process that is the time diff
-    /// from calling `trace_enable` to calling `collect`
+    /// from calling `start_trace` to calling `collect`
     pub elapsed_ns: u64,
 
     /// For conversion of cycles -> ns
@@ -92,7 +85,7 @@ pub struct Span {
 ///       +-----------------------------------------+-------------------------------+
 ///       | state: Spawning, related_id: 42, id: 77 | state: Settle, related_id: 77 |
 ///       +-----------------------------------------+-------------------------------+
-///                                                 | <- handle.trace_enable()
+///                                                 | <- handle.start_trace()
 /// ```
 ///
 /// ## Scheduling & Settle
@@ -152,4 +145,48 @@ pub struct Properties {
     pub span_ids: Vec<u64>,
     pub property_lens: Vec<u64>,
     pub payload: Vec<u8>,
+}
+
+pub fn start_trace<T: Into<u32>>(event: T) -> Option<(ScopeGuard, Collector)> {
+    let now_cycles = minstant::now();
+    let collector = Collector::new();
+
+    let event = event.into();
+    let (scope_guard, _) = ScopeGuard::new(
+        collector.inner.clone(),
+        now_cycles,
+        crate::trace::LeadingSpan {
+            state: State::Root,
+            related_id: 0,
+            begin_cycles: now_cycles,
+            elapsed_cycles: 0,
+            event,
+        },
+        event,
+    )?;
+
+    Some((scope_guard, collector))
+}
+
+#[inline]
+pub fn new_span<T: Into<u32>>(event: T) -> Option<crate::trace::SpanGuard> {
+    crate::trace::SpanGuard::new(event.into())
+}
+
+/// The property is in bytes format, so it is not limited to be a key-value pair but
+/// anything intended. However, the downside of flexibility is that manual encoding
+/// and manual decoding need to consider.
+#[inline]
+pub fn new_property<B: AsRef<[u8]>>(p: B) {
+    crate::trace::append_property(|| p);
+}
+
+/// `property` of closure version
+#[inline]
+pub fn new_property_with<F, B>(f: F)
+where
+    B: AsRef<[u8]>,
+    F: FnOnce() -> B,
+{
+    crate::trace::append_property(f);
 }

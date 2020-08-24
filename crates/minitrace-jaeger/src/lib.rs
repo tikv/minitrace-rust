@@ -1,7 +1,9 @@
-use crate::{Properties, Span, State, TraceDetails};
-use rand::prelude::*;
 use std::cell::RefCell;
 use std::collections::HashMap;
+
+use rand::prelude::*;
+
+use minitrace::{Properties, Span, State, TraceResult};
 
 thread_local! {
    static TRACE_ID_HIGH: i64 = random();
@@ -16,13 +18,13 @@ thread_local! {
 pub fn thrift_compact_encode<'a, S0: AsRef<str>, S1: AsRef<str> + 'a, S2: AsRef<str> + 'a>(
     buf: &mut Vec<u8>,
     service_name: &str,
-    TraceDetails {
+    TraceResult {
         start_time_ns,
         elapsed_ns,
         cycles_per_second,
         spans,
         properties,
-    }: &'a TraceDetails,
+    }: &'a TraceResult,
     event_to_operation_name: impl Fn(u32) -> S0,
     property_to_kv: impl Fn(&'a [u8]) -> (S1, S2),
 ) {
@@ -548,7 +550,7 @@ mod tests {
     #[test]
     fn it_works() {
         let res = {
-            let (_g, collector) = crate::trace_enable(0u32);
+            let (_g, collector) = crate::start_trace(0u32);
             crate::property(b"test property:a root span");
 
             std::thread::sleep(std::time::Duration::from_millis(20));
