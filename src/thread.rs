@@ -1,7 +1,9 @@
 // Copyright 2020 TiKV Project Authors. Licensed under Apache-2.0.
 
+use either::Either;
+
 use crate::collector::CollectorInner;
-use crate::{ScopeGuard, State};
+use crate::{new_span, ScopeGuard, SpanGuard, State};
 
 /// Bind the current tracing context to another executing context (e.g. a closure).
 ///
@@ -32,7 +34,7 @@ pub struct AsyncScopeHandle {
 }
 
 pub struct AsyncScopeGuard<'a> {
-    _local: ScopeGuard,
+    _guard: Either<ScopeGuard, SpanGuard>,
 
     // `AsyncScopeHandle` may be used to trace a `Future` task which
     // consists of a sequence of local-tracings.
@@ -85,41 +87,41 @@ impl AsyncScopeHandle {
     }
 
     pub fn start_trace<E: Into<u32>>(&mut self, event: E) -> Option<AsyncScopeGuard> {
-        if let Some(inner) = &mut self.inner {
-            let event = event.into();
+        let inner = self.inner.as_mut()?;
+        let event = event.into();
+        let now_cycles = minstant::now();
 
-            let now_cycles = minstant::now();
-            if let Some((local_guard, self_id)) = crate::trace::ScopeGuard::new(
-                inner.collector.clone(),
-                now_cycles,
-                crate::trace::LeadingSpan {
-                    // At this restoring time, fill this leading span with the
-                    // related id, begin cycles and ...
-                    state: inner.next_suspending_state,
-                    related_id: inner.next_related_id,
-                    begin_cycles: inner.suspending_begin_cycles,
-                    // ... other fields calculating via them.
-                    elapsed_cycles: now_cycles.saturating_sub(inner.suspending_begin_cycles),
-                    event,
-                },
+        if let Some((local_guard, self_id)) = crate::trace::ScopeGuard::new(
+            inner.collector.clone(),
+            now_cycles,
+            crate::trace::LeadingSpan {
+                // At this restoring time, fill this leading span with the
+                // related id, begin cycles and ...
+                state: inner.next_suspending_state,
+                related_id: inner.next_related_id,
+                begin_cycles: inner.suspending_begin_cycles,
+                // ... other fields calculating via them.
+                elapsed_cycles: now_cycles.saturating_sub(inner.suspending_begin_cycles),
                 event,
-            ) {
-                // Reserve these for the next suspending process
-                inner.next_related_id = self_id;
-                inner.next_suspending_state = State::Scheduling;
+            },
+            event,
+        ) {
+            // Reserve these for the next suspending process
+            inner.next_related_id = self_id;
+            inner.next_suspending_state = State::Scheduling;
 
-                // Obviously, the begin cycles of the next suspending is impossible to predict, and it should
-                // be recorded when `local_guard` is dropping. Here `AsyncScopeGuard` is for this purpose.
-                // See `impl Drop for AsyncScopeGuard`.
-                Some(AsyncScopeGuard {
-                    _local: local_guard,
-                    handle: inner,
-                })
-            } else {
-                None
-            }
+            // Obviously, the begin cycles of the next suspending is impossible to predict, and it should
+            // be recorded when `local_guard` is dropping. Here `AsyncScopeGuard` is for this purpose.
+            // See `impl Drop for AsyncScopeGuard`.
+            Some(AsyncScopeGuard {
+                _guard: Either::Left(local_guard),
+                handle: inner,
+            })
         } else {
-            None
+            Some(AsyncScopeGuard {
+                _guard: Either::Right(new_span(event)?),
+                handle: inner,
+            })
         }
     }
 }

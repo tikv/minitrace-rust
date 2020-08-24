@@ -92,7 +92,7 @@ $ docker run --rm -d -p6831:6831/udp -p6832:6832/udp -p16686:16686 jaegertracing
 
 ### Run Synchronous Example
 ```sh
-$ cargo run --features "jaeger" --example synchronous
+$ cargo run --example synchronous
 ====================================================================== 111.69 ms
 =                                                                        2.13 ms
                                                                          1.06 ms
@@ -119,7 +119,7 @@ $ cargo run --features "jaeger" --example synchronous
 
 ### Run Asynchronous Example
 ```sh
-$ cargo run --features "jaeger" --example asynchronous
+$ cargo run --example asynchronous
 ============================                                            21.81 ms
 ==============                                                          10.84 ms
 ============================                                            21.67 ms

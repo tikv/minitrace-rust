@@ -11,6 +11,7 @@ pin-project = "0.4"
 minitrace-macro = { path = "crates/minitrace-macro" }
 lazy_static = "1.4.0"
 crossbeam = "0.7"
+either = "1.6"
 minstant = { git = "https://github.com/zhongzc/minstant.git" }
 
 [dependencies.futures_01]
