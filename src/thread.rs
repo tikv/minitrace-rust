@@ -5,13 +5,13 @@ use crate::{ScopeGuard, State};
 
 /// Bind the current tracing context to another executing context (e.g. a closure).
 ///
-/// ```no_run
-/// # use minitrace::new_async_scope;
+/// ```
+/// # use minitrace::thread::new_async_scope;
 /// # use std::thread;
 /// #
 /// let mut handle = new_async_scope();
 /// thread::spawn(move || {
-///     let _g = handle.start_trace(EVENT);
+///     let _g = handle.start_trace(0u32);
 /// });
 /// ```
 #[inline]
