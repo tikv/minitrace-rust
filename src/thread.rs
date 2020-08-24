@@ -9,9 +9,8 @@ use crate::{ScopeGuard, State};
 /// # use minitrace::new_async_scope;
 /// # use std::thread;
 /// #
-/// let handle = new_async_scope();
+/// let mut handle = new_async_scope();
 /// thread::spawn(move || {
-///     let mut handle = handle;
 ///     let _g = handle.start_trace(EVENT);
 /// });
 /// ```

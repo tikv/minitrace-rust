@@ -550,19 +550,19 @@ mod tests {
     #[test]
     fn it_works() {
         let res = {
-            let (_g, collector) = crate::start_trace(0u32);
-            crate::property(b"test property:a root span");
+            let (_g, collector) = minitrace::start_trace(0u32);
+            minitrace::new_property(b"test property:a root span");
 
             std::thread::sleep(std::time::Duration::from_millis(20));
 
             {
-                let _g = crate::new_span(1u32);
-                crate::property(b"where am i:in child");
+                let _g = minitrace::new_span(1u32);
+                minitrace::new_property(b"where am i:in child");
                 std::thread::sleep(std::time::Duration::from_millis(10));
             }
 
-            crate::property(b"another test property:done");
-            collector
+            minitrace::new_property(b"another test property:done");
+            collector.unwrap()
         }
         .collect();
 
