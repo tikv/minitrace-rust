@@ -147,12 +147,12 @@ pub struct Properties {
     pub payload: Vec<u8>,
 }
 
-pub fn start_trace<T: Into<u32>>(event: T) -> Option<(ScopeGuard, Collector)> {
+pub fn start_trace<T: Into<u32>>(event: T) -> (Option<ScopeGuard>, Option<Collector>) {
     let now_cycles = minstant::now();
     let collector = Collector::new();
 
     let event = event.into();
-    let (scope_guard, _) = ScopeGuard::new(
+    if let Some((scope_guard, _)) = ScopeGuard::new(
         collector.inner.clone(),
         now_cycles,
         crate::trace::LeadingSpan {
@@ -163,9 +163,11 @@ pub fn start_trace<T: Into<u32>>(event: T) -> Option<(ScopeGuard, Collector)> {
             event,
         },
         event,
-    )?;
-
-    Some((scope_guard, collector))
+    ) {
+        (Some(scope_guard), Some(collector))
+    } else {
+        (None, None)
+    }
 }
 
 #[inline]

@@ -294,7 +294,7 @@ fn check_clear() {
 
 #[test]
 fn trace_basic() {
-    let (root, collector) = crate::start_trace(0u32).unwrap();
+    let (root, collector) = crate::start_trace(0u32);
     {
         let _guard = root;
         {
@@ -302,7 +302,7 @@ fn trace_basic() {
         }
     }
 
-    let trace_details = collector.collect();
+    let trace_details = collector.unwrap().collect();
 
     let real_tree = build_tree(&trace_details);
     let shape = leading!(0, child: normal!(0, normals: [normal!(1)]));
@@ -322,7 +322,7 @@ fn trace_not_enable() {
 
 #[test]
 fn trace_async_basic() {
-    let (root, collector) = crate::start_trace(0u32).unwrap();
+    let (root, collector) = crate::start_trace(0u32);
 
     let wg = crossbeam::sync::WaitGroup::new();
     let mut join_handles = vec![];
@@ -359,7 +359,7 @@ fn trace_async_basic() {
     }
 
     wg.wait();
-    let trace_details = collector.collect();
+    let trace_details = collector.unwrap().collect();
 
     let real_tree = build_tree(&trace_details);
     let shape = leading!(
@@ -389,7 +389,7 @@ fn trace_async_basic() {
 
 #[test]
 fn trace_wide_function() {
-    let (root, collector) = crate::start_trace(0u32).unwrap();
+    let (root, collector) = crate::start_trace(0u32);
 
     {
         let _guard = root;
@@ -398,7 +398,7 @@ fn trace_wide_function() {
         }
     }
 
-    let trace_details = collector.collect();
+    let trace_details = collector.unwrap().collect();
 
     let real_tree = build_tree(&trace_details);
     let shape = leading!(
@@ -435,14 +435,14 @@ fn trace_deep_function() {
         }
     }
 
-    let (root, collector) = crate::start_trace(0u32).unwrap();
+    let (root, collector) = crate::start_trace(0u32);
 
     {
         let _guard = root;
         sync_spanned_rec_event_step_to_1(10);
     }
 
-    let trace_details = collector.collect();
+    let trace_details = collector.unwrap().collect();
 
     let real_tree = build_tree(&trace_details);
     let shape = leading!(
@@ -499,7 +499,7 @@ fn trace_deep_function() {
 
 #[test]
 fn trace_collect_ahead() {
-    let (root, collector) = crate::start_trace(0u32).unwrap();
+    let (root, collector) = crate::start_trace(0u32);
 
     {
         let _guard = crate::new_span(1u32);
@@ -519,7 +519,7 @@ fn trace_collect_ahead() {
     });
 
     drop(root);
-    let trace_details = collector.collect();
+    let trace_details = collector.unwrap().collect();
     drop(wg);
 
     let real_tree = build_tree(&trace_details);
@@ -532,7 +532,7 @@ fn trace_collect_ahead() {
 
 #[test]
 fn test_property_sync() {
-    let (root, collector) = crate::start_trace(0u32).unwrap();
+    let (root, collector) = crate::start_trace(0u32);
     crate::new_property(b"123");
 
     let g1 = crate::new_span(1u32);
@@ -548,7 +548,7 @@ fn test_property_sync() {
     drop(g1);
     drop(root);
 
-    let trace_details = collector.collect();
+    let trace_details = collector.unwrap().collect();
 
     let real_tree = build_tree(&trace_details);
     let shape = leading!(
@@ -589,7 +589,7 @@ fn test_property_sync() {
 
 #[test]
 fn test_property_async() {
-    let (root, collector) = crate::start_trace(0u32).unwrap();
+    let (root, collector) = crate::start_trace(0u32);
 
     let wg = crossbeam::sync::WaitGroup::new();
     let mut join_handles = vec![];
@@ -616,7 +616,7 @@ fn test_property_async() {
 
     wg.wait();
 
-    let trace_details = collector.collect();
+    let trace_details = collector.unwrap().collect();
     let real_tree = build_tree(&trace_details);
     let shape = leading!(
         0,

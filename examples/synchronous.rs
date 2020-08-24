@@ -29,7 +29,7 @@ fn func2(i: u64) {
 }
 
 fn main() {
-    let (root, collector) = minitrace::start_trace(SyncJob::Root).unwrap();
+    let (root, collector) = minitrace::start_trace(SyncJob::Root);
     minitrace::new_property(b"sample property:it works");
     {
         let _guard = root;
@@ -38,7 +38,7 @@ fn main() {
         }
     }
 
-    let trace_details = collector.collect();
+    let trace_details = collector.unwrap().collect();
 
     #[cfg(feature = "jaeger")]
     {
