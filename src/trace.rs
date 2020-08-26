@@ -30,17 +30,13 @@ pub fn start_trace<T: Into<u32>>(root_event: T) -> Option<ScopeGuard> {
         return None;
     }
 
-    let mut span = Span {
-        id: tl.new_span_id(),
-        state: State::Normal,
-        relation_id: RelationId::Root,
-        begin_cycles: 0,
-        elapsed_cycles: 0,
-        event: root_event.into(),
-    };
-    span.start();
-
-    Some(ScopeGuard::enter(span, tl))
+    unsafe {
+        Some(ScopeGuard::enter(tl, |span| {
+            span.state = State::Normal;
+            span.relation_id = RelationId::Root;
+            span.event = root_event.into();
+        }))
+    }
 }
 
 pub fn new_span<T: Into<u32>>(event: T) -> Option<SpanGuard> {
@@ -53,15 +49,10 @@ pub fn new_span<T: Into<u32>>(event: T) -> Option<SpanGuard> {
 
     let parent_id = *tl.enter_stack.last().unwrap();
     unsafe {
-        Some(SpanGuard::enter_quick(tl, |span| {
-            *span = Span {
-                id: span.id,
-                state: State::Normal,
-                relation_id: RelationId::ChildOf(parent_id),
-                begin_cycles: 0,
-                elapsed_cycles: 0,
-                event: event.into(),
-            }
+        Some(SpanGuard::enter(tl, |span| {
+            span.state = State::Normal;
+            span.relation_id = RelationId::ChildOf(parent_id);
+            span.event = event.into();
         }))
     }
 }
@@ -94,7 +85,7 @@ pub struct TraceLocal {
 }
 
 impl TraceLocal {
-    // #[inline]
+    #[inline]
     pub fn new_span_id(&mut self) -> SpanId {
         let id = ((self.id_prefix as u64) << 32) | self.id_suffix as u64;
 
@@ -152,18 +143,7 @@ pub struct SpanGuard {
 
 impl SpanGuard {
     #[inline]
-    pub(crate) fn enter(span: Span, tl: &mut TraceLocal) -> Self {
-        tl.enter_stack.push(span.id);
-        tl.span_set.spans.push(span);
-
-        Self {
-            span_index: tl.span_set.spans.len() - 1,
-            _marker: PhantomData,
-        }
-    }
-
-    #[inline]
-    pub(crate) unsafe fn enter_quick<F>(tl: &mut TraceLocal, init: F) -> Self
+    pub(crate) unsafe fn enter<F>(tl: &mut TraceLocal, init: F) -> Self
     where
         F: FnOnce(&mut Span),
     {
@@ -175,6 +155,9 @@ impl SpanGuard {
         let span_index = spans.len();
         spans.set_len(span_index + 1);
 
+        let span = &mut spans[span_index];
+        span.id = id;
+        span.begin_cycles = minstant::now();
         init(&mut spans[span_index]);
 
         Self {
@@ -202,18 +185,7 @@ pub struct ScopeGuard {
 
 impl ScopeGuard {
     #[inline]
-    pub(crate) fn enter(span: Span, tl: &mut TraceLocal) -> Self {
-        tl.enter_stack.push(span.id);
-        tl.span_set.spans.push(span);
-
-        Self {
-            span_index: tl.span_set.spans.len() - 1,
-            _marker: PhantomData,
-        }
-    }
-
-    #[inline]
-    pub(crate) unsafe fn enter_quick<F>(tl: &mut TraceLocal, init: F) -> Self
+    pub(crate) unsafe fn enter<F>(tl: &mut TraceLocal, init: F) -> Self
     where
         F: FnOnce(&mut Span),
     {
@@ -225,6 +197,9 @@ impl ScopeGuard {
         let span_index = spans.len();
         spans.set_len(span_index + 1);
 
+        let span = &mut spans[span_index];
+        span.id = id;
+        span.begin_cycles = minstant::now();
         init(&mut spans[span_index]);
 
         Self {

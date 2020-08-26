@@ -68,17 +68,25 @@ impl AsyncGuard {
         let event = event.into();
         pending_span.event = event;
 
-        let mut span = Span {
-            id: tl.new_span_id(),
-            state: State::Normal,
-            relation_id: RelationId::FollowFrom(pending_span.id),
-            begin_cycles: 0,
-            elapsed_cycles: 0,
-            event,
-        };
-        span.start();
+        // let mut span = Span {
+        //     id: tl.new_span_id(),
+        //     state: State::Normal,
+        //     relation_id: RelationId::FollowFrom(pending_span.id),
+        //     begin_cycles: 0,
+        //     elapsed_cycles: 0,
+        //     event,
+        // };
+        // span.start();
 
-        let guard = SpanGuard::enter(span, tl);
+        // let guard = SpanGuard::enter(span, tl);
+
+        let guard = unsafe {
+            SpanGuard::enter(tl, |span| {
+                span.state = State::Normal;
+                span.relation_id = RelationId::FollowFrom(pending_span.id);
+                span.event = event;
+            })
+        };
 
         tl.span_set.spans.push(pending_span);
 
