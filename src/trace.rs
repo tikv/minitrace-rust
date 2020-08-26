@@ -85,7 +85,7 @@ pub struct TraceLocal {
 }
 
 impl TraceLocal {
-    #[inline]
+    #[inline(always)]
     pub fn new_span_id(&mut self) -> SpanId {
         let id = ((self.id_prefix as u64) << 32) | self.id_suffix as u64;
 
@@ -117,14 +117,15 @@ pub struct Span {
 }
 
 impl Span {
-    #[inline]
+    #[inline(always)]
     pub(crate) fn start(&mut self) {
-        self.begin_cycles = minstant::now();
+        self.begin_cycles = unsafe { core::arch::x86_64::_rdtsc() };
     }
 
-    #[inline]
+    #[inline(always)]
     pub(crate) fn stop(&mut self) {
-        self.elapsed_cycles = minstant::now().saturating_sub(self.begin_cycles);
+        self.elapsed_cycles =
+            unsafe { core::arch::x86_64::_rdtsc() }.saturating_sub(self.begin_cycles);
     }
 }
 
@@ -142,7 +143,7 @@ pub struct SpanGuard {
 }
 
 impl SpanGuard {
-    #[inline]
+    #[inline(always)]
     pub(crate) unsafe fn enter<F>(tl: &mut TraceLocal, init: F) -> Self
     where
         F: FnOnce(&mut Span),
@@ -155,10 +156,10 @@ impl SpanGuard {
         let span_index = spans.len();
         spans.set_len(span_index + 1);
 
-        let span = &mut spans[span_index];
+        let span = spans.get_unchecked_mut(span_index);
         span.id = id;
-        span.begin_cycles = minstant::now();
-        init(&mut spans[span_index]);
+        span.begin_cycles = unsafe { core::arch::x86_64::_rdtsc() };
+        init(span);
 
         Self {
             span_index,
@@ -172,8 +173,10 @@ impl Drop for SpanGuard {
         let trace = TRACE_LOCAL.with(|trace| trace.get());
         let tl = unsafe { &mut *trace };
 
-        tl.enter_stack.pop();
-        tl.span_set.spans[self.span_index].stop();
+        tl.enter_stack.pop().unwrap();
+        unsafe {
+            tl.span_set.spans.get_unchecked_mut(self.span_index).stop();
+        }
     }
 }
 
@@ -184,7 +187,7 @@ pub struct ScopeGuard {
 }
 
 impl ScopeGuard {
-    #[inline]
+    #[inline(always)]
     pub(crate) unsafe fn enter<F>(tl: &mut TraceLocal, init: F) -> Self
     where
         F: FnOnce(&mut Span),
@@ -197,10 +200,10 @@ impl ScopeGuard {
         let span_index = spans.len();
         spans.set_len(span_index + 1);
 
-        let span = &mut spans[span_index];
+        let span = spans.get_unchecked_mut(span_index);
         span.id = id;
-        span.begin_cycles = minstant::now();
-        init(&mut spans[span_index]);
+        span.begin_cycles = unsafe { core::arch::x86_64::_rdtsc() };
+        init(span);
 
         Self {
             span_index,
@@ -214,8 +217,10 @@ impl Drop for ScopeGuard {
         let trace = TRACE_LOCAL.with(|trace| trace.get());
         let tl = unsafe { &mut *trace };
 
-        tl.enter_stack.pop();
-        tl.span_set.spans[self.span_index].stop();
+        tl.enter_stack.pop().unwrap();
+        unsafe {
+            tl.span_set.spans.get_unchecked_mut(self.span_index).stop();
+        }
 
         (*SPAN_COLLECTOR).push(tl.span_set.take());
     }

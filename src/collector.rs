@@ -20,7 +20,7 @@ pub fn collect_all() -> TraceResult {
     }
 
     TraceResult {
-        baseline_cycle: minstant::now(),
+        baseline_cycle: unsafe { core::arch::x86_64::_rdtsc() },
         baseline_ns: real_time_ns(),
         cycles_per_second: minstant::cycles_per_second(),
         spans: span_set.spans,
@@ -107,33 +107,6 @@ impl SpanSet {
                 payload: Vec::with_capacity(INIT_BYTES_LEN),
             },
         }
-    }
-
-    pub fn from_span(span: Span) -> Self {
-        let mut span_set = SpanSet {
-            spans: Vec::with_capacity(1),
-            properties: Properties {
-                span_ids: Vec::new(),
-                property_lens: Vec::new(),
-                payload: Vec::new(),
-            },
-        };
-        span_set.spans.push(span);
-        span_set
-    }
-
-    pub fn is_empty(&self) -> bool {
-        self.spans.is_empty()
-            && self.properties.span_ids.is_empty()
-            && self.properties.property_lens.is_empty()
-            && self.properties.payload.is_empty()
-    }
-
-    pub fn shrink(&mut self) {
-        self.spans.shrink_to_fit();
-        self.properties.span_ids.shrink_to_fit();
-        self.properties.property_lens.shrink_to_fit();
-        self.properties.payload.shrink_to_fit();
     }
 
     pub fn take(&mut self) -> Self {

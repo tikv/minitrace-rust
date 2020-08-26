@@ -37,10 +37,6 @@ tracing-subscriber = "0.2"
 name = "trace"
 harness = false
 
-[[bench]]
-name = "compare"
-harness = false
-
 [workspace]
 members = [ "crates/*" ]
 

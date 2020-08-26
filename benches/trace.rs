@@ -28,9 +28,9 @@ fn trace_wide_bench(c: &mut Criterion) {
                 if *len > 1 {
                     dummy_iter(*len);
                 }
-            });
 
-            minitrace::collect_all();
+                minitrace::collect_all();
+            });
         },
         vec![1, 10, 100, 1000, 10000],
     );
@@ -46,27 +46,9 @@ fn trace_deep_bench(c: &mut Criterion) {
                 if *len > 1 {
                     dummy_rec(*len);
                 }
+
+                minitrace::collect_all();
             });
-
-            minitrace::collect_all();
-        },
-        vec![1, 10, 100, 1000, 10000],
-    );
-}
-
-fn bench_collect(c: &mut Criterion) {
-    c.bench_function_over_inputs(
-        "bench_collect",
-        |b, len| {
-            {
-                let _root = minitrace::start_trace(0u32);
-
-                if *len > 1 {
-                    dummy_rec(*len);
-                }
-            }
-
-            b.iter(|| black_box(minitrace::collect_all()));
         },
         vec![1, 10, 100, 1000, 10000],
     );
@@ -88,9 +70,9 @@ fn trace_future_bench(c: &mut Criterion) {
                 let _root = minitrace::start_trace(0u32);
 
                 let _ = futures_03::executor::block_on(f(*len).in_new_span(0u32));
-            });
 
-            minitrace::collect_all();
+                minitrace::collect_all();
+            });
         },
         vec![1, 10, 100, 1000, 10000],
     );
@@ -106,9 +88,9 @@ fn trace_start_context(c: &mut Criterion) {
                 for _ in 0..*len {
                     let _guard = black_box(minitrace::new_async_span());
                 }
-            });
 
-            minitrace::collect_all();
+                minitrace::collect_all();
+            });
         },
         vec![1, 10, 100, 1000, 10000],
     );
@@ -118,7 +100,6 @@ criterion_group!(
     benches,
     trace_wide_bench,
     trace_deep_bench,
-    bench_collect,
     trace_start_context,
     trace_future_bench
 );

@@ -13,7 +13,7 @@ use crate::trace::{RelationId, Span, SpanGuard, State, TRACE_LOCAL};
 ///     let _g = handle.start_trace(0u32);
 /// });
 /// ```
-#[inline]
+#[inline(always)]
 pub fn new_async_span() -> AsyncGuard {
     AsyncGuard::start(false)
 }
@@ -67,18 +67,6 @@ impl AsyncGuard {
 
         let event = event.into();
         pending_span.event = event;
-
-        // let mut span = Span {
-        //     id: tl.new_span_id(),
-        //     state: State::Normal,
-        //     relation_id: RelationId::FollowFrom(pending_span.id),
-        //     begin_cycles: 0,
-        //     elapsed_cycles: 0,
-        //     event,
-        // };
-        // span.start();
-
-        // let guard = SpanGuard::enter(span, tl);
 
         let guard = unsafe {
             SpanGuard::enter(tl, |span| {

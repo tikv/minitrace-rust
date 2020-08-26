@@ -7,7 +7,7 @@ use crate::thread::AsyncGuard;
 impl<T: Sized> FutureExt for T {}
 
 pub trait FutureExt: Sized {
-    #[inline]
+    #[inline(always)]
     fn in_new_span<E: Into<u32>>(self, event: E) -> NewSpan<Self> {
         NewSpan {
             inner: self,
