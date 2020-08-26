@@ -60,28 +60,49 @@ fn bench_collect(c: &mut Criterion) {
         |b, len| {
             {
                 let _root = minitrace::start_trace(0u32);
-                
+
                 if *len > 1 {
                     dummy_rec(*len);
                 }
             }
 
-            b.iter(|| {
-                black_box(minitrace::collect_all())
-            });
+            b.iter(|| black_box(minitrace::collect_all()));
         },
         vec![1, 10, 100, 1000, 10000],
     );
 }
 
+fn trace_future_bench(c: &mut Criterion) {
+    use minitrace::future::FutureExt;
 
-fn bench_new_async_span(c: &mut Criterion) {
+    async fn f(i: u32) {
+        for i in 0..i - 1 {
+            async {}.in_new_span(black_box(i)).await
+        }
+    }
+
     c.bench_function_over_inputs(
-        "bench_new_async_span",
+        "trace_future",
         |b, len| {
-            let _root = minitrace::start_trace(0u32);
-
             b.iter(|| {
+                let _root = minitrace::start_trace(0u32);
+
+                let _ = futures_03::executor::block_on(f(*len).in_new_span(0u32));
+            });
+
+            minitrace::collect_all();
+        },
+        vec![1, 10, 100, 1000, 10000],
+    );
+}
+
+fn trace_start_context(c: &mut Criterion) {
+    c.bench_function_over_inputs(
+        "trace_context",
+        |b, len| {
+            b.iter(|| {
+                let _root = minitrace::start_trace(0u32);
+
                 for _ in 0..*len {
                     let _guard = black_box(minitrace::new_async_span());
                 }
@@ -93,5 +114,12 @@ fn bench_new_async_span(c: &mut Criterion) {
     );
 }
 
-criterion_group!(benches, trace_wide_bench, trace_deep_bench, bench_collect, bench_new_async_span);
+criterion_group!(
+    benches,
+    trace_wide_bench,
+    trace_deep_bench,
+    bench_collect,
+    trace_start_context,
+    trace_future_bench
+);
 criterion_main!(benches);

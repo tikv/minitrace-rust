@@ -10,8 +10,8 @@ mod utils;
 pub use crate::collector::{collect_all, Properties, TraceResult};
 pub use crate::thread::{new_async_span, AsyncGuard};
 pub use crate::trace::{
-    new_property, new_property_with, new_span, start_trace, DetachGuard, RelationId, Span,
-    SpanGuard, SpanId, State,
+    new_property, new_property_with, new_span, start_trace, RelationId, Span, SpanGuard, SpanId,
+    State,
 };
 
 pub use minitrace_macro::{trace, trace_async};

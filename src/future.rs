@@ -34,7 +34,9 @@ impl<T: std::future::Future> std::future::Future for NewSpan<T> {
 
         let _guard = span_handle.ready(*this.event);
         let poll = this.inner.poll(cx);
-        *this.span_handle = AsyncGuard::start(true);
+        if poll.is_pending() {
+            *this.span_handle = AsyncGuard::start(true);
+        }
         poll
     }
 }
@@ -48,7 +50,9 @@ impl<T: futures_01::Future> futures_01::Future for NewSpan<T> {
 
         let _guard = span_handle.ready(self.event);
         let poll = self.inner.poll();
-        self.span_handle = AsyncGuard::start(true);
+        if let Ok(futures_01::Async::NotReady) = poll {
+            self.span_handle = AsyncGuard::start(true);
+        }
         poll
     }
 }

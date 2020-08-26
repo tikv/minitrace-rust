@@ -80,9 +80,7 @@ impl AsyncGuard {
 
         let guard = SpanGuard::enter(span, tl);
 
-        // Submit pending_span within the scope of the new span,
-        // so as to reduce a SpanSet allocation.
-        tl.submit_span(pending_span);
+        tl.span_set.spans.push(pending_span);
 
         Some(guard)
     }

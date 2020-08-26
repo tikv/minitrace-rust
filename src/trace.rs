@@ -22,9 +22,13 @@ fn next_global_id_prefix() -> u32 {
     GLOBAL_ID_COUNTER.fetch_add(1, Ordering::AcqRel)
 }
 
-pub fn start_trace<T: Into<u32>>(root_event: T) -> SpanGuard {
+pub fn start_trace<T: Into<u32>>(root_event: T) -> Option<ScopeGuard> {
     let trace = TRACE_LOCAL.with(|trace| trace.get());
     let tl = unsafe { &mut *trace };
+
+    if !tl.enter_stack.is_empty() {
+        return None;
+    }
 
     let mut span = Span {
         id: tl.new_span_id(),
@@ -36,7 +40,7 @@ pub fn start_trace<T: Into<u32>>(root_event: T) -> SpanGuard {
     };
     span.start();
 
-    SpanGuard::enter(span, tl)
+    Some(ScopeGuard::enter(span, tl))
 }
 
 pub fn new_span<T: Into<u32>>(event: T) -> Option<SpanGuard> {
@@ -48,17 +52,18 @@ pub fn new_span<T: Into<u32>>(event: T) -> Option<SpanGuard> {
     }
 
     let parent_id = *tl.enter_stack.last().unwrap();
-    let mut span = Span {
-        id: tl.new_span_id(),
-        state: State::Normal,
-        relation_id: RelationId::ChildOf(parent_id),
-        begin_cycles: 0,
-        elapsed_cycles: 0,
-        event: event.into(),
-    };
-    span.start();
-
-    Some(SpanGuard::enter(span, tl))
+    unsafe {
+        Some(SpanGuard::enter_quick(tl, |span| {
+            *span = Span {
+                id: span.id,
+                state: State::Normal,
+                relation_id: RelationId::ChildOf(parent_id),
+                begin_cycles: 0,
+                elapsed_cycles: 0,
+                event: event.into(),
+            }
+        }))
+    }
 }
 
 /// The property is in bytes format, so it is not limited to be a key-value pair but
@@ -89,9 +94,10 @@ pub struct TraceLocal {
 }
 
 impl TraceLocal {
+    // #[inline]
     pub fn new_span_id(&mut self) -> SpanId {
         let id = ((self.id_prefix as u64) << 32) | self.id_suffix as u64;
-        
+
         if self.id_suffix == std::u32::MAX {
             self.id_suffix = 0;
             self.id_prefix = next_global_id_prefix();
@@ -100,20 +106,6 @@ impl TraceLocal {
         }
 
         id
-    }
-
-    pub fn submit_span(&mut self, span: Span) {
-        if !self.enter_stack.is_empty() {
-            self.span_set.spans.push(span);
-        } else {
-            (*SPAN_COLLECTOR).push(SpanSet::from_span(span));
-        }
-    }
-
-    pub fn submit_span_set(&mut self) {
-        if !self.span_set.is_empty() {
-            (*SPAN_COLLECTOR).push(self.span_set.take());
-        }
     }
 }
 
@@ -154,7 +146,7 @@ pub enum RelationId {
 
 #[must_use]
 pub struct SpanGuard {
-    span: Span,
+    span_index: usize,
     _marker: PhantomData<*const ()>,
 }
 
@@ -162,39 +154,32 @@ impl SpanGuard {
     #[inline]
     pub(crate) fn enter(span: Span, tl: &mut TraceLocal) -> Self {
         tl.enter_stack.push(span.id);
+        tl.span_set.spans.push(span);
 
         Self {
-            span,
+            span_index: tl.span_set.spans.len() - 1,
             _marker: PhantomData,
         }
     }
 
-    pub fn span_id(&self) -> SpanId {
-        self.span.id
-    }
-
-    pub fn detach(self) -> DetachGuard {
-        let local = TRACE_LOCAL.with(|local| local.get());
-        let tl = unsafe { &mut *local };
-
-        self.exit(tl);
-
-        DetachGuard::new(self.span)
-    }
-
     #[inline]
-    fn exit(&self, tl: &mut TraceLocal) {
-        if let Some(idx) = tl
-            .enter_stack
-            .iter()
-            .rev()
-            .position(|span_id| *span_id == self.span.id)
-        {
-            tl.enter_stack.remove(tl.enter_stack.len() - idx - 1);
-        }
+    pub(crate) unsafe fn enter_quick<F>(tl: &mut TraceLocal, init: F) -> Self
+    where
+        F: FnOnce(&mut Span),
+    {
+        let id = tl.new_span_id();
+        tl.enter_stack.push(id);
 
-        if tl.enter_stack.is_empty() {
-            tl.submit_span_set();
+        let spans = &mut tl.span_set.spans;
+        spans.reserve(1);
+        let span_index = spans.len();
+        spans.set_len(span_index + 1);
+
+        init(&mut spans[span_index]);
+
+        Self {
+            span_index,
+            _marker: PhantomData,
         }
     }
 }
@@ -204,30 +189,60 @@ impl Drop for SpanGuard {
         let trace = TRACE_LOCAL.with(|trace| trace.get());
         let tl = unsafe { &mut *trace };
 
-        self.span.stop();
-        tl.submit_span(self.span);
-        self.exit(tl);
+        tl.enter_stack.pop();
+        tl.span_set.spans[self.span_index].stop();
     }
 }
 
 #[must_use]
-pub struct DetachGuard {
-    span: Span,
+pub struct ScopeGuard {
+    span_index: usize,
+    _marker: PhantomData<*const ()>,
 }
 
-impl DetachGuard {
-    pub(crate) fn new(span: Span) -> Self {
-        DetachGuard { span }
+impl ScopeGuard {
+    #[inline]
+    pub(crate) fn enter(span: Span, tl: &mut TraceLocal) -> Self {
+        tl.enter_stack.push(span.id);
+        tl.span_set.spans.push(span);
+
+        Self {
+            span_index: tl.span_set.spans.len() - 1,
+            _marker: PhantomData,
+        }
+    }
+
+    #[inline]
+    pub(crate) unsafe fn enter_quick<F>(tl: &mut TraceLocal, init: F) -> Self
+    where
+        F: FnOnce(&mut Span),
+    {
+        let id = tl.new_span_id();
+        tl.enter_stack.push(id);
+
+        let spans = &mut tl.span_set.spans;
+        spans.reserve(1);
+        let span_index = spans.len();
+        spans.set_len(span_index + 1);
+
+        init(&mut spans[span_index]);
+
+        Self {
+            span_index,
+            _marker: PhantomData,
+        }
     }
 }
 
-impl Drop for DetachGuard {
+impl Drop for ScopeGuard {
     fn drop(&mut self) {
         let trace = TRACE_LOCAL.with(|trace| trace.get());
         let tl = unsafe { &mut *trace };
 
-        self.span.stop();
-        tl.submit_span(self.span);
+        tl.enter_stack.pop();
+        tl.span_set.spans[self.span_index].stop();
+
+        (*SPAN_COLLECTOR).push(tl.span_set.take());
     }
 }
 
