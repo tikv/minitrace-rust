@@ -521,11 +521,9 @@ version = "0.1.0"
 dependencies = [
  "criterion",
  "crossbeam",
- "either",
  "futures 0.1.29",
  "futures 0.3.4",
  "lazy_static",
- "minitrace-jaeger",
  "minitrace-macro",
  "minstant",
  "opentelemetry",

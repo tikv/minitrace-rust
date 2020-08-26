@@ -1,6 +1,6 @@
 // Copyright 2020 TiKV Project Authors. Licensed under Apache-2.0.
 
-mod common;
+// mod common;
 use minitrace::future::FutureExt as _;
 
 #[derive(Debug)]
@@ -8,6 +8,7 @@ enum AsyncJob {
     #[allow(dead_code)]
     Unknown,
     Root,
+    Loop,
     IterJob,
     OtherJob,
 }
@@ -44,7 +45,9 @@ async fn other_job() {
 
 #[tokio::main]
 async fn main() {
-    let (collector, _) = async {
+    let _root = minitrace::start_trace(AsyncJob::Root);
+
+    let _ = async {
         minitrace::new_property(b"sample property:it works");
         let jhs = parallel_job();
         other_job().await;
@@ -53,34 +56,36 @@ async fn main() {
             jh.await.unwrap();
         }
     }
-    .collect_trace(AsyncJob::Root)
+    .in_new_span(AsyncJob::Loop)
     .await;
 
-    let trace_result = collector.collect();
+    let trace_result = minitrace::collect_all();
 
-    use std::net::SocketAddr;
-    let mut buf = Vec::with_capacity(2048);
-    minitrace_jaeger::thrift_compact_encode(
-        &mut buf,
-        "Async Example",
-        &trace_result,
-        |e| {
-            format!("{:?}", unsafe {
-                std::mem::transmute::<_, AsyncJob>(e as u8)
-            })
-        },
-        |property| {
-            let mut split = property.splitn(2, |b| *b == b':');
-            let key = String::from_utf8_lossy(split.next().unwrap()).to_owned();
-            let value = String::from_utf8_lossy(split.next().unwrap()).to_owned();
-            (key, value)
-        },
-    );
+    dbg!(trace_result);
 
-    let local_addr: SocketAddr = "0.0.0.0:0".parse().unwrap();
-    if let Ok(mut socket) = tokio::net::UdpSocket::bind(local_addr).await {
-        let _ = socket.send_to(&buf, "127.0.0.1:6831").await;
-    }
+    // use std::net::SocketAddr;
+    // let mut buf = Vec::with_capacity(2048);
+    // minitrace_jaeger::thrift_compact_encode(
+    //     &mut buf,
+    //     "Async Example",
+    //     &trace_result,
+    //     |e| {
+    //         format!("{:?}", unsafe {
+    //             std::mem::transmute::<_, AsyncJob>(e as u8)
+    //         })
+    //     },
+    //     |property| {
+    //         let mut split = property.splitn(2, |b| *b == b':');
+    //         let key = String::from_utf8_lossy(split.next().unwrap()).to_owned();
+    //         let value = String::from_utf8_lossy(split.next().unwrap()).to_owned();
+    //         (key, value)
+    //     },
+    // );
 
-    crate::common::draw_stdout(trace_result);
+    // let local_addr: SocketAddr = "0.0.0.0:0".parse().unwrap();
+    // if let Ok(mut socket) = tokio::net::UdpSocket::bind(local_addr).await {
+    //     let _ = socket.send_to(&buf, "127.0.0.1:6831").await;
+    // }
+
+    // crate::common::draw_stdout(trace_result);
 }

@@ -48,7 +48,7 @@ fn build_tree(trace_details: &crate::TraceResult) -> Rc<RefCell<LeadingNode>> {
                     id_to_node.insert(span.id, Node::LeadingNode(leading_node.clone()));
                     root = Some(leading_node);
                 }
-                crate::State::Local => match id_to_node.get(&span.related_id) {
+                crate::State::Local => match id_to_node.get(&span.relation_id) {
                     Some(Node::NormalNode(parent)) => {
                         let normal_node = Rc::new(RefCell::new(NormalNode {
                             span,
@@ -66,7 +66,7 @@ fn build_tree(trace_details: &crate::TraceResult) -> Rc<RefCell<LeadingNode>> {
                         idle.push(span);
                     }
                 },
-                crate::State::Spawning => match id_to_node.get(&span.related_id) {
+                crate::State::Spawning => match id_to_node.get(&span.relation_id) {
                     Some(Node::NormalNode(parent)) => {
                         let leading_node = Rc::new(RefCell::new(LeadingNode {
                             span,
@@ -82,7 +82,7 @@ fn build_tree(trace_details: &crate::TraceResult) -> Rc<RefCell<LeadingNode>> {
                     Some(_) => unreachable!(),
                     None => idle.push(span),
                 },
-                crate::State::Scheduling => match id_to_node.get(&span.related_id) {
+                crate::State::Scheduling => match id_to_node.get(&span.relation_id) {
                     Some(Node::LeadingNode(prev)) => {
                         let leading_node = Rc::new(RefCell::new(LeadingNode {
                             span,
@@ -95,7 +95,7 @@ fn build_tree(trace_details: &crate::TraceResult) -> Rc<RefCell<LeadingNode>> {
                     Some(_) => unreachable!(),
                     None => idle.push(span),
                 },
-                crate::State::Settle => match id_to_node.get(&span.related_id) {
+                crate::State::Settle => match id_to_node.get(&span.relation_id) {
                     Some(Node::LeadingNode(prev)) => {
                         let normal_node = Rc::new(RefCell::new(NormalNode {
                             span,
@@ -190,7 +190,7 @@ macro_rules! leading {
             span: crate::Span {
                 id: 0,
                 state: crate::State::Root,
-                related_id: 0,
+                relation_id: 0,
                 begin_cycles: 0,
                 elapsed_cycles: 0,
                 event: $event,
@@ -213,7 +213,7 @@ macro_rules! normal {
             span: crate::Span {
                 id: 0,
                 state: crate::State::Root,
-                related_id: 0,
+                relation_id: 0,
                 begin_cycles: 0,
                 elapsed_cycles: 0,
                 event: $event,

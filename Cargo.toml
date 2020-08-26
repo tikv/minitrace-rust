@@ -11,7 +11,6 @@ pin-project = "0.4"
 minitrace-macro = { path = "crates/minitrace-macro" }
 lazy_static = "1.4.0"
 crossbeam = "0.7"
-either = "1.6"
 minstant = { git = "https://github.com/zhongzc/minstant.git" }
 
 [dependencies.futures_01]
@@ -23,7 +22,7 @@ version = "0.3.1"
 package = "futures"
 
 [dev-dependencies]
-minitrace-jaeger = { path = "crates/minitrace-jaeger" }
+# minitrace-jaeger = { path = "crates/minitrace-jaeger" }
 tokio = { version = "0.2", features = ["full"] }
 criterion = "0.3"
 rustracing = "0.4"
@@ -44,3 +43,7 @@ harness = false
 
 [workspace]
 members = [ "crates/*" ]
+
+[profile.bench]
+opt-level = 3
+lto = true

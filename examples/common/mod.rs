@@ -58,7 +58,7 @@ fn build_tree(
                     id_to_node.insert(span.id, Node::LeadingNode(leading_node.clone()));
                     root = Some(leading_node);
                 }
-                minitrace::State::Local => match id_to_node.get(&span.related_id) {
+                minitrace::State::Local => match id_to_node.get(&span.relation_id) {
                     Some(Node::NormalNode(parent)) => {
                         let normal_node = Rc::new(RefCell::new(NormalNode {
                             span,
@@ -74,7 +74,7 @@ fn build_tree(
                     Some(_) => unreachable!(),
                     None => idle.push(span),
                 },
-                minitrace::State::Spawning => match id_to_node.get(&span.related_id) {
+                minitrace::State::Spawning => match id_to_node.get(&span.relation_id) {
                     Some(Node::NormalNode(parent)) => {
                         let leading_node = Rc::new(RefCell::new(LeadingNode { children: vec![] }));
                         parent
@@ -86,7 +86,7 @@ fn build_tree(
                     Some(_) => unreachable!(),
                     None => idle.push(span),
                 },
-                minitrace::State::Scheduling => match id_to_node.get(&span.related_id) {
+                minitrace::State::Scheduling => match id_to_node.get(&span.relation_id) {
                     Some(Node::LeadingNode(prev)) => {
                         let prev = prev.clone();
                         id_to_node.insert(span.id, Node::LeadingNode(prev));
@@ -94,7 +94,7 @@ fn build_tree(
                     Some(_) => unreachable!(),
                     None => idle.push(span),
                 },
-                minitrace::State::Settle => match id_to_node.get(&span.related_id) {
+                minitrace::State::Settle => match id_to_node.get(&span.relation_id) {
                     Some(Node::LeadingNode(prev)) => {
                         let normal_node = Rc::new(RefCell::new(NormalNode {
                             span,

@@ -1,9 +1,6 @@
 // Copyright 2020 TiKV Project Authors. Licensed under Apache-2.0.
 
-use either::Either;
-
-use crate::collector::CollectorInner;
-use crate::{new_span, ScopeGuard, SpanGuard, State};
+use crate::trace::{RelationId, Span, SpanGuard, State, TRACE_LOCAL};
 
 /// Bind the current tracing context to another executing context (e.g. a closure).
 ///
@@ -17,111 +14,76 @@ use crate::{new_span, ScopeGuard, SpanGuard, State};
 /// });
 /// ```
 #[inline]
-pub fn new_async_scope() -> AsyncScopeHandle {
-    crate::thread::AsyncScopeHandle::new()
-}
-
-struct AsyncScopeInner {
-    collector: std::sync::Arc<CollectorInner>,
-    next_suspending_state: State,
-    next_related_id: u64,
-    suspending_begin_cycles: u64,
+pub fn new_async_span() -> AsyncGuard {
+    AsyncGuard::start(false)
 }
 
 #[must_use]
-pub struct AsyncScopeHandle {
-    inner: Option<AsyncScopeInner>,
+pub struct AsyncGuard {
+    /// If None, it indicates tracing is not enabled
+    pub(crate) pending_span: Option<Span>,
 }
 
-pub struct AsyncScopeGuard<'a> {
-    _guard: Either<ScopeGuard, SpanGuard>,
-
-    // `AsyncScopeHandle` may be used to trace a `Future` task which
-    // consists of a sequence of local-tracings.
-    //
-    // We can treat the end of current local-tracing as the creation of
-    // the next local-tracing. By the moment that the next local-tracing
-    // is started, the gap time is the wait time of the next local-tracing.
-    //
-    // Here is the mutable reference for this purpose.
-    handle: &'a mut AsyncScopeInner,
-}
-
-impl Drop for AsyncScopeGuard<'_> {
-    fn drop(&mut self) {
-        self.handle.suspending_begin_cycles = minstant::now();
+impl AsyncGuard {
+    pub(crate) fn new_empty() -> Self {
+        AsyncGuard { pending_span: None }
     }
-}
 
-impl AsyncScopeHandle {
-    fn new() -> Self {
+    pub(crate) fn start(follow_from_parent: bool) -> Self {
         let trace = crate::trace::TRACE_LOCAL.with(|trace| trace.get());
         let tl = unsafe { &mut *trace };
 
-        if tl.cur_collector.is_none() || tl.enter_stack.is_empty() {
-            return Self { inner: None };
+        if tl.enter_stack.is_empty() {
+            return AsyncGuard::new_empty();
         }
 
-        let collector = tl.cur_collector.as_ref().unwrap().clone();
-        let related_id = *tl.enter_stack.last().unwrap();
-        Self {
-            inner: Some(AsyncScopeInner {
-                collector,
-                next_suspending_state: State::Spawning,
-                next_related_id: related_id,
-                suspending_begin_cycles: minstant::now(),
-            }),
-        }
-    }
-
-    pub(crate) fn new_root(collector: std::sync::Arc<crate::collector::CollectorInner>) -> Self {
-        let now_cycles = minstant::now();
-        Self {
-            inner: Some(AsyncScopeInner {
-                collector,
-                next_suspending_state: State::Root,
-                next_related_id: 0,
-                suspending_begin_cycles: now_cycles,
-            }),
-        }
-    }
-
-    pub fn start_trace<E: Into<u32>>(&mut self, event: E) -> Option<AsyncScopeGuard> {
-        let inner = self.inner.as_mut()?;
-        let event = event.into();
-        let now_cycles = minstant::now();
-
-        if let Some((local_guard, self_id)) = crate::trace::ScopeGuard::new(
-            inner.collector.clone(),
-            now_cycles,
-            crate::trace::LeadingSpan {
-                // At this restoring time, fill this leading span with the
-                // related id, begin cycles and ...
-                state: inner.next_suspending_state,
-                related_id: inner.next_related_id,
-                begin_cycles: inner.suspending_begin_cycles,
-                // ... other fields calculating via them.
-                elapsed_cycles: now_cycles.saturating_sub(inner.suspending_begin_cycles),
-                event,
-            },
-            event,
-        ) {
-            // Reserve these for the next suspending process
-            inner.next_related_id = self_id;
-            inner.next_suspending_state = State::Scheduling;
-
-            // Obviously, the begin cycles of the next suspending is impossible to predict, and it should
-            // be recorded when `local_guard` is dropping. Here `AsyncScopeGuard` is for this purpose.
-            // See `impl Drop for AsyncScopeGuard`.
-            Some(AsyncScopeGuard {
-                _guard: Either::Left(local_guard),
-                handle: inner,
-            })
+        let parent_id = *tl.enter_stack.last().unwrap();
+        let relation_id = if follow_from_parent {
+            RelationId::FollowFrom(parent_id)
         } else {
-            Some(AsyncScopeGuard {
-                _guard: Either::Right(new_span(event)?),
-                handle: inner,
-            })
+            RelationId::ChildOf(parent_id)
+        };
+
+        let mut pending_span = Span {
+            id: tl.new_span_id(),
+            state: State::Pending,
+            relation_id,
+            begin_cycles: 0,
+            elapsed_cycles: 0,
+            event: 0,
+        };
+        pending_span.start();
+
+        Self {
+            pending_span: Some(pending_span),
         }
+    }
+
+    pub fn ready<E: Into<u32>>(self, event: E) -> Option<SpanGuard> {
+        let mut pending_span = self.pending_span?;
+
+        let trace = TRACE_LOCAL.with(|trace| trace.get());
+        let tl = unsafe { &mut *trace };
+
+        let event = event.into();
+        pending_span.event = event;
+
+        let mut span = Span {
+            id: tl.new_span_id(),
+            state: State::Normal,
+            relation_id: RelationId::FollowFrom(pending_span.id),
+            begin_cycles: 0,
+            elapsed_cycles: 0,
+            event,
+        };
+        span.start();
+
+        let guard = SpanGuard::enter(span, tl);
+
+        // Submit pending_span within the scope of the new span,
+        // so as to reduce a SpanSet allocation.
+        tl.submit_span(pending_span);
+
+        Some(guard)
     }
 }

@@ -1,6 +1,6 @@
 // Copyright 2020 TiKV Project Authors. Licensed under Apache-2.0.
 
-mod common;
+// mod common;
 
 #[derive(Debug)]
 enum SyncJob {
@@ -29,7 +29,7 @@ fn func2(i: u64) {
 }
 
 fn main() {
-    let (root, collector) = minitrace::start_trace(SyncJob::Root);
+    let root = minitrace::start_trace(SyncJob::Root);
     minitrace::new_property(b"sample property:it works");
     {
         let _guard = root;
@@ -38,31 +38,33 @@ fn main() {
         }
     }
 
-    let trace_details = collector.unwrap().collect();
+    let trace_results = minitrace::collect_all();
 
-    let mut buf = Vec::with_capacity(2048);
-    minitrace_jaeger::thrift_compact_encode(
-        &mut buf,
-        "Sync Example",
-        &trace_details,
-        |e| {
-            format!("{:?}", unsafe {
-                std::mem::transmute::<_, SyncJob>(e as u8)
-            })
-        },
-        |property| {
-            let mut split = property.splitn(2, |b| *b == b':');
-            let key = String::from_utf8_lossy(split.next().unwrap()).to_owned();
-            let value = String::from_utf8_lossy(split.next().unwrap()).to_owned();
-            (key, value)
-        },
-    );
-    let agent = std::net::SocketAddr::from(([127, 0, 0, 1], 6831));
-    let _ = std::net::UdpSocket::bind(std::net::SocketAddr::new(
-        std::net::IpAddr::V4(std::net::Ipv4Addr::new(0, 0, 0, 0)),
-        0,
-    ))
-    .and_then(move |s| s.send_to(&buf, agent));
+    dbg!(trace_results);
 
-    crate::common::draw_stdout(trace_details);
+    // let mut buf = Vec::with_capacity(2048);
+    // minitrace_jaeger::thrift_compact_encode(
+    //     &mut buf,
+    //     "Sync Example",
+    //     &trace_details,
+    //     |e| {
+    //         format!("{:?}", unsafe {
+    //             std::mem::transmute::<_, SyncJob>(e as u8)
+    //         })
+    //     },
+    //     |property| {
+    //         let mut split = property.splitn(2, |b| *b == b':');
+    //         let key = String::from_utf8_lossy(split.next().unwrap()).to_owned();
+    //         let value = String::from_utf8_lossy(split.next().unwrap()).to_owned();
+    //         (key, value)
+    //     },
+    // );
+    // let agent = std::net::SocketAddr::from(([127, 0, 0, 1], 6831));
+    // let _ = std::net::UdpSocket::bind(std::net::SocketAddr::new(
+    //     std::net::IpAddr::V4(std::net::Ipv4Addr::new(0, 0, 0, 0)),
+    //     0,
+    // ))
+    // .and_then(move |s| s.send_to(&buf, agent));
+
+    // crate::common::draw_stdout(trace_details);
 }
