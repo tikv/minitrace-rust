@@ -13,10 +13,10 @@ pub fn thrift_compact_encode<'a, S0: AsRef<str>, S1: AsRef<str> + 'a, S2: AsRef<
     trace_id_low: i64,
     TraceDetails {
         start_time_ns,
-        elapsed_ns,
         cycles_per_second,
         spans,
         properties,
+        ..
     }: &'a TraceDetails,
     event_to_operation_name: impl Fn(u32) -> S0,
     property_to_kv: impl Fn(&'a [u8]) -> (S1, S2),
@@ -25,7 +25,7 @@ pub fn thrift_compact_encode<'a, S0: AsRef<str>, S1: AsRef<str> + 'a, S2: AsRef<
     let start_time_us = *start_time_ns / 1_000;
 
     // # thrift message header
-    // ## protocal id
+    // ## protocol id
     // ```
     // const COMPACT_PROTOCOL_ID: u8 = 0x82;
     // buf.push(COMPACT_PROTOCOL_ID);
@@ -96,118 +96,20 @@ pub fn thrift_compact_encode<'a, S0: AsRef<str>, S1: AsRef<str> + 'a, S2: AsRef<
     // ```
     buf.push(0x19);
 
-    let root_span = spans
+    let anchor_cycles = spans
         .iter()
-        .find(|s| s.state == State::Root)
-        .expect("not contain root span");
-
-    let anchor_cycles = root_span.begin_cycles;
-    let root_id = root_span.id;
-    let root_event = root_span.event;
+        .map(|s| s.begin_cycles)
+        .min()
+        .expect("unexpected empty container");
 
     // spans list header
-    let len = spans.len() + 1; // `+1` due to an extra span as below
+    let len = spans.len();
     const STRUCT_TYPE: u8 = 12;
     if len < 15 {
         buf.push((len << 4) as u8 | STRUCT_TYPE as u8);
     } else {
         buf.push(0b1111_0000 | STRUCT_TYPE as u8);
         encode::varint(buf, len as _);
-    }
-
-    // Add a span represents the entire tracing process
-    {
-        // trace id low field header
-        // ```
-        // const TRACE_ID_LOW_DELTA: i16 = 1;
-        // const I64_TYPE: u8 = 6;
-        // const TRACE_ID_LOW_TYPE: u8 = (TRACE_ID_LOW_DELTA << 4) as u8 | I64_TYPE;
-        // buf.push(TRACE_ID_LOW_TYPE);
-        // ```
-        buf.push(0x16);
-        // trace id low data
-        encode::varint(buf, zigzag::from_i64(trace_id_low));
-
-        // trace id high field header
-        // ```ref_kind
-        // const TRACE_ID_HIGH_DELTA: i16 = 1;
-        // const I64_TYPE: u8 = 6;
-        // const TRACE_ID_HIGH_TYPE: u8 = (TRACE_ID_HIGH_DELTA << 4) as u8 | I64_TYPE;
-        // buf.push(TRACE_ID_HIGH_TYPE);
-        // ```
-        buf.push(0x16);
-        // trace id high data
-        encode::varint(buf, zigzag::from_i64(trace_id_high));
-
-        // The prev id of root span never conflicts with other span ids in
-        // current tracing context
-        let id = root_id.wrapping_sub(1);
-
-        // span id field header
-        // ```
-        // const SPAN_ID_DELTA: i16 = 1;
-        // const I64_TYPE: u8 = 6;
-        // const SPAN_ID_TYPE: u8 = (SPAN_ID_DELTA << 4) as u8 | I64_TYPE;
-        // buf.push(SPAN_ID_TYPE);
-        // ```
-        buf.push(0x16);
-        // span id data
-        encode::varint(buf, zigzag::from_i64(id as _));
-
-        // parent span id field header
-        // ```
-        // const PARENT_SPAN_ID_DELTA: i16 = 1;
-        // const I64_TYPE: u8 = 6;
-        // const PARENT_SPAN_ID_TYPE: u8 = (PARENT_SPAN_ID_DELTA << 4) as u8 | I64_TYPE;
-        // buf.push(PARENT_SPAN_ID_TYPE);
-        // ```
-        buf.push(0x16);
-        // parent span id data
-        encode::varint(buf, zigzag::from_i64(0));
-
-        // operation name field header
-        // ```
-        // const OPERATION_NAME_DELTA: i16 = 1;
-        // const BINARY_TYPE: u8 = 8;
-        // const OPERATION_NAME_TYPE: u8 = (OPERATION_NAME_DELTA << 4) as u8 | BINARY_TYPE;
-        // buf.push(OPERATION_NAME_TYPE);
-        // ```
-        buf.push(0x18);
-        // operation name data
-        encode::bytes(buf, event_to_operation_name(root_event).as_ref().as_bytes());
-
-        // flags header
-        //
-        // ```
-        // const FLAGS_DELTA: i16 = 2;
-        // const I32_TYPE: u8 = 5;
-        // const FLAGS_TYPE: u8 = (FLAGS_DELTA << 4) as u8 | I32_TYPE;
-        // ```
-        buf.push(0x25);
-        // flags data: `1` signifies a SAMPLED span, `2` signifies a DEBUG span.
-        encode::varint(buf, zigzag::from_i32(1) as _);
-
-        // start time header
-        // ```
-        // const START_TIME_DELTA: i16 = 1;
-        // const I64_TYPE: u8 = 6;property_lens
-        buf.push(0x16);
-        // start time data
-        encode::varint(buf, zigzag::from_i64(start_time_us as _));
-
-        // duration header
-        // ```
-        // const DURATION_DELTA: i16 = 1;
-        // const I64_TYPE: u8 = 6;
-        // const DURATION_TYPE: u8 = (DURATION_DELTA << 4) as u8 | I64_TYPE;
-        // ```
-        buf.push(0x16);
-        // duration data
-        let duration_us = *elapsed_ns / 1_000;
-        encode::varint(buf, zigzag::from_i64(duration_us as _));
-
-        // span struct tail
-        buf.push(0x00);
     }
 
     for span in spans {
@@ -219,12 +121,6 @@ pub fn thrift_compact_encode<'a, S0: AsRef<str>, S1: AsRef<str> + 'a, S2: AsRef<
             elapsed_cycles,
             event,
         } = span;
-        let related_id = if *state == State::Root {
-            // the above span as its parent
-            id.wrapping_sub(1)
-        } else {
-            *related_id
-        };
 
         // trace id low field header
         // ```
@@ -268,7 +164,7 @@ pub fn thrift_compact_encode<'a, S0: AsRef<str>, S1: AsRef<str> + 'a, S2: AsRef<
         // ```
         buf.push(0x16);
         // parent span id data
-        encode::varint(buf, zigzag::from_i64(related_id as _));
+        encode::varint(buf, zigzag::from_i64(*related_id as _));
 
         // operation name field header
         // ```
@@ -350,8 +246,8 @@ pub fn thrift_compact_encode<'a, S0: AsRef<str>, S1: AsRef<str> + 'a, S2: AsRef<
         // ```
         buf.push(0x16);
         // reference span id data
-        encode::varint(buf, zigzag::from_i64(related_id as _));
-        // reference struce tail
+        encode::varint(buf, zigzag::from_i64(*related_id as _));
+        // reference struct tail
         buf.push(0x00);
 
         // flags header
