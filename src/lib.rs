@@ -87,7 +87,7 @@ pub struct Span {
 /// +--------------------------------------+
 /// |          A span with id 42           |
 /// +--------------------------------------+
-///       | let handle = trace_crossthread();
+///       | let handle = trace_binder();
 ///       | <- thread::spawn()
 ///       +-----------------------------------------+-------------------------------+
 ///       | state: Spawning, related_id: 42, id: 77 | state: Settle, related_id: 77 |

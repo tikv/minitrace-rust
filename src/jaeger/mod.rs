@@ -1,12 +1,5 @@
 use crate::{Properties, Span, State, TraceDetails};
-use rand::prelude::*;
-use std::cell::RefCell;
 use std::collections::HashMap;
-
-thread_local! {
-   static TRACE_ID_HIGH: i64 = random();
-   static TRACE_ID_LOW: RefCell<i64> = RefCell::new(0);
-}
 
 /// Thrift components defined in [jaeger.thrift].
 /// Thrift compact protocol encoding described in [thrift spec]
@@ -16,6 +9,8 @@ thread_local! {
 pub fn thrift_compact_encode<'a, S0: AsRef<str>, S1: AsRef<str> + 'a, S2: AsRef<str> + 'a>(
     buf: &mut Vec<u8>,
     service_name: &str,
+    trace_id_high: i64,
+    trace_id_low: i64,
     TraceDetails {
         start_time_ns,
         elapsed_ns,
@@ -26,11 +21,6 @@ pub fn thrift_compact_encode<'a, S0: AsRef<str>, S1: AsRef<str> + 'a, S2: AsRef<
     event_to_operation_name: impl Fn(u32) -> S0,
     property_to_kv: impl Fn(&'a [u8]) -> (S1, S2),
 ) {
-    let trace_id_high = TRACE_ID_HIGH.with(|h| *h);
-    let trace_id_low = TRACE_ID_LOW.with(|l| {
-        *l.borrow_mut() += 1;
-        *l.borrow()
-    });
     let (bytes_slices, id_to_bytes_slice) = reorder_properties(properties);
     let start_time_us = *start_time_ns / 1_000;
 
@@ -568,6 +558,8 @@ mod tests {
         thrift_compact_encode(
             &mut buf,
             "test_minitrace",
+            rand::random(),
+            rand::random(),
             &res,
             |s| {
                 if s == 0 {
