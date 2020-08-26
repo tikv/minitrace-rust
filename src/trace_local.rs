@@ -42,7 +42,7 @@ static GLOBAL_ID_COUNTER: std::sync::atomic::AtomicU32 = std::sync::atomic::Atom
 
 #[inline]
 fn next_global_id_prefix() -> u32 {
-    GLOBAL_ID_COUNTER.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
+    GLOBAL_ID_COUNTER.fetch_add(1, std::sync::atomic::Ordering::AcqRel)
 }
 
 pub struct LocalTraceGuard {
@@ -82,12 +82,18 @@ impl LocalTraceGuard {
         }: LeadingSpan,
         settle_event: u32,
     ) -> Option<(Self, SpanId)> {
+        // The collector is closed, so it doesn't need to create a new tracing context.
         if collector.closed.load(std::sync::atomic::Ordering::Relaxed) {
             return None;
         }
 
         let trace_local = TRACE_LOCAL.with(|trace_local| trace_local.get());
         let tl = unsafe { &mut *trace_local };
+
+        // Tracing context should not be nested.
+        if tl.cur_collector.is_some() {
+            return None;
+        }
 
         tl.cur_collector = Some(collector.clone());
 

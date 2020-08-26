@@ -46,6 +46,8 @@ fn main() {
         minitrace::jaeger::thrift_compact_encode(
             &mut buf,
             "Sync Example",
+            rand::random(),
+            rand::random(),
             &trace_details,
             |e| {
                 format!("{:?}", unsafe {

@@ -65,10 +65,9 @@ Threads:
 ```rust
 let (root, collector) = minitrace::trace_enable(0u32);
 
-let handle = minitrace::trace_binder();
+let mut handle = minitrace::trace_binder();
 
 let th = std::thread::spawn(move || {
-    let mut handle = handle;
     let _parent_guard = handle.trace_enable(1u32);
 
     {

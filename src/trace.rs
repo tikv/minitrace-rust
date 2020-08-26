@@ -80,13 +80,12 @@ pub fn new_span<T: Into<u32>>(event: T) -> Option<crate::trace_local::SpanGuard>
 
 /// Bind the current tracing context to another executing context (e.g. a closure).
 ///
-/// ```no_run
+/// ```
 /// # use minitrace::trace_binder;
 /// # use std::thread;
 /// #
-/// let handle = trace_binder();
+/// let mut handle = trace_binder();
 /// thread::spawn(move || {
-///     let mut handle = handle;
 ///     let _g = handle.trace_enable(EVENT);
 /// });
 /// ```
