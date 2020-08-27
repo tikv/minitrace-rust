@@ -46,9 +46,9 @@ pub struct TraceDetails {
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub struct Span {
-    pub id: u64,
+    pub id: u32,
     pub state: State,
-    pub related_id: u64,
+    pub related_id: u32,
     pub begin_cycles: u64,
     pub elapsed_cycles: u64,
     pub event: u32,
@@ -149,7 +149,7 @@ pub enum State {
 /// ```
 #[derive(Debug, Clone)]
 pub struct Properties {
-    pub span_ids: Vec<u64>,
+    pub span_ids: Vec<u32>,
     pub property_lens: Vec<u64>,
     pub payload: Vec<u8>,
 }

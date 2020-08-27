@@ -355,7 +355,7 @@ pub fn thrift_compact_encode<'a, S0: AsRef<str>, S1: AsRef<str> + 'a, S2: AsRef<
 
 // Return ([property], id -> &[property])
 #[allow(clippy::type_complexity)]
-fn reorder_properties(p: &Properties) -> (Vec<(u64, &[u8])>, HashMap<u64, (usize, usize)>) {
+fn reorder_properties(p: &Properties) -> (Vec<(u32, &[u8])>, HashMap<u32, (usize, usize)>) {
     if p.span_ids.is_empty() || p.property_lens.is_empty() {
         return (vec![], HashMap::new());
     }

@@ -3,7 +3,7 @@
 struct AsyncTraceInner {
     collector: std::sync::Arc<crate::collector::CollectorInner>,
     next_suspending_state: crate::State,
-    next_related_id: u64,
+    next_related_id: u32,
     suspending_begin_cycles: u64,
     pending_event: Option<u32>,
 }
