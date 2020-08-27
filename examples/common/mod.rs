@@ -33,7 +33,7 @@ fn build_tree(
 ) {
     let mut spans = trace_details.spans.clone();
     spans.sort_by(|a, b| a.begin_cycles.cmp(&b.begin_cycles));
-    let mut id_to_node: HashMap<u64, Node> = HashMap::new();
+    let mut id_to_node: HashMap<u32, Node> = HashMap::new();
 
     let mut root = None;
     let mut min_begin = 0;

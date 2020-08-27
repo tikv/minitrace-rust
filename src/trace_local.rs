@@ -1,6 +1,6 @@
 // Copyright 2020 TiKV Project Authors. Licensed under Apache-2.0.
 
-type SpanId = u64;
+type SpanId = u32;
 
 const INIT_NORMAL_LEN: usize = 1024;
 const INIT_BYTES_LEN: usize = 16384;
@@ -31,17 +31,17 @@ pub(crate) struct TraceLocal {
     pub(crate) property_payload: Vec<u8>,
 
     /// for id construction
-    pub(crate) id_prefix: u32,
-    pub(crate) id_suffix: u32,
+    pub(crate) id_prefix: u16,
+    pub(crate) id_suffix: u16,
 
     /// shared tracing collector
     pub(crate) cur_collector: Option<std::sync::Arc<crate::collector::CollectorInner>>,
 }
 
-static GLOBAL_ID_COUNTER: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
+static GLOBAL_ID_COUNTER: std::sync::atomic::AtomicU16 = std::sync::atomic::AtomicU16::new(0);
 
 #[inline]
-fn next_global_id_prefix() -> u32 {
+fn next_global_id_prefix() -> u16 {
     GLOBAL_ID_COUNTER.fetch_add(1, std::sync::atomic::Ordering::AcqRel)
 }
 
@@ -99,13 +99,13 @@ impl LocalTraceGuard {
 
         // fetch two ids, one for leading span, one for new span
         let (id0, id1) = {
-            if tl.id_suffix >= std::u32::MAX - 1 {
+            if tl.id_suffix >= std::u16::MAX - 1 {
                 tl.id_suffix = 0;
                 tl.id_prefix = next_global_id_prefix();
             } else {
                 tl.id_suffix += 2;
             }
-            let id = ((tl.id_prefix as u64) << 32) | tl.id_suffix as u64;
+            let id = ((tl.id_prefix as u32) << 16) | tl.id_suffix as u32;
             (id - 1, id)
         };
 
@@ -229,13 +229,13 @@ impl SpanGuard {
         let parent_id = *tl.enter_stack.last().unwrap();
 
         let id = {
-            if tl.id_suffix == std::u32::MAX {
+            if tl.id_suffix == std::u16::MAX {
                 tl.id_suffix = 0;
                 tl.id_prefix = next_global_id_prefix();
             } else {
                 tl.id_suffix += 1;
             }
-            ((tl.id_prefix as u64) << 32) | tl.id_suffix as u64
+            ((tl.id_prefix as u32) << 16) | tl.id_suffix as u32
         };
 
         tl.enter_stack.push(id);

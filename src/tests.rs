@@ -29,7 +29,7 @@ enum Node {
 fn build_tree(trace_details: &crate::TraceDetails) -> Rc<RefCell<LeadingNode>> {
     let mut spans = trace_details.spans.clone();
     spans.sort_by(|a, b| a.begin_cycles.cmp(&b.begin_cycles));
-    let mut id_to_node: HashMap<u64, Node> = HashMap::new();
+    let mut id_to_node: HashMap<u32, Node> = HashMap::new();
 
     let mut root = None;
     let mut idle = vec![];
