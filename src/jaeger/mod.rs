@@ -1,5 +1,18 @@
-use crate::{Properties, Span, State, TraceDetails};
+use crate::{Properties, Span, TraceDetails};
 use std::collections::HashMap;
+
+#[repr(i32)]
+pub enum ReferenceType {
+    ChildOf = 0,
+    FollowFrom = 1,
+}
+
+pub struct JaegerSpanInfo<S: AsRef<str>> {
+    pub self_id: i64,
+    pub parent_id: i64,
+    pub reference_type: ReferenceType,
+    pub operation_name: S,
+}
 
 /// Thrift components defined in [jaeger.thrift].
 /// Thrift compact protocol encoding described in [thrift spec]
@@ -18,7 +31,7 @@ pub fn thrift_compact_encode<'a, S0: AsRef<str>, S1: AsRef<str> + 'a, S2: AsRef<
         properties,
         ..
     }: &'a TraceDetails,
-    event_to_operation_name: impl Fn(u32) -> S0,
+    span_remap: impl Fn(&'a Span) -> JaegerSpanInfo<S0>,
     property_to_kv: impl Fn(&'a [u8]) -> (S1, S2),
 ) {
     let (bytes_slices, id_to_bytes_slice) = reorder_properties(properties);
@@ -113,13 +126,18 @@ pub fn thrift_compact_encode<'a, S0: AsRef<str>, S1: AsRef<str> + 'a, S2: AsRef<
     }
 
     for span in spans {
+        let JaegerSpanInfo {
+            self_id,
+            parent_id,
+            reference_type,
+            operation_name,
+        } = span_remap(span);
+
         let Span {
             id,
-            state,
-            related_id,
             begin_cycles,
             elapsed_cycles,
-            event,
+            ..
         } = span;
 
         // trace id low field header
@@ -153,7 +171,7 @@ pub fn thrift_compact_encode<'a, S0: AsRef<str>, S1: AsRef<str> + 'a, S2: AsRef<
         // ```
         buf.push(0x16);
         // span id data
-        encode::varint(buf, zigzag::from_i64(*id as _));
+        encode::varint(buf, zigzag::from_i64(self_id));
 
         // parent span id field header
         // ```
@@ -164,7 +182,7 @@ pub fn thrift_compact_encode<'a, S0: AsRef<str>, S1: AsRef<str> + 'a, S2: AsRef<
         // ```
         buf.push(0x16);
         // parent span id data
-        encode::varint(buf, zigzag::from_i64(*related_id as _));
+        encode::varint(buf, zigzag::from_i64(parent_id));
 
         // operation name field header
         // ```
@@ -175,16 +193,7 @@ pub fn thrift_compact_encode<'a, S0: AsRef<str>, S1: AsRef<str> + 'a, S2: AsRef<
         // ```
         buf.push(0x18);
         // operation name data
-        let extra_str = match *state {
-            State::Root | State::Spawning | State::Scheduling => "[PENDING] ",
-            _ => "",
-        }
-        .as_bytes();
-        let operation_name = event_to_operation_name(*event);
-        let operation_name = operation_name.as_ref().as_bytes();
-        encode::varint(buf, extra_str.len() as u64 + operation_name.len() as u64);
-        buf.extend_from_slice(extra_str);
-        buf.extend_from_slice(operation_name);
+        encode::bytes(buf, operation_name.as_ref().as_bytes());
 
         // references field header
         // ```
@@ -210,16 +219,7 @@ pub fn thrift_compact_encode<'a, S0: AsRef<str>, S1: AsRef<str> + 'a, S2: AsRef<
         // ```
         buf.push(0x15);
         // reference kind data
-        encode::varint(
-            buf,
-            zigzag::from_i32(match state {
-                State::Root => 0,       // Child of
-                State::Local => 0,      // Child of
-                State::Spawning => 1,   // Follows from
-                State::Scheduling => 1, // Follows from
-                State::Settle => 1,     // Follows from
-            }) as _,
-        );
+        encode::varint(buf, zigzag::from_i32(reference_type as _) as _);
         // reference trace id low header
         // ```
         // const REF_TRACE_ID_LOW_DELTA: i16 = 1;
@@ -246,7 +246,7 @@ pub fn thrift_compact_encode<'a, S0: AsRef<str>, S1: AsRef<str> + 'a, S2: AsRef<
         // ```
         buf.push(0x16);
         // reference span id data
-        encode::varint(buf, zigzag::from_i64(*related_id as _));
+        encode::varint(buf, zigzag::from_i64(parent_id));
         // reference struct tail
         buf.push(0x00);
 
@@ -430,6 +430,7 @@ mod zigzag {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::State;
 
     #[test]
     fn it_works() {
@@ -457,12 +458,17 @@ mod tests {
             rand::random(),
             rand::random(),
             &res,
-            |s| {
-                if s == 0 {
-                    "Parent"
-                } else {
-                    "Child"
-                }
+            |s| JaegerSpanInfo {
+                self_id: s.id as _,
+                parent_id: s.related_id as _,
+                reference_type: match s.state {
+                    State::Root => ReferenceType::ChildOf,
+                    State::Local => ReferenceType::ChildOf,
+                    State::Spawning => ReferenceType::FollowFrom,
+                    State::Scheduling => ReferenceType::FollowFrom,
+                    State::Settle => ReferenceType::FollowFrom,
+                },
+                operation_name: if s.event == 0 { "Parent" } else { "Child" },
             },
             |property| {
                 let mut split = property.splitn(2, |b| *b == b':');
