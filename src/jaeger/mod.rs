@@ -19,7 +19,7 @@ pub struct JaegerSpanInfo<S: AsRef<str>> {
 ///
 /// [jaeger.thrift]: https://github.com/jaegertracing/jaeger-idl/blob/52fb4c9440/thrift/jaeger.thrift
 /// [thrift spec]: https://github.com/apache/thrift/blob/01d53f483a/doc/specs/thrift-compact-protocol.md
-pub fn thrift_compact_encode<'a, S0: AsRef<str>, S1: AsRef<str> + 'a, S2: AsRef<str> + 'a>(
+pub fn thrift_compact_encode<'a, S0: AsRef<str>, S1: AsRef<str>, S2: AsRef<str>>(
     buf: &mut Vec<u8>,
     service_name: &str,
     trace_id_high: i64,
