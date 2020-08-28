@@ -1,5 +1,7 @@
 // Copyright 2020 TiKV Project Authors. Licensed under Apache-2.0.
 
+use std::sync::Arc;
+
 use crossbeam::channel::Sender;
 use either::Either;
 
@@ -37,7 +39,7 @@ pub fn new_async_handle() -> AsyncHandle {
 }
 
 struct AsyncHandleInner {
-    collector: Sender<SpanSet>,
+    collector: Arc<Sender<SpanSet>>,
     parent_id: u32,
     begin_cycles: u64,
 }

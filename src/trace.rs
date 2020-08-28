@@ -2,6 +2,7 @@
 
 use std::marker::PhantomData;
 use std::sync::atomic::{AtomicU16, Ordering};
+use std::sync::Arc;
 
 use crossbeam::channel::Sender;
 
@@ -46,7 +47,7 @@ pub fn start_trace<T: Into<u32>>(root_event: T) -> Option<(ScopeGuard, Tracker)>
     );
 
     let (tx, rx) = crossbeam::channel::unbounded();
-    tl.cur_collector = Some(tx);
+    tl.cur_collector = Some(Arc::new(tx));
 
     Some((ScopeGuard { inner: span_inner }, Tracker::new(rx)))
 }
@@ -101,7 +102,7 @@ pub struct TraceLocal {
     pub enter_stack: Vec<SpanId>,
     pub span_set: SpanSet,
 
-    pub cur_collector: Option<Sender<SpanSet>>,
+    pub cur_collector: Option<Arc<Sender<SpanSet>>>,
 }
 
 impl TraceLocal {

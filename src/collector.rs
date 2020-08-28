@@ -8,11 +8,6 @@ use crate::utils::real_time_ns;
 const INIT_LEN: usize = 1024;
 const INIT_BYTES_LEN: usize = 16384;
 
-// lazy_static! {
-//     pub static ref SPAN_COLLECTOR: SegQueue<(u32, SpanSet)> = SegQueue::new();
-//     pub static ref COLLECTED: Mutex<HashMap<u32, SpanSet>> = Mutex::new(HashMap::new());
-// }
-
 pub struct Tracker {
     rx: Receiver<SpanSet>,
     start_time_ns: u64,
