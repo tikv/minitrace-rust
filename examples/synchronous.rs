@@ -42,6 +42,9 @@ fn main() {
 
     #[cfg(feature = "jaeger")]
     {
+        use minitrace::jaeger::{JaegerSpanInfo, ReferenceType};
+        use minitrace::State;
+
         let mut buf = Vec::with_capacity(2048);
         minitrace::jaeger::thrift_compact_encode(
             &mut buf,
@@ -49,10 +52,29 @@ fn main() {
             rand::random(),
             rand::random(),
             &trace_details,
-            |e| {
-                format!("{:?}", unsafe {
-                    std::mem::transmute::<_, SyncJob>(e as u8)
-                })
+            |s| JaegerSpanInfo {
+                self_id: s.id as _,
+                parent_id: s.related_id as _,
+                reference_type: match s.state {
+                    State::Root => ReferenceType::ChildOf,
+                    State::Local => ReferenceType::ChildOf,
+                    State::Spawning => ReferenceType::FollowFrom,
+                    State::Scheduling => ReferenceType::FollowFrom,
+                    State::Settle => ReferenceType::FollowFrom,
+                },
+                operation_name: {
+                    format!(
+                        "{}{:?}",
+                        match s.state {
+                            State::Root => "[Root] ",
+                            State::Local => "",
+                            State::Spawning => "[Spawning] ",
+                            State::Scheduling => "[Scheduling] ",
+                            State::Settle => "",
+                        },
+                        unsafe { std::mem::transmute::<_, SyncJob>(s.event as u8) }
+                    )
+                },
             },
             |property| {
                 let mut split = property.splitn(2, |b| *b == b':');
