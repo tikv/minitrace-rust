@@ -23,7 +23,7 @@ pub fn collect_by_trace_id(trace_id: u32) -> Option<TraceResult> {
     let span_set = collected.remove(&trace_id)?;
 
     Some(TraceResult {
-        baseline_cycle: minstant::now(),
+        baseline_cycles: minstant::now(),
         baseline_ns: real_time_ns(),
         cycles_per_second: minstant::cycles_per_second(),
         spans: span_set.spans,
@@ -40,7 +40,7 @@ pub fn collect_all() -> HashMap<u32, TraceResult> {
             (
                 trace_id,
                 TraceResult {
-                    baseline_cycle: minstant::now(),
+                    baseline_cycles: minstant::now(),
                     baseline_ns: real_time_ns(),
                     cycles_per_second: minstant::cycles_per_second(),
                     spans: span_set.spans,
@@ -60,7 +60,7 @@ fn collect_and_merge(collected: &mut HashMap<u32, SpanSet>) {
 
 #[derive(Debug, Clone)]
 pub struct TraceResult {
-    pub baseline_cycle: u64,
+    pub baseline_cycles: u64,
     pub baseline_ns: u64,
 
     /// For conversion of cycles -> ns
@@ -102,7 +102,7 @@ pub struct TraceResult {
 /// ```
 #[derive(Debug, Clone)]
 pub struct Properties {
-    pub span_ids: Vec<u64>,
+    pub span_ids: Vec<u32>,
     pub property_lens: Vec<u64>,
     pub payload: Vec<u8>,
 }

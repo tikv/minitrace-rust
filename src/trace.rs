@@ -7,7 +7,7 @@ use crate::collector::{SpanSet, SPAN_COLLECTOR};
 
 pub type SpanId = u32;
 
-static GLOBAL_ID_COUNTER: AtomicU16 = AtomicU32::new(1);
+static GLOBAL_ID_COUNTER: AtomicU16 = AtomicU16::new(1);
 
 thread_local! {
     pub static TRACE_LOCAL: std::cell::UnsafeCell<TraceLocal> = std::cell::UnsafeCell::new(TraceLocal {
@@ -23,7 +23,7 @@ fn next_global_id_prefix() -> u16 {
     GLOBAL_ID_COUNTER.fetch_add(1, Ordering::AcqRel)
 }
 
-pub fn start_trace<T: Into<u32>>(trace_id: u32, root_event: T) -> Option<(ScopeGuard, SpanId)> {
+pub fn start_trace<T: Into<u32>>(trace_id: u32, root_event: T) -> Option<ScopeGuard> {
     let trace = TRACE_LOCAL.with(|trace| trace.get());
     let tl = unsafe { &mut *trace };
 
@@ -31,10 +31,9 @@ pub fn start_trace<T: Into<u32>>(trace_id: u32, root_event: T) -> Option<(ScopeG
         return None;
     }
 
-    let root_id = tl.new_span_id();
     let span_inner = SpanGuardInner::enter(
         Span {
-            id: root_id,
+            id: tl.new_span_id(),
             state: State::Normal,
             parent_id: 0,
             begin_cycles: minstant::now(),
@@ -46,7 +45,7 @@ pub fn start_trace<T: Into<u32>>(trace_id: u32, root_event: T) -> Option<(ScopeG
     let guard = ScopeGuard { inner: span_inner };
     tl.last_trace_id = trace_id;
 
-    Some((guard, root_id))
+    Some(guard)
 }
 
 pub fn new_span<T: Into<u32>>(event: T) -> Option<SpanGuard> {
@@ -194,7 +193,7 @@ impl SpanGuardInner {
 
         let now_cycle = minstant::now();
         let span = &mut tl.span_set.spans[self.span_index];
-        span.elapsed_cycles = now_cycle.saturating_sub(span.begin_cycles);
+        span.elapsed_cycles = now_cycle.wrapping_sub(span.begin_cycles);
 
         now_cycle
     }

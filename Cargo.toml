@@ -24,7 +24,7 @@ version = "0.3.1"
 package = "futures"
 
 [dev-dependencies]
-# minitrace-jaeger = { path = "crates/minitrace-jaeger" }
+minitrace-jaeger = { path = "crates/minitrace-jaeger" }
 tokio = { version = "0.2", features = ["full"] }
 criterion = "0.3"
 rustracing = "0.4"
@@ -34,6 +34,7 @@ tracing-opentelemetry = "0.4"
 tracing = "0.1"
 tracing-core = "0.1"
 tracing-subscriber = "0.2"
+rand = "0.7"
 
 [[bench]]
 name = "trace"

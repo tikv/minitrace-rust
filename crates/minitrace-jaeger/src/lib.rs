@@ -1,14 +1,6 @@
-use std::cell::RefCell;
 use std::collections::HashMap;
 
-use rand::prelude::*;
-
 use minitrace::{Properties, Span, State, TraceResult};
-
-thread_local! {
-   static TRACE_ID_HIGH: i64 = random();
-   static TRACE_ID_LOW: RefCell<i64> = RefCell::new(0);
-}
 
 /// Thrift components defined in [jaeger.thrift].
 /// Thrift compact protocol encoding described in [thrift spec]
@@ -18,9 +10,11 @@ thread_local! {
 pub fn thrift_compact_encode<'a, S0: AsRef<str>, S1: AsRef<str> + 'a, S2: AsRef<str> + 'a>(
     buf: &mut Vec<u8>,
     service_name: &str,
+    trace_id_high: i64,
+    trace_id_low: i64,
     TraceResult {
-        start_time_ns,
-        elapsed_ns,
+        baseline_cycles,
+        baseline_ns,
         cycles_per_second,
         spans,
         properties,
@@ -28,13 +22,7 @@ pub fn thrift_compact_encode<'a, S0: AsRef<str>, S1: AsRef<str> + 'a, S2: AsRef<
     event_to_operation_name: impl Fn(u32) -> S0,
     property_to_kv: impl Fn(&'a [u8]) -> (S1, S2),
 ) {
-    let trace_id_high = TRACE_ID_HIGH.with(|h| *h);
-    let trace_id_low = TRACE_ID_LOW.with(|l| {
-        *l.borrow_mut() += 1;
-        *l.borrow()
-    });
     let (bytes_slices, id_to_bytes_slice) = reorder_properties(properties);
-    let start_time_us = *start_time_ns / 1_000;
 
     // # thrift message header
     // ## protocal id
@@ -110,8 +98,20 @@ pub fn thrift_compact_encode<'a, S0: AsRef<str>, S1: AsRef<str> + 'a, S2: AsRef<
 
     let root_span = spans
         .iter()
-        .find(|s| s.state == State::Root)
+        .find(|s| s.parent_id == 0)
         .expect("not contain root span");
+
+    let start_time_us = (((*baseline_ns as i64) / 1000)
+        + ((root_span.begin_cycles as i64).wrapping_sub(*baseline_cycles as i64)) * (1_000_000)
+            / (*cycles_per_second as i64)) as u64;
+    let elapsed_us = (spans
+        .iter()
+        .map(|span| span.begin_cycles + span.elapsed_cycles)
+        .max()
+        .unwrap()
+        - root_span.begin_cycles)
+        * (1_000_000)
+        / *cycles_per_second;
 
     let anchor_cycles = root_span.begin_cycles;
     let root_id = root_span.id;
@@ -215,7 +215,7 @@ pub fn thrift_compact_encode<'a, S0: AsRef<str>, S1: AsRef<str> + 'a, S2: AsRef<
         // ```
         buf.push(0x16);
         // duration data
-        let duration_us = *elapsed_ns / 1_000;
+        let duration_us = elapsed_us;
         encode::varint(buf, zigzag::from_i64(duration_us as _));
 
         // span struct tail
@@ -231,12 +231,6 @@ pub fn thrift_compact_encode<'a, S0: AsRef<str>, S1: AsRef<str> + 'a, S2: AsRef<
             elapsed_cycles,
             event,
         } = span;
-        let parent_id = if *state == State::Root {
-            // the above span as its parent
-            id.wrapping_sub(1)
-        } else {
-            *parent_id
-        };
 
         // trace id low field header
         // ```
@@ -280,7 +274,7 @@ pub fn thrift_compact_encode<'a, S0: AsRef<str>, S1: AsRef<str> + 'a, S2: AsRef<
         // ```
         buf.push(0x16);
         // parent span id data
-        encode::varint(buf, zigzag::from_i64(parent_id as _));
+        encode::varint(buf, zigzag::from_i64(*parent_id as _));
 
         // operation name field header
         // ```
@@ -292,7 +286,7 @@ pub fn thrift_compact_encode<'a, S0: AsRef<str>, S1: AsRef<str> + 'a, S2: AsRef<
         buf.push(0x18);
         // operation name data
         let extra_str = match *state {
-            State::Root | State::Spawning | State::Scheduling => "[PENDING] ",
+            State::Pending => "[PENDING] ",
             _ => "",
         }
         .as_bytes();
@@ -328,13 +322,8 @@ pub fn thrift_compact_encode<'a, S0: AsRef<str>, S1: AsRef<str> + 'a, S2: AsRef<
         // reference kind data
         encode::varint(
             buf,
-            zigzag::from_i32(match state {
-                State::Root => 0,       // Child of
-                State::Local => 0,      // Child of
-                State::Spawning => 1,   // Follows from
-                State::Scheduling => 1, // Follows from
-                State::Settle => 1,     // Follows from
-            }) as _,
+            // follow from
+            zigzag::from_i32(1) as _,
         );
         // reference trace id low header
         // ```
@@ -362,7 +351,7 @@ pub fn thrift_compact_encode<'a, S0: AsRef<str>, S1: AsRef<str> + 'a, S2: AsRef<
         // ```
         buf.push(0x16);
         // reference span id data
-        encode::varint(buf, zigzag::from_i64(parent_id as _));
+        encode::varint(buf, zigzag::from_i64(*parent_id as _));
         // reference struce tail
         buf.push(0x00);
 
@@ -382,7 +371,7 @@ pub fn thrift_compact_encode<'a, S0: AsRef<str>, S1: AsRef<str> + 'a, S2: AsRef<
         // const I64_TYPE: u8 = 6;property_lens
         buf.push(0x16);
         // start time data
-        let delta_cycles = begin_cycles.saturating_sub(anchor_cycles);
+        let delta_cycles = begin_cycles.wrapping_sub(anchor_cycles);
         let delta_us = delta_cycles as f64 / *cycles_per_second as f64 * 1_000_000.0;
         encode::varint(
             buf,
@@ -471,7 +460,7 @@ pub fn thrift_compact_encode<'a, S0: AsRef<str>, S1: AsRef<str> + 'a, S2: AsRef<
 
 // Return ([property], id -> &[property])
 #[allow(clippy::type_complexity)]
-fn reorder_properties(p: &Properties) -> (Vec<(u64, &[u8])>, HashMap<u64, (usize, usize)>) {
+fn reorder_properties(p: &Properties) -> (Vec<(u32, &[u8])>, HashMap<u32, (usize, usize)>) {
     if p.span_ids.is_empty() || p.property_lens.is_empty() {
         return (vec![], HashMap::new());
     }
@@ -550,19 +539,19 @@ mod tests {
     #[test]
     fn it_works() {
         let res = {
-            let (_g, collector) = minitrace::start_trace(0, 0u32);
-            minitrace::new_property(b"test property:a root span");
+            let (_g, collector) = minitrace::trace_enable(0u32);
+            minitrace::property(b"test property:a root span");
 
             std::thread::sleep(std::time::Duration::from_millis(20));
 
             {
                 let _g = minitrace::new_span(1u32);
-                minitrace::new_property(b"where am i:in child");
+                minitrace::property(b"where am i:in child");
                 std::thread::sleep(std::time::Duration::from_millis(10));
             }
 
-            minitrace::new_property(b"another test property:done");
-            collector.unwrap()
+            minitrace::property(b"another test property:done");
+            collector
         }
         .collect();
 
@@ -570,6 +559,8 @@ mod tests {
         thrift_compact_encode(
             &mut buf,
             "test_minitrace",
+            rand::random(),
+            rand::random(),
             &res,
             |s| {
                 if s == 0 {

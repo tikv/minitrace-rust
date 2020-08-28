@@ -48,18 +48,16 @@ async fn other_job() {
 async fn main() {
     let root = minitrace::start_trace(0, AsyncJob::Root);
 
-    let _ = tokio::spawn(
-        async {
-            minitrace::new_property(b"sample property:it works");
-            let jhs = parallel_job();
-            other_job().await;
+    let _ = async {
+        minitrace::new_property(b"sample property:it works");
+        let jhs = parallel_job();
+        other_job().await;
 
-            for jh in jhs {
-                jh.await.unwrap();
-            }
+        for jh in jhs {
+            jh.await.unwrap();
         }
-        .in_new_span(AsyncJob::Loop),
-    )
+    }
+    .in_new_span(AsyncJob::Loop)
     .await;
 
     drop(root);
@@ -68,29 +66,31 @@ async fn main() {
 
     // dbg!(&trace_result);
 
-    // use std::net::SocketAddr;
-    // let mut buf = Vec::with_capacity(2048);
-    // minitrace_jaeger::thrift_compact_encode(
-    //     &mut buf,
-    //     "Async Example",
-    //     &trace_result,
-    //     |e| {
-    //         format!("{:?}", unsafe {
-    //             std::mem::transmute::<_, AsyncJob>(e as u8)
-    //         })
-    //     },
-    //     |property| {
-    //         let mut split = property.splitn(2, |b| *b == b':');
-    //         let key = String::from_utf8_lossy(split.next().unwrap()).to_owned();
-    //         let value = String::from_utf8_lossy(split.next().unwrap()).to_owned();
-    //         (key, value)
-    //     },
-    // );
+    use std::net::SocketAddr;
+    let mut buf = Vec::with_capacity(2048);
+    minitrace_jaeger::thrift_compact_encode(
+        &mut buf,
+        "Async Example",
+        rand::random(),
+        rand::random(),
+        &trace_result,
+        |e| {
+            format!("{:?}", unsafe {
+                std::mem::transmute::<_, AsyncJob>(e as u8)
+            })
+        },
+        |property| {
+            let mut split = property.splitn(2, |b| *b == b':');
+            let key = String::from_utf8_lossy(split.next().unwrap()).to_owned();
+            let value = String::from_utf8_lossy(split.next().unwrap()).to_owned();
+            (key, value)
+        },
+    );
 
-    // let local_addr: SocketAddr = "0.0.0.0:0".parse().unwrap();
-    // if let Ok(mut socket) = tokio::net::UdpSocket::bind(local_addr).await {
-    //     let _ = socket.send_to(&buf, "127.0.0.1:6831").await;
-    // }
+    let local_addr: SocketAddr = "0.0.0.0:0".parse().unwrap();
+    if let Ok(mut socket) = tokio::net::UdpSocket::bind(local_addr).await {
+        let _ = socket.send_to(&buf, "127.0.0.1:6831").await;
+    }
 
     crate::common::draw_stdout(trace_result);
 }

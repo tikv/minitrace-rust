@@ -37,7 +37,7 @@ pub fn new_async_handle() -> AsyncHandle {
 
 struct AsyncHandleInner {
     trace_id: u32,
-    parent_id: u64,
+    parent_id: u32,
     begin_cycles: u64,
 }
 
@@ -52,60 +52,78 @@ impl AsyncHandle {
         &mut self,
         event: T,
     ) -> Option<Either<AsyncScopeGuard<'_>, SpanGuard>> {
-        let inner = self.inner.as_mut()?;
+        if self.inner.is_none() {
+            return None;
+        }
 
         let trace = TRACE_LOCAL.with(|trace| trace.get());
         let tl = unsafe { &mut *trace };
 
         let event = event.into();
         if tl.enter_stack.is_empty() {
-            let pending_span = Span {
-                id: tl.new_span_id(),
-                state: State::Pending,
-                parent_id: inner.parent_id,
-                begin_cycles: inner.begin_cycles,
-                elapsed_cycles: minstant::now().saturating_sub(inner.begin_cycles),
-                event,
-            };
-            tl.span_set.spans.push(pending_span);
-
-            let span_inner = SpanGuardInner::enter(
-                Span {
-                    id: tl.new_span_id(),
-                    state: State::Normal,
-                    parent_id: inner.parent_id,
-                    begin_cycles: minstant::now(),
-                    elapsed_cycles: 0,
-                    event: event.into(),
-                },
-                tl,
-            );
-            tl.last_trace_id = inner.trace_id;
-
-            Some(Either::Left(AsyncScopeGuard {
-                inner: span_inner,
-                handle: self,
-            }))
+            Some(Either::Left(self.new_scope(event, tl)))
         } else {
-            let span_inner = SpanGuardInner::enter(
-                Span {
-                    id: tl.new_span_id(),
-                    state: State::Normal,
-                    parent_id: inner.parent_id,
-                    begin_cycles: if inner.begin_cycles != 0 {
-                        inner.begin_cycles
-                    } else {
-                        minstant::now()
-                    },
-                    elapsed_cycles: 0,
-                    event: event.into(),
-                },
-                tl,
-            );
-            inner.begin_cycles = 0;
-
-            Some(Either::Right(SpanGuard { inner: span_inner }))
+            Some(Either::Right(self.new_span(event, tl)))
         }
+    }
+
+    fn new_scope(&mut self, event: u32, tl: &mut TraceLocal) -> AsyncScopeGuard<'_> {
+        let inner = self.inner.as_mut().unwrap();
+
+        let pending_id = tl.new_span_id();
+        let pending_span = Span {
+            id: pending_id,
+            state: State::Pending,
+            parent_id: inner.parent_id,
+            begin_cycles: inner.begin_cycles,
+            elapsed_cycles: minstant::now().wrapping_sub(inner.begin_cycles),
+            event,
+        };
+        tl.span_set.spans.push(pending_span);
+
+        let span_id = tl.new_span_id();
+        let span_inner = SpanGuardInner::enter(
+            Span {
+                id: span_id,
+                state: State::Normal,
+                parent_id: pending_id,
+                begin_cycles: minstant::now(),
+                elapsed_cycles: 0,
+                event: event.into(),
+            },
+            tl,
+        );
+        inner.parent_id = span_id;
+        tl.last_trace_id = inner.trace_id;
+
+        AsyncScopeGuard {
+            inner: span_inner,
+            handle: self,
+        }
+    }
+
+    fn new_span(&mut self, event: u32, tl: &mut TraceLocal) -> SpanGuard {
+        let inner = self.inner.as_mut().unwrap();
+
+        let parent_id = *tl.enter_stack.last().unwrap();
+        let span_inner = SpanGuardInner::enter(
+            Span {
+                id: tl.new_span_id(),
+                state: State::Normal,
+                parent_id,
+                begin_cycles: if inner.begin_cycles != 0 {
+                    inner.begin_cycles
+                } else {
+                    minstant::now()
+                },
+                elapsed_cycles: 0,
+                event: event.into(),
+            },
+            tl,
+        );
+        inner.begin_cycles = 0;
+
+        SpanGuard { inner: span_inner }
     }
 }
 
