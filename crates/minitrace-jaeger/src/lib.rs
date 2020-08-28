@@ -13,11 +13,12 @@ pub fn thrift_compact_encode<'a, S0: AsRef<str>, S1: AsRef<str> + 'a, S2: AsRef<
     trace_id_high: i64,
     trace_id_low: i64,
     TraceResult {
-        baseline_cycles,
-        baseline_ns,
+        start_time_ns,
+        elapsed_ns,
         cycles_per_second,
         spans,
         properties,
+        ..
     }: &'a TraceResult,
     event_to_operation_name: impl Fn(u32) -> S0,
     property_to_kv: impl Fn(&'a [u8]) -> (S1, S2),
@@ -101,17 +102,8 @@ pub fn thrift_compact_encode<'a, S0: AsRef<str>, S1: AsRef<str> + 'a, S2: AsRef<
         .find(|s| s.parent_id == 0)
         .expect("not contain root span");
 
-    let start_time_us = (((*baseline_ns as i64) / 1000)
-        + ((root_span.begin_cycles as i64).wrapping_sub(*baseline_cycles as i64)) * (1_000_000)
-            / (*cycles_per_second as i64)) as u64;
-    let elapsed_us = (spans
-        .iter()
-        .map(|span| span.begin_cycles + span.elapsed_cycles)
-        .max()
-        .unwrap()
-        - root_span.begin_cycles)
-        * (1_000_000)
-        / *cycles_per_second;
+    let start_time_us = start_time_ns / 1000;
+    let elapsed_us = elapsed_ns / 1000;
 
     let anchor_cycles = root_span.begin_cycles;
     let root_id = root_span.id;

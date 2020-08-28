@@ -1,19 +1,20 @@
 // Copyright 2020 TiKV Project Authors. Licensed under Apache-2.0.
 
+use crossbeam::channel::Sender;
 use either::Either;
 
-use crate::collector::SPAN_COLLECTOR;
+use crate::collector::SpanSet;
 use crate::trace::*;
 
-/// Bind the current tracing context to another executing context (e.g. a closure).
+/// Bind the current tracing context to another executing context.
 ///
 /// ```
-/// # use minitrace::thread::new_async_scope;
+/// # use minitrace::thread::new_async_handle;
 /// # use std::thread;
 /// #
-/// let mut handle = new_async_scope();
+/// let mut handle = new_async_handle();
 /// thread::spawn(move || {
-///     let _g = handle.start_trace(0, 0u32);
+///     let _g = handle.start_trace(0u32);
 /// });
 /// ```
 #[inline]
@@ -27,7 +28,7 @@ pub fn new_async_handle() -> AsyncHandle {
 
     let parent_id = *tl.enter_stack.last().unwrap();
     let inner = AsyncHandleInner {
-        trace_id: tl.last_trace_id,
+        collector: tl.cur_collector.clone().unwrap(),
         parent_id,
         begin_cycles: minstant::now(),
     };
@@ -36,7 +37,7 @@ pub fn new_async_handle() -> AsyncHandle {
 }
 
 struct AsyncHandleInner {
-    trace_id: u32,
+    collector: Sender<SpanSet>,
     parent_id: u32,
     begin_cycles: u64,
 }
@@ -94,7 +95,8 @@ impl AsyncHandle {
             tl,
         );
         inner.parent_id = span_id;
-        tl.last_trace_id = inner.trace_id;
+
+        tl.cur_collector = Some(inner.collector.clone());
 
         AsyncScopeGuard {
             inner: span_inner,
@@ -139,8 +141,8 @@ impl<'a> Drop for AsyncScopeGuard<'a> {
         let tl = unsafe { &mut *trace };
 
         let now_cycle = self.inner.exit(tl);
-        self.handle.inner.as_mut().unwrap().begin_cycles = now_cycle;
-
-        (*SPAN_COLLECTOR).push((tl.last_trace_id, tl.span_set.take()));
+        let inner = self.handle.inner.as_mut().unwrap();
+        inner.begin_cycles = now_cycle;
+        inner.collector.send(tl.span_set.take()).ok();
     }
 }

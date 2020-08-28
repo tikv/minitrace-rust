@@ -3,7 +3,9 @@
 use std::marker::PhantomData;
 use std::sync::atomic::{AtomicU16, Ordering};
 
-use crate::collector::{SpanSet, SPAN_COLLECTOR};
+use crossbeam::channel::Sender;
+
+use crate::collector::{SpanSet, Tracker};
 
 pub type SpanId = u32;
 
@@ -15,7 +17,7 @@ thread_local! {
         id_suffix: 0,
         enter_stack: Vec::with_capacity(1024),
         span_set: SpanSet::with_capacity(),
-        last_trace_id: 0,
+        cur_collector: None,
     });
 }
 
@@ -23,7 +25,7 @@ fn next_global_id_prefix() -> u16 {
     GLOBAL_ID_COUNTER.fetch_add(1, Ordering::AcqRel)
 }
 
-pub fn start_trace<T: Into<u32>>(trace_id: u32, root_event: T) -> Option<ScopeGuard> {
+pub fn start_trace<T: Into<u32>>(root_event: T) -> Option<(ScopeGuard, Tracker)> {
     let trace = TRACE_LOCAL.with(|trace| trace.get());
     let tl = unsafe { &mut *trace };
 
@@ -42,10 +44,11 @@ pub fn start_trace<T: Into<u32>>(trace_id: u32, root_event: T) -> Option<ScopeGu
         },
         tl,
     );
-    let guard = ScopeGuard { inner: span_inner };
-    tl.last_trace_id = trace_id;
 
-    Some(guard)
+    let (tx, rx) = crossbeam::channel::unbounded();
+    tl.cur_collector = Some(tx);
+
+    Some((ScopeGuard { inner: span_inner }, Tracker::new(rx)))
 }
 
 pub fn new_span<T: Into<u32>>(event: T) -> Option<SpanGuard> {
@@ -97,7 +100,8 @@ pub struct TraceLocal {
     /// responsible to submit the local span sets.
     pub enter_stack: Vec<SpanId>,
     pub span_set: SpanSet,
-    pub last_trace_id: u32,
+
+    pub cur_collector: Option<Sender<SpanSet>>,
 }
 
 impl TraceLocal {
@@ -145,7 +149,12 @@ impl Drop for ScopeGuard {
 
         self.inner.exit(tl);
 
-        (*SPAN_COLLECTOR).push((tl.last_trace_id, tl.span_set.take()));
+        tl.cur_collector
+            .as_ref()
+            .unwrap()
+            .send(tl.span_set.take())
+            .ok();
+        tl.cur_collector = None;
     }
 }
 
