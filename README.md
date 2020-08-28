@@ -15,7 +15,7 @@ minitrace = { git = "https://github.com/pingcap-incubator/minitrace-rust.git" }
 ### In Synchronous Code
 
 ```rust
-let (root_guard, collector) = minitrace::start_trace(0u32);
+let (root_guard, collector) = minitrace::start_trace(0, 0u32);
 minitrace::new_property(b"tracing started");
 
 {
@@ -63,12 +63,12 @@ let trace_results = collector.unwrap().collect();
 Threads:
 
 ```rust
-let (root, collector) = minitrace::start_trace(0u32);
+let (root, collector) = minitrace::start_trace(0, 0u32);
 
 let mut handle = minitrace::thread::new_async_scope();
 
 let th = std::thread::spawn(move || {
-    let _parent_guard = handle.start_trace(1u32);
+    let _parent_guard = handle.start_trace(0, 1u32);
 
     {
         let _child_guard = minitrace::new_span(2u32);

@@ -13,7 +13,7 @@ use crate::trace::*;
 /// #
 /// let mut handle = new_async_scope();
 /// thread::spawn(move || {
-///     let _g = handle.start_trace(0u32);
+///     let _g = handle.start_trace(0, 0u32);
 /// });
 /// ```
 #[inline]
@@ -27,6 +27,7 @@ pub fn new_async_handle() -> AsyncHandle {
 
     let parent_id = *tl.enter_stack.last().unwrap();
     let inner = AsyncHandleInner {
+        trace_id: tl.last_trace_id,
         parent_id,
         begin_cycles: minstant::now(),
     };
@@ -35,6 +36,7 @@ pub fn new_async_handle() -> AsyncHandle {
 }
 
 struct AsyncHandleInner {
+    trace_id: u32,
     parent_id: u64,
     begin_cycles: u64,
 }
@@ -78,6 +80,7 @@ impl AsyncHandle {
                 },
                 tl,
             );
+            tl.last_trace_id = inner.trace_id;
 
             Some(Either::Left(AsyncScopeGuard {
                 inner: span_inner,
@@ -120,6 +123,6 @@ impl<'a> Drop for AsyncScopeGuard<'a> {
         let now_cycle = self.inner.exit(tl);
         self.handle.inner.as_mut().unwrap().begin_cycles = now_cycle;
 
-        (*SPAN_COLLECTOR).push(tl.span_set.take());
+        (*SPAN_COLLECTOR).push((tl.last_trace_id, tl.span_set.take()));
     }
 }

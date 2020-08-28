@@ -46,7 +46,7 @@ async fn other_job() {
 
 #[tokio::main]
 async fn main() {
-    let root = minitrace::start_trace(AsyncJob::Root);
+    let root = minitrace::start_trace(0, AsyncJob::Root);
 
     let _ = tokio::spawn(
         async {
@@ -64,9 +64,9 @@ async fn main() {
 
     drop(root);
 
-    let trace_result = minitrace::collect_all();
+    let trace_result = minitrace::collect_by_trace_id(0).unwrap();
 
-    dbg!(&trace_result);
+    // dbg!(&trace_result);
 
     // use std::net::SocketAddr;
     // let mut buf = Vec::with_capacity(2048);

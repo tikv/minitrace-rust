@@ -7,7 +7,7 @@ mod collector;
 mod trace;
 mod utils;
 
-pub use crate::collector::{collect_all, Properties, TraceResult};
+pub use crate::collector::{collect_all, collect_by_trace_id, Properties, TraceResult};
 pub use crate::trace::{
     new_property, new_property_with, new_span, start_trace, ScopeGuard, Span, SpanGuard, SpanId,
     State,

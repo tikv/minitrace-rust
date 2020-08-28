@@ -550,7 +550,7 @@ mod tests {
     #[test]
     fn it_works() {
         let res = {
-            let (_g, collector) = minitrace::start_trace(0u32);
+            let (_g, collector) = minitrace::start_trace(0, 0u32);
             minitrace::new_property(b"test property:a root span");
 
             std::thread::sleep(std::time::Duration::from_millis(20));

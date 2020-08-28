@@ -15,6 +15,7 @@ thread_local! {
         id_suffix: 0,
         enter_stack: Vec::with_capacity(1024),
         span_set: SpanSet::with_capacity(),
+        last_trace_id: 0,
     });
 }
 
@@ -22,7 +23,7 @@ fn next_global_id_prefix() -> u32 {
     GLOBAL_ID_COUNTER.fetch_add(1, Ordering::AcqRel)
 }
 
-pub fn start_trace<T: Into<u32>>(root_event: T) -> Option<(ScopeGuard, SpanId)> {
+pub fn start_trace<T: Into<u32>>(trace_id: u32, root_event: T) -> Option<(ScopeGuard, SpanId)> {
     let trace = TRACE_LOCAL.with(|trace| trace.get());
     let tl = unsafe { &mut *trace };
 
@@ -43,6 +44,7 @@ pub fn start_trace<T: Into<u32>>(root_event: T) -> Option<(ScopeGuard, SpanId)> 
         tl,
     );
     let guard = ScopeGuard { inner: span_inner };
+    tl.last_trace_id = trace_id;
 
     Some((guard, root_id))
 }
@@ -96,6 +98,7 @@ pub struct TraceLocal {
     /// responsible to submit the local span sets.
     pub enter_stack: Vec<SpanId>,
     pub span_set: SpanSet,
+    pub last_trace_id: u32,
 }
 
 impl TraceLocal {
@@ -130,13 +133,6 @@ pub struct Span {
     pub event: u32,
 }
 
-// impl Span {
-//     #[inline]
-//     pub(crate) fn stop(&mut self) {
-//         self.elapsed_cycles = minstant::now().saturating_sub(self.begin_cycles);
-//     }
-// }
-
 #[must_use]
 pub struct ScopeGuard {
     inner: SpanGuardInner,
@@ -150,7 +146,7 @@ impl Drop for ScopeGuard {
 
         self.inner.exit(tl);
 
-        (*SPAN_COLLECTOR).push(tl.span_set.take());
+        (*SPAN_COLLECTOR).push((tl.last_trace_id, tl.span_set.take()));
     }
 }
 

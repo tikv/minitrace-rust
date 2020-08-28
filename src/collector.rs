@@ -1,5 +1,8 @@
 // Copyright 2020 TiKV Project Authors. Licensed under Apache-2.0.
 
+use std::collections::HashMap;
+use std::sync::Mutex;
+
 use crossbeam::queue::SegQueue;
 use lazy_static::lazy_static;
 
@@ -10,21 +13,48 @@ const INIT_LEN: usize = 1024;
 const INIT_BYTES_LEN: usize = 16384;
 
 lazy_static! {
-    pub static ref SPAN_COLLECTOR: SegQueue<SpanSet> = SegQueue::new();
+    pub static ref SPAN_COLLECTOR: SegQueue<(u32, SpanSet)> = SegQueue::new();
+    pub static ref COLLECTED: Mutex<HashMap<u32, SpanSet>> = Mutex::new(HashMap::new());
 }
 
-pub fn collect_all() -> TraceResult {
-    let mut span_set = SpanSet::new();
-    while let Ok(other_span_set) = SPAN_COLLECTOR.pop() {
-        span_set = span_set.merge(other_span_set);
-    }
+pub fn collect_by_trace_id(trace_id: u32) -> Option<TraceResult> {
+    let mut collected = COLLECTED.lock().unwrap();
+    collect_and_merge(&mut collected);
+    let span_set = collected.remove(&trace_id)?;
 
-    TraceResult {
+    Some(TraceResult {
         baseline_cycle: minstant::now(),
         baseline_ns: real_time_ns(),
         cycles_per_second: minstant::cycles_per_second(),
         spans: span_set.spans,
         properties: span_set.properties,
+    })
+}
+
+pub fn collect_all() -> HashMap<u32, TraceResult> {
+    let mut collected = COLLECTED.lock().unwrap();
+    collect_and_merge(&mut collected);
+    collected
+        .drain()
+        .map(|(trace_id, span_set)| {
+            (
+                trace_id,
+                TraceResult {
+                    baseline_cycle: minstant::now(),
+                    baseline_ns: real_time_ns(),
+                    cycles_per_second: minstant::cycles_per_second(),
+                    spans: span_set.spans,
+                    properties: span_set.properties,
+                },
+            )
+        })
+        .collect()
+}
+
+fn collect_and_merge(collected: &mut HashMap<u32, SpanSet>) {
+    while let Ok((other_trace_id, other_span_set)) = SPAN_COLLECTOR.pop() {
+        let span_set = collected.entry(other_trace_id).or_insert(SpanSet::new());
+        span_set.append(other_span_set);
     }
 }
 
@@ -140,7 +170,7 @@ impl SpanSet {
         }
     }
 
-    pub fn merge(mut self, mut other: Self) -> Self {
+    pub fn append(&mut self, mut other: Self) {
         self.spans.append(&mut other.spans);
         self.properties
             .span_ids
@@ -151,6 +181,5 @@ impl SpanSet {
         self.properties
             .payload
             .append(&mut other.properties.payload);
-        self
     }
 }

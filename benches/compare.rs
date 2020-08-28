@@ -56,7 +56,7 @@ fn minitrace_harness() {
         }
     }
 
-    let root = minitrace::start_trace(PARENT);
+    let root = minitrace::start_trace(0, PARENT);
 
     {
         let _guard = root;

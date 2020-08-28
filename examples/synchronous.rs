@@ -29,7 +29,7 @@ fn func2(i: u64) {
 }
 
 fn main() {
-    let root = minitrace::start_trace(SyncJob::Root);
+    let root = minitrace::start_trace(0, SyncJob::Root);
     minitrace::new_property(b"sample property:it works");
     {
         let _guard = root;
@@ -38,9 +38,9 @@ fn main() {
         }
     }
 
-    let trace_results = minitrace::collect_all();
+    let trace_result = minitrace::collect_by_trace_id(0).unwrap();
 
-    dbg!(&trace_results);
+    // dbg!(&trace_result);
 
     // let mut buf = Vec::with_capacity(2048);
     // minitrace_jaeger::thrift_compact_encode(
@@ -66,5 +66,5 @@ fn main() {
     // ))
     // .and_then(move |s| s.send_to(&buf, agent));
 
-    crate::common::draw_stdout(trace_results);
+    crate::common::draw_stdout(trace_result);
 }
