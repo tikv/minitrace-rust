@@ -3,7 +3,6 @@
 use std::sync::Arc;
 
 use crossbeam::channel::Sender;
-use either::Either;
 
 use crate::collector::SpanSet;
 use crate::trace::*;
@@ -51,28 +50,29 @@ pub struct AsyncHandle {
 }
 
 impl AsyncHandle {
-    pub fn start_trace<T: Into<u32>>(
-        &mut self,
-        event: T,
-    ) -> Option<Either<AsyncScopeGuard<'_>, SpanGuard>> {
-        if self.inner.is_none() {
-            return None;
-        }
+    pub fn start_trace<T: Into<u32>>(&mut self, event: T) -> Option<AsyncGuard<'_>> {
+        let inner = self.inner.as_mut()?;
 
         let trace = TRACE_LOCAL.with(|trace| trace.get());
         let tl = unsafe { &mut *trace };
 
         let event = event.into();
         if tl.enter_stack.is_empty() {
-            Some(Either::Left(self.new_scope(event, tl)))
+            Some(AsyncGuard::AsyncScopeGuard(
+                self.new_scope(inner, event, tl),
+            ))
         } else {
-            Some(Either::Right(self.new_span(event, tl)))
+            Some(AsyncGuard::SpanGuard(self.new_span(inner, event, tl)))
         }
     }
 
-    fn new_scope(&mut self, event: u32, tl: &mut TraceLocal) -> AsyncScopeGuard<'_> {
-        let inner = self.inner.as_mut().unwrap();
-
+    #[inline]
+    fn new_scope(
+        &mut self,
+        inner: &mut AsyncHandleInner,
+        event: u32,
+        tl: &mut TraceLocal,
+    ) -> AsyncScopeGuard<'_> {
         let pending_id = tl.new_span_id();
         let pending_span = Span {
             id: pending_id,
@@ -106,9 +106,13 @@ impl AsyncHandle {
         }
     }
 
-    fn new_span(&mut self, event: u32, tl: &mut TraceLocal) -> SpanGuard {
-        let inner = self.inner.as_mut().unwrap();
-
+    #[inline]
+    fn new_span(
+        &mut self,
+        inner: &mut AsyncHandleInner,
+        event: u32,
+        tl: &mut TraceLocal,
+    ) -> SpanGuard {
         let parent_id = *tl.enter_stack.last().unwrap();
         let span_inner = SpanGuardInner::enter(
             Span {
@@ -129,6 +133,11 @@ impl AsyncHandle {
 
         SpanGuard { inner: span_inner }
     }
+}
+
+pub enum AsyncGuard<'a> {
+    AsyncScopeGuard(AsyncScopeGuard<'a>),
+    SpanGuard(SpanGuard),
 }
 
 pub struct AsyncScopeGuard<'a> {
