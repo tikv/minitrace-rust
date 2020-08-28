@@ -1,5 +1,8 @@
 // Copyright 2020 TiKV Project Authors. Licensed under Apache-2.0.
 
+use minitrace::State;
+use minitrace_jaeger::{JaegerSpanInfo, ReferenceType};
+
 mod common;
 
 #[derive(Debug)]
@@ -47,10 +50,20 @@ fn main() {
         rand::random(),
         rand::random(),
         &trace_result,
-        |e| {
-            format!("{:?}", unsafe {
-                std::mem::transmute::<_, SyncJob>(e as u8)
-            })
+        |s| JaegerSpanInfo {
+            self_id: s.id as _,
+            parent_id: s.parent_id as _,
+            reference_type: ReferenceType::FollowFrom,
+            operation_name: {
+                format!(
+                    "{}{:?}",
+                    match s.state {
+                        State::Pending => "[Pending] ",
+                        State::Normal => "",
+                    },
+                    unsafe { std::mem::transmute::<_, SyncJob>(s.event as u8) }
+                )
+            },
         },
         |property| {
             let mut split = property.splitn(2, |b| *b == b':');

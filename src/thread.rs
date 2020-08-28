@@ -31,7 +31,7 @@ pub fn new_async_handle() -> AsyncHandle {
     let parent_id = *tl.enter_stack.last().unwrap();
     let inner = AsyncHandleInner {
         collector: tl.cur_collector.clone().unwrap(),
-        parent_id,
+        next_suspending_parent_id: parent_id,
         begin_cycles: minstant::now(),
     };
 
@@ -40,7 +40,7 @@ pub fn new_async_handle() -> AsyncHandle {
 
 struct AsyncHandleInner {
     collector: Arc<Sender<SpanSet>>,
-    parent_id: u32,
+    next_suspending_parent_id: u32,
     begin_cycles: u64,
 }
 
@@ -77,7 +77,7 @@ impl AsyncHandle {
         let pending_span = Span {
             id: pending_id,
             state: State::Pending,
-            parent_id: inner.parent_id,
+            parent_id: inner.next_suspending_parent_id,
             begin_cycles: inner.begin_cycles,
             elapsed_cycles: minstant::now().wrapping_sub(inner.begin_cycles),
             event,
@@ -96,7 +96,7 @@ impl AsyncHandle {
             },
             tl,
         );
-        inner.parent_id = span_id;
+        inner.next_suspending_parent_id = span_id;
 
         tl.cur_collector = Some(inner.collector.clone());
 

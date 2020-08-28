@@ -3,6 +3,8 @@
 mod common;
 
 use minitrace::future::FutureExt as _;
+use minitrace::State;
+use minitrace_jaeger::{JaegerSpanInfo, ReferenceType};
 
 #[derive(Debug)]
 enum AsyncJob {
@@ -48,7 +50,7 @@ async fn other_job() {
 async fn main() {
     let (root, tracker) = minitrace::start_trace(AsyncJob::Root).unwrap();
 
-    let _ = async {
+    let f = async {
         minitrace::new_property(b"sample property:it works");
         let jhs = parallel_job();
         other_job().await;
@@ -57,10 +59,10 @@ async fn main() {
             jh.await.unwrap();
         }
     }
-    .in_new_span(AsyncJob::Loop)
-    .await;
+    .in_new_span(AsyncJob::Loop);
 
     drop(root);
+    f.await;
 
     let trace_result = tracker.finish().collect();
 
@@ -72,10 +74,20 @@ async fn main() {
         rand::random(),
         rand::random(),
         &trace_result,
-        |e| {
-            format!("{:?}", unsafe {
-                std::mem::transmute::<_, AsyncJob>(e as u8)
-            })
+        |s| JaegerSpanInfo {
+            self_id: s.id as _,
+            parent_id: s.parent_id as _,
+            reference_type: ReferenceType::FollowFrom,
+            operation_name: {
+                format!(
+                    "{}{:?}",
+                    match s.state {
+                        State::Pending => "[Pending] ",
+                        State::Normal => "",
+                    },
+                    unsafe { std::mem::transmute::<_, AsyncJob>(s.event as u8) }
+                )
+            },
         },
         |property| {
             let mut split = property.splitn(2, |b| *b == b':');

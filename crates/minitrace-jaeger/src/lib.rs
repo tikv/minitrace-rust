@@ -1,32 +1,44 @@
+use minitrace::{Properties, Span, TraceResult};
 use std::collections::HashMap;
 
-use minitrace::{Properties, Span, State, TraceResult};
+#[repr(i32)]
+pub enum ReferenceType {
+    ChildOf = 0,
+    FollowFrom = 1,
+}
+
+pub struct JaegerSpanInfo<S: AsRef<str>> {
+    pub self_id: i64,
+    pub parent_id: i64,
+    pub reference_type: ReferenceType,
+    pub operation_name: S,
+}
 
 /// Thrift components defined in [jaeger.thrift].
 /// Thrift compact protocol encoding described in [thrift spec]
 ///
 /// [jaeger.thrift]: https://github.com/jaegertracing/jaeger-idl/blob/52fb4c9440/thrift/jaeger.thrift
 /// [thrift spec]: https://github.com/apache/thrift/blob/01d53f483a/doc/specs/thrift-compact-protocol.md
-pub fn thrift_compact_encode<'a, S0: AsRef<str>, S1: AsRef<str> + 'a, S2: AsRef<str> + 'a>(
+pub fn thrift_compact_encode<'a, S0: AsRef<str>, S1: AsRef<str>, S2: AsRef<str>>(
     buf: &mut Vec<u8>,
     service_name: &str,
     trace_id_high: i64,
     trace_id_low: i64,
     TraceResult {
         start_time_ns,
-        elapsed_ns,
         cycles_per_second,
         spans,
         properties,
         ..
     }: &'a TraceResult,
-    event_to_operation_name: impl Fn(u32) -> S0,
+    span_remap: impl Fn(&'a Span) -> JaegerSpanInfo<S0>,
     property_to_kv: impl Fn(&'a [u8]) -> (S1, S2),
 ) {
     let (bytes_slices, id_to_bytes_slice) = reorder_properties(properties);
+    let start_time_us = *start_time_ns / 1_000;
 
     // # thrift message header
-    // ## protocal id
+    // ## protocol id
     // ```
     // const COMPACT_PROTOCOL_ID: u8 = 0x82;
     // buf.push(COMPACT_PROTOCOL_ID);
@@ -97,20 +109,14 @@ pub fn thrift_compact_encode<'a, S0: AsRef<str>, S1: AsRef<str> + 'a, S2: AsRef<
     // ```
     buf.push(0x19);
 
-    let root_span = spans
+    let anchor_cycles = spans
         .iter()
-        .find(|s| s.parent_id == 0)
-        .expect("not contain root span");
-
-    let start_time_us = start_time_ns / 1000;
-    let elapsed_us = elapsed_ns / 1000;
-
-    let anchor_cycles = root_span.begin_cycles;
-    let root_id = root_span.id;
-    let root_event = root_span.event;
+        .map(|s| s.begin_cycles)
+        .min()
+        .expect("unexpected empty container");
 
     // spans list header
-    let len = spans.len() + 1; // `+1` due to an extra span as below
+    let len = spans.len();
     const STRUCT_TYPE: u8 = 12;
     if len < 15 {
         buf.push((len << 4) as u8 | STRUCT_TYPE as u8);
@@ -119,109 +125,19 @@ pub fn thrift_compact_encode<'a, S0: AsRef<str>, S1: AsRef<str> + 'a, S2: AsRef<
         encode::varint(buf, len as _);
     }
 
-    // Add a span represents the entire tracing process
-    {
-        // trace id low field header
-        // ```
-        // const TRACE_ID_LOW_DELTA: i16 = 1;
-        // const I64_TYPE: u8 = 6;
-        // const TRACE_ID_LOW_TYPE: u8 = (TRACE_ID_LOW_DELTA << 4) as u8 | I64_TYPE;
-        // buf.push(TRACE_ID_LOW_TYPE);
-        // ```
-        buf.push(0x16);
-        // trace id low data
-        encode::varint(buf, zigzag::from_i64(trace_id_low));
-
-        // trace id high field header
-        // ```ref_kind
-        // const TRACE_ID_HIGH_DELTA: i16 = 1;
-        // const I64_TYPE: u8 = 6;
-        // const TRACE_ID_HIGH_TYPE: u8 = (TRACE_ID_HIGH_DELTA << 4) as u8 | I64_TYPE;
-        // buf.push(TRACE_ID_HIGH_TYPE);
-        // ```
-        buf.push(0x16);
-        // trace id high data
-        encode::varint(buf, zigzag::from_i64(trace_id_high));
-
-        // The prev id of root span never conflicts with other span ids in
-        // current tracing context
-        let id = root_id.wrapping_sub(1);
-
-        // span id field header
-        // ```
-        // const SPAN_ID_DELTA: i16 = 1;
-        // const I64_TYPE: u8 = 6;
-        // const SPAN_ID_TYPE: u8 = (SPAN_ID_DELTA << 4) as u8 | I64_TYPE;
-        // buf.push(SPAN_ID_TYPE);
-        // ```
-        buf.push(0x16);
-        // span id data
-        encode::varint(buf, zigzag::from_i64(id as _));
-
-        // parent span id field header
-        // ```
-        // const PARENT_SPAN_ID_DELTA: i16 = 1;
-        // const I64_TYPE: u8 = 6;
-        // const PARENT_SPAN_ID_TYPE: u8 = (PARENT_SPAN_ID_DELTA << 4) as u8 | I64_TYPE;
-        // buf.push(PARENT_SPAN_ID_TYPE);
-        // ```
-        buf.push(0x16);
-        // parent span id data
-        encode::varint(buf, zigzag::from_i64(0));
-
-        // operation name field header
-        // ```
-        // const OPERATION_NAME_DELTA: i16 = 1;
-        // const BINARY_TYPE: u8 = 8;
-        // const OPERATION_NAME_TYPE: u8 = (OPERATION_NAME_DELTA << 4) as u8 | BINARY_TYPE;
-        // buf.push(OPERATION_NAME_TYPE);
-        // ```
-        buf.push(0x18);
-        // operation name data
-        encode::bytes(buf, event_to_operation_name(root_event).as_ref().as_bytes());
-
-        // flags header
-        //
-        // ```
-        // const FLAGS_DELTA: i16 = 2;
-        // const I32_TYPE: u8 = 5;
-        // const FLAGS_TYPE: u8 = (FLAGS_DELTA << 4) as u8 | I32_TYPE;
-        // ```
-        buf.push(0x25);
-        // flags data: `1` signifies a SAMPLED span, `2` signifies a DEBUG span.
-        encode::varint(buf, zigzag::from_i32(1) as _);
-
-        // start time header
-        // ```
-        // const START_TIME_DELTA: i16 = 1;
-        // const I64_TYPE: u8 = 6;property_lens
-        buf.push(0x16);
-        // start time data
-        encode::varint(buf, zigzag::from_i64(start_time_us as _));
-
-        // duration header
-        // ```
-        // const DURATION_DELTA: i16 = 1;
-        // const I64_TYPE: u8 = 6;
-        // const DURATION_TYPE: u8 = (DURATION_DELTA << 4) as u8 | I64_TYPE;
-        // ```
-        buf.push(0x16);
-        // duration data
-        let duration_us = elapsed_us;
-        encode::varint(buf, zigzag::from_i64(duration_us as _));
-
-        // span struct tail
-        buf.push(0x00);
-    }
-
     for span in spans {
+        let JaegerSpanInfo {
+            self_id,
+            parent_id,
+            reference_type,
+            operation_name,
+        } = span_remap(span);
+
         let Span {
             id,
-            state,
-            parent_id,
             begin_cycles,
             elapsed_cycles,
-            event,
+            ..
         } = span;
 
         // trace id low field header
@@ -255,7 +171,7 @@ pub fn thrift_compact_encode<'a, S0: AsRef<str>, S1: AsRef<str> + 'a, S2: AsRef<
         // ```
         buf.push(0x16);
         // span id data
-        encode::varint(buf, zigzag::from_i64(*id as _));
+        encode::varint(buf, zigzag::from_i64(self_id));
 
         // parent span id field header
         // ```
@@ -266,7 +182,7 @@ pub fn thrift_compact_encode<'a, S0: AsRef<str>, S1: AsRef<str> + 'a, S2: AsRef<
         // ```
         buf.push(0x16);
         // parent span id data
-        encode::varint(buf, zigzag::from_i64(*parent_id as _));
+        encode::varint(buf, zigzag::from_i64(parent_id));
 
         // operation name field header
         // ```
@@ -277,16 +193,7 @@ pub fn thrift_compact_encode<'a, S0: AsRef<str>, S1: AsRef<str> + 'a, S2: AsRef<
         // ```
         buf.push(0x18);
         // operation name data
-        let extra_str = match *state {
-            State::Pending => "[PENDING] ",
-            _ => "",
-        }
-        .as_bytes();
-        let operation_name = event_to_operation_name(*event);
-        let operation_name = operation_name.as_ref().as_bytes();
-        encode::varint(buf, extra_str.len() as u64 + operation_name.len() as u64);
-        buf.extend_from_slice(extra_str);
-        buf.extend_from_slice(operation_name);
+        encode::bytes(buf, operation_name.as_ref().as_bytes());
 
         // references field header
         // ```
@@ -312,11 +219,7 @@ pub fn thrift_compact_encode<'a, S0: AsRef<str>, S1: AsRef<str> + 'a, S2: AsRef<
         // ```
         buf.push(0x15);
         // reference kind data
-        encode::varint(
-            buf,
-            // follow from
-            zigzag::from_i32(1) as _,
-        );
+        encode::varint(buf, zigzag::from_i32(reference_type as _) as _);
         // reference trace id low header
         // ```
         // const REF_TRACE_ID_LOW_DELTA: i16 = 1;
@@ -343,8 +246,8 @@ pub fn thrift_compact_encode<'a, S0: AsRef<str>, S1: AsRef<str> + 'a, S2: AsRef<
         // ```
         buf.push(0x16);
         // reference span id data
-        encode::varint(buf, zigzag::from_i64(*parent_id as _));
-        // reference struce tail
+        encode::varint(buf, zigzag::from_i64(parent_id));
+        // reference struct tail
         buf.push(0x00);
 
         // flags header
@@ -531,19 +434,19 @@ mod tests {
     #[test]
     fn it_works() {
         let res = {
-            let (_g, collector) = minitrace::trace_enable(0u32);
-            minitrace::property(b"test property:a root span");
+            let (_root, tracker) = minitrace::start_trace(0u32).unwrap();
+            minitrace::new_property(b"test property:a root span");
 
             std::thread::sleep(std::time::Duration::from_millis(20));
 
             {
                 let _g = minitrace::new_span(1u32);
-                minitrace::property(b"where am i:in child");
+                minitrace::new_property(b"where am i:in child");
                 std::thread::sleep(std::time::Duration::from_millis(10));
             }
 
-            minitrace::property(b"another test property:done");
-            collector
+            minitrace::new_property(b"another test property:done");
+            tracker.finish()
         }
         .collect();
 
@@ -554,12 +457,11 @@ mod tests {
             rand::random(),
             rand::random(),
             &res,
-            |s| {
-                if s == 0 {
-                    "Parent"
-                } else {
-                    "Child"
-                }
+            |s| JaegerSpanInfo {
+                self_id: s.id as _,
+                parent_id: s.parent_id as _,
+                reference_type: ReferenceType::FollowFrom,
+                operation_name: if s.event == 0 { "Parent" } else { "Child" },
             },
             |property| {
                 let mut split = property.splitn(2, |b| *b == b':');
