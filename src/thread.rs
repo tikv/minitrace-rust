@@ -96,7 +96,7 @@ impl AsyncHandle {
             },
             tl,
         );
-        inner.parent_id = span_id;
+        inner.parent_id = pending_id;
 
         tl.cur_collector = Some(inner.collector.clone());
 
