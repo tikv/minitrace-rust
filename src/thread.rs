@@ -70,7 +70,7 @@ impl AsyncHandle {
     fn new_scope<'a>(
         handle_inner: &'a mut AsyncHandleInner,
         event: u32,
-        tl: &'a mut TraceLocal,
+        tl: &mut TraceLocal,
     ) -> AsyncScopeGuard<'a> {
         let pending_id = tl.new_span_id();
         let pending_span = Span {
