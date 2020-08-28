@@ -1,5 +1,7 @@
 // Copyright 2020 TiKV Project Authors. Licensed under Apache-2.0.
 
+#![allow(clippy::question_mark)]
+
 pub mod future;
 pub mod thread;
 

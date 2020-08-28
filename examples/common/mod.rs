@@ -16,7 +16,7 @@ fn build_tree(spans: &[Span]) -> (Dag<Span, ()>, NodeIndex, u64, u64) {
 
     for span in spans {
         let span_id = span.id;
-        let node_id = dag.add_node(span.clone());
+        let node_id = dag.add_node(*span);
         id_map.insert(span_id, node_id);
         min_begin = min_begin.min(span.begin_cycles);
         max_end = max_end.max(span.begin_cycles + span.elapsed_cycles);

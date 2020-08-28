@@ -92,7 +92,7 @@ impl AsyncHandle {
                 parent_id: pending_id,
                 begin_cycles: minstant::now(),
                 elapsed_cycles: 0,
-                event: event.into(),
+                event,
             },
             tl,
         );
@@ -121,7 +121,7 @@ impl AsyncHandle {
                     minstant::now()
                 },
                 elapsed_cycles: 0,
-                event: event.into(),
+                event,
             },
             tl,
         );
