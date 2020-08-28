@@ -51,28 +51,25 @@ pub struct AsyncHandle {
 
 impl AsyncHandle {
     pub fn start_trace<T: Into<u32>>(&mut self, event: T) -> Option<AsyncGuard<'_>> {
-        let inner = self.inner.as_mut()?;
+        if self.inner.is_none() {
+            return None;
+        }
 
         let trace = TRACE_LOCAL.with(|trace| trace.get());
         let tl = unsafe { &mut *trace };
 
         let event = event.into();
         if tl.enter_stack.is_empty() {
-            Some(AsyncGuard::AsyncScopeGuard(
-                self.new_scope(inner, event, tl),
-            ))
+            Some(AsyncGuard::AsyncScopeGuard(self.new_scope(event, tl)))
         } else {
-            Some(AsyncGuard::SpanGuard(self.new_span(inner, event, tl)))
+            Some(AsyncGuard::SpanGuard(self.new_span(event, tl)))
         }
     }
 
     #[inline]
-    fn new_scope(
-        &mut self,
-        inner: &mut AsyncHandleInner,
-        event: u32,
-        tl: &mut TraceLocal,
-    ) -> AsyncScopeGuard<'_> {
+    fn new_scope(&mut self, event: u32, tl: &mut TraceLocal) -> AsyncScopeGuard<'_> {
+        let inner = self.inner.as_mut().unwrap();
+
         let pending_id = tl.new_span_id();
         let pending_span = Span {
             id: pending_id,
@@ -107,12 +104,9 @@ impl AsyncHandle {
     }
 
     #[inline]
-    fn new_span(
-        &mut self,
-        inner: &mut AsyncHandleInner,
-        event: u32,
-        tl: &mut TraceLocal,
-    ) -> SpanGuard {
+    fn new_span(&mut self, event: u32, tl: &mut TraceLocal) -> SpanGuard {
+        let inner = self.inner.as_mut().unwrap();
+
         let parent_id = *tl.enter_stack.last().unwrap();
         let span_inner = SpanGuardInner::enter(
             Span {
