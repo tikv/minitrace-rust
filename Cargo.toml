@@ -10,7 +10,6 @@ edition = "2018"
 pin-project = "0.4"
 minitrace-macro = { path = "crates/minitrace-macro" }
 lazy_static = "1.4.0"
-either = "1.6.0"
 daggy = "0.7"
 crossbeam = "0.7"
 minstant = { git = "https://github.com/zhongzc/minstant.git" }

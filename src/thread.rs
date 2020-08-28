@@ -3,7 +3,6 @@
 use std::sync::Arc;
 
 use crossbeam::channel::Sender;
-use either::Either;
 
 use crate::collector::SpanSet;
 use crate::trace::*;
@@ -51,10 +50,7 @@ pub struct AsyncHandle {
 }
 
 impl AsyncHandle {
-    pub fn start_trace<T: Into<u32>>(
-        &mut self,
-        event: T,
-    ) -> Option<Either<AsyncScopeGuard<'_>, SpanGuard>> {
+    pub fn start_trace<T: Into<u32>>(&mut self, event: T) -> Option<AsyncGuard<'_>> {
         if self.inner.is_none() {
             return None;
         }
@@ -64,12 +60,13 @@ impl AsyncHandle {
 
         let event = event.into();
         if tl.enter_stack.is_empty() {
-            Some(Either::Left(self.new_scope(event, tl)))
+            Some(AsyncGuard::AsyncScopeGuard(self.new_scope(event, tl)))
         } else {
-            Some(Either::Right(self.new_span(event, tl)))
+            Some(AsyncGuard::SpanGuard(self.new_span(event, tl)))
         }
     }
 
+    #[inline]
     fn new_scope(&mut self, event: u32, tl: &mut TraceLocal) -> AsyncScopeGuard<'_> {
         let inner = self.inner.as_mut().unwrap();
 
@@ -106,6 +103,7 @@ impl AsyncHandle {
         }
     }
 
+    #[inline]
     fn new_span(&mut self, event: u32, tl: &mut TraceLocal) -> SpanGuard {
         let inner = self.inner.as_mut().unwrap();
 
@@ -129,6 +127,11 @@ impl AsyncHandle {
 
         SpanGuard { inner: span_inner }
     }
+}
+
+pub enum AsyncGuard<'a> {
+    AsyncScopeGuard(AsyncScopeGuard<'a>),
+    SpanGuard(SpanGuard),
 }
 
 pub struct AsyncScopeGuard<'a> {
