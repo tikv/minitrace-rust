@@ -2,17 +2,17 @@
 
 use std::task::Poll;
 
-use crate::thread::AsyncGuard;
+use crate::thread::{new_async_handle, AsyncHandle};
 
 impl<T: Sized> FutureExt for T {}
 
 pub trait FutureExt: Sized {
-    #[inline(always)]
+    #[inline]
     fn in_new_span<E: Into<u32>>(self, event: E) -> NewSpan<Self> {
         NewSpan {
             inner: self,
             event: event.into(),
-            span_handle: AsyncGuard::start(false),
+            async_handle: new_async_handle(),
         }
     }
 }
@@ -22,7 +22,7 @@ pub struct NewSpan<T> {
     #[pin]
     inner: T,
     event: u32,
-    span_handle: AsyncGuard,
+    async_handle: AsyncHandle,
 }
 
 impl<T: std::future::Future> std::future::Future for NewSpan<T> {
@@ -30,14 +30,8 @@ impl<T: std::future::Future> std::future::Future for NewSpan<T> {
 
     fn poll(self: std::pin::Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> Poll<Self::Output> {
         let this = self.project();
-        let span_handle = std::mem::replace(this.span_handle, AsyncGuard::new_empty());
-
-        let _guard = span_handle.ready(*this.event);
-        let poll = this.inner.poll(cx);
-        if poll.is_pending() {
-            *this.span_handle = AsyncGuard::start(true);
-        }
-        poll
+        let _guard = this.async_handle.start_trace(*this.event);
+        this.inner.poll(cx)
     }
 }
 
@@ -46,13 +40,7 @@ impl<T: futures_01::Future> futures_01::Future for NewSpan<T> {
     type Error = T::Error;
 
     fn poll(&mut self) -> futures_01::Poll<Self::Item, Self::Error> {
-        let span_handle = std::mem::replace(&mut self.span_handle, AsyncGuard::new_empty());
-
-        let _guard = span_handle.ready(self.event);
-        let poll = self.inner.poll();
-        if let Ok(futures_01::Async::NotReady) = poll {
-            self.span_handle = AsyncGuard::start(true);
-        }
-        poll
+        let _guard = self.async_handle.start_trace(self.event);
+        self.inner.poll()
     }
 }

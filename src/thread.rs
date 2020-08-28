@@ -1,6 +1,9 @@
 // Copyright 2020 TiKV Project Authors. Licensed under Apache-2.0.
 
-use crate::trace::{RelationId, Span, SpanGuard, State, TRACE_LOCAL};
+use either::Either;
+
+use crate::collector::SPAN_COLLECTOR;
+use crate::trace::*;
 
 /// Bind the current tracing context to another executing context (e.g. a closure).
 ///
@@ -13,71 +16,110 @@ use crate::trace::{RelationId, Span, SpanGuard, State, TRACE_LOCAL};
 ///     let _g = handle.start_trace(0u32);
 /// });
 /// ```
-#[inline(always)]
-pub fn new_async_span() -> AsyncGuard {
-    AsyncGuard::start(false)
+#[inline]
+pub fn new_async_handle() -> AsyncHandle {
+    let trace = TRACE_LOCAL.with(|trace| trace.get());
+    let tl = unsafe { &mut *trace };
+
+    if tl.enter_stack.is_empty() {
+        return AsyncHandle { inner: None };
+    }
+
+    let parent_id = *tl.enter_stack.last().unwrap();
+    let inner = AsyncHandleInner {
+        parent_id,
+        begin_cycles: minstant::now(),
+    };
+
+    AsyncHandle { inner: Some(inner) }
+}
+
+struct AsyncHandleInner {
+    parent_id: u64,
+    begin_cycles: u64,
 }
 
 #[must_use]
-pub struct AsyncGuard {
-    /// If None, it indicates tracing is not enabled
-    pub(crate) pending_span: Option<Span>,
+pub struct AsyncHandle {
+    /// None indicates that tracing is not enabled
+    inner: Option<AsyncHandleInner>,
 }
 
-impl AsyncGuard {
-    pub(crate) fn new_empty() -> Self {
-        AsyncGuard { pending_span: None }
-    }
-
-    pub(crate) fn start(follow_from_parent: bool) -> Self {
-        let trace = crate::trace::TRACE_LOCAL.with(|trace| trace.get());
-        let tl = unsafe { &mut *trace };
-
-        if tl.enter_stack.is_empty() {
-            return AsyncGuard::new_empty();
-        }
-
-        let parent_id = *tl.enter_stack.last().unwrap();
-        let relation_id = if follow_from_parent {
-            RelationId::FollowFrom(parent_id)
-        } else {
-            RelationId::ChildOf(parent_id)
-        };
-
-        let mut pending_span = Span {
-            id: tl.new_span_id(),
-            state: State::Pending,
-            relation_id,
-            begin_cycles: 0,
-            elapsed_cycles: 0,
-            event: 0,
-        };
-        pending_span.start();
-
-        Self {
-            pending_span: Some(pending_span),
-        }
-    }
-
-    pub fn ready<E: Into<u32>>(self, event: E) -> Option<SpanGuard> {
-        let mut pending_span = self.pending_span?;
+impl AsyncHandle {
+    pub fn start_trace<T: Into<u32>>(
+        &mut self,
+        event: T,
+    ) -> Option<Either<AsyncScopeGuard<'_>, SpanGuard>> {
+        let inner = self.inner.as_mut()?;
 
         let trace = TRACE_LOCAL.with(|trace| trace.get());
         let tl = unsafe { &mut *trace };
 
         let event = event.into();
-        pending_span.event = event;
+        if tl.enter_stack.is_empty() {
+            let pending_span = Span {
+                id: tl.new_span_id(),
+                state: State::Pending,
+                parent_id: inner.parent_id,
+                begin_cycles: inner.begin_cycles,
+                elapsed_cycles: minstant::now().saturating_sub(inner.begin_cycles),
+                event,
+            };
+            tl.span_set.spans.push(pending_span);
 
-        let guard = unsafe {
-            SpanGuard::enter(tl, |span| {
-                span.state = State::Normal;
-                span.relation_id = RelationId::FollowFrom(pending_span.id);
-                span.event = event;
-            })
-        };
+            let span_inner = SpanGuardInner::enter(
+                Span {
+                    id: tl.new_span_id(),
+                    state: State::Normal,
+                    parent_id: inner.parent_id,
+                    begin_cycles: minstant::now(),
+                    elapsed_cycles: 0,
+                    event: event.into(),
+                },
+                tl,
+            );
 
-        tl.span_set.spans.push(pending_span);
+            Some(Either::Left(AsyncScopeGuard {
+                inner: span_inner,
+                handle: self,
+            }))
+        } else {
+            let span_inner = SpanGuardInner::enter(
+                Span {
+                    id: tl.new_span_id(),
+                    state: State::Normal,
+                    parent_id: inner.parent_id,
+                    begin_cycles: if inner.begin_cycles != 0 {
+                        inner.begin_cycles
+                    } else {
+                        minstant::now()
+                    },
+                    elapsed_cycles: 0,
+                    event: event.into(),
+                },
+                tl,
+            );
+            inner.begin_cycles = 0;
 
-        Some(guard)
+            Some(Either::Right(SpanGuard { inner: span_inner }))
+        }
+    }
+}
+
+pub struct AsyncScopeGuard<'a> {
+    inner: SpanGuardInner,
+    handle: &'a mut AsyncHandle,
+}
+
+impl<'a> Drop for AsyncScopeGuard<'a> {
+    #[inline]
+    fn drop(&mut self) {
+        let trace = TRACE_LOCAL.with(|trace| trace.get());
+        let tl = unsafe { &mut *trace };
+
+        let now_cycle = self.inner.exit(tl);
+        self.handle.inner.as_mut().unwrap().begin_cycles = now_cycle;
+
+        (*SPAN_COLLECTOR).push(tl.span_set.take());
     }
 }

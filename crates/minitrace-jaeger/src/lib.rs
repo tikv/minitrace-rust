@@ -226,16 +226,16 @@ pub fn thrift_compact_encode<'a, S0: AsRef<str>, S1: AsRef<str> + 'a, S2: AsRef<
         let Span {
             id,
             state,
-            relation_id,
+            parent_id,
             begin_cycles,
             elapsed_cycles,
             event,
         } = span;
-        let relation_id = if *state == State::Root {
+        let parent_id = if *state == State::Root {
             // the above span as its parent
             id.wrapping_sub(1)
         } else {
-            *relation_id
+            *parent_id
         };
 
         // trace id low field header
@@ -280,7 +280,7 @@ pub fn thrift_compact_encode<'a, S0: AsRef<str>, S1: AsRef<str> + 'a, S2: AsRef<
         // ```
         buf.push(0x16);
         // parent span id data
-        encode::varint(buf, zigzag::from_i64(relation_id as _));
+        encode::varint(buf, zigzag::from_i64(parent_id as _));
 
         // operation name field header
         // ```
@@ -362,7 +362,7 @@ pub fn thrift_compact_encode<'a, S0: AsRef<str>, S1: AsRef<str> + 'a, S2: AsRef<
         // ```
         buf.push(0x16);
         // reference span id data
-        encode::varint(buf, zigzag::from_i64(relation_id as _));
+        encode::varint(buf, zigzag::from_i64(parent_id as _));
         // reference struce tail
         buf.push(0x00);
 

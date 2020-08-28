@@ -86,7 +86,7 @@ fn trace_start_context(c: &mut Criterion) {
                 let _root = minitrace::start_trace(0u32);
 
                 for _ in 0..*len {
-                    let _guard = black_box(minitrace::new_async_span());
+                    let _guard = black_box(minitrace::thread::new_async_handle());
                 }
 
                 minitrace::collect_all();
@@ -100,7 +100,7 @@ criterion_group!(
     benches,
     trace_wide_bench,
     trace_deep_bench,
-    trace_start_context,
-    trace_future_bench
+    trace_future_bench,
+    trace_start_context
 );
 criterion_main!(benches);

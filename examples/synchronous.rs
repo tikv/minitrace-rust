@@ -1,6 +1,6 @@
 // Copyright 2020 TiKV Project Authors. Licensed under Apache-2.0.
 
-// mod common;
+mod common;
 
 #[derive(Debug)]
 enum SyncJob {
@@ -40,7 +40,7 @@ fn main() {
 
     let trace_results = minitrace::collect_all();
 
-    dbg!(trace_results);
+    dbg!(&trace_results);
 
     // let mut buf = Vec::with_capacity(2048);
     // minitrace_jaeger::thrift_compact_encode(
@@ -66,5 +66,5 @@ fn main() {
     // ))
     // .and_then(move |s| s.send_to(&buf, agent));
 
-    // crate::common::draw_stdout(trace_details);
+    crate::common::draw_stdout(trace_results);
 }

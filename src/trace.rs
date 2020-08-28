@@ -7,7 +7,7 @@ use crate::collector::{SpanSet, SPAN_COLLECTOR};
 
 pub type SpanId = u64;
 
-static GLOBAL_ID_COUNTER: AtomicU32 = AtomicU32::new(0);
+static GLOBAL_ID_COUNTER: AtomicU32 = AtomicU32::new(1);
 
 thread_local! {
     pub static TRACE_LOCAL: std::cell::UnsafeCell<TraceLocal> = std::cell::UnsafeCell::new(TraceLocal {
@@ -22,7 +22,7 @@ fn next_global_id_prefix() -> u32 {
     GLOBAL_ID_COUNTER.fetch_add(1, Ordering::AcqRel)
 }
 
-pub fn start_trace<T: Into<u32>>(root_event: T) -> Option<ScopeGuard> {
+pub fn start_trace<T: Into<u32>>(root_event: T) -> Option<(ScopeGuard, SpanId)> {
     let trace = TRACE_LOCAL.with(|trace| trace.get());
     let tl = unsafe { &mut *trace };
 
@@ -30,13 +30,21 @@ pub fn start_trace<T: Into<u32>>(root_event: T) -> Option<ScopeGuard> {
         return None;
     }
 
-    unsafe {
-        Some(ScopeGuard::enter(tl, |span| {
-            span.state = State::Normal;
-            span.relation_id = RelationId::Root;
-            span.event = root_event.into();
-        }))
-    }
+    let root_id = tl.new_span_id();
+    let span_inner = SpanGuardInner::enter(
+        Span {
+            id: root_id,
+            state: State::Normal,
+            parent_id: 0,
+            begin_cycles: minstant::now(),
+            elapsed_cycles: 0,
+            event: root_event.into(),
+        },
+        tl,
+    );
+    let guard = ScopeGuard { inner: span_inner };
+
+    Some((guard, root_id))
 }
 
 pub fn new_span<T: Into<u32>>(event: T) -> Option<SpanGuard> {
@@ -48,13 +56,19 @@ pub fn new_span<T: Into<u32>>(event: T) -> Option<SpanGuard> {
     }
 
     let parent_id = *tl.enter_stack.last().unwrap();
-    unsafe {
-        Some(SpanGuard::enter(tl, |span| {
-            span.state = State::Normal;
-            span.relation_id = RelationId::ChildOf(parent_id);
-            span.event = event.into();
-        }))
-    }
+    let span_inner = SpanGuardInner::enter(
+        Span {
+            id: tl.new_span_id(),
+            state: State::Normal,
+            parent_id,
+            begin_cycles: minstant::now(),
+            elapsed_cycles: 0,
+            event: event.into(),
+        },
+        tl,
+    );
+
+    Some(SpanGuard { inner: span_inner })
 }
 
 /// The property is in bytes format, so it is not limited to be a key-value pair but
@@ -85,7 +99,7 @@ pub struct TraceLocal {
 }
 
 impl TraceLocal {
-    #[inline(always)]
+    #[inline]
     pub fn new_span_id(&mut self) -> SpanId {
         let id = ((self.id_prefix as u64) << 32) | self.id_suffix as u64;
 
@@ -110,123 +124,87 @@ pub enum State {
 pub struct Span {
     pub id: SpanId,
     pub state: State,
-    pub relation_id: RelationId,
+    pub parent_id: u64,
     pub begin_cycles: u64,
     pub elapsed_cycles: u64,
     pub event: u32,
 }
 
-impl Span {
-    #[inline(always)]
-    pub(crate) fn start(&mut self) {
-        self.begin_cycles = unsafe { core::arch::x86_64::_rdtsc() };
-    }
-
-    #[inline(always)]
-    pub(crate) fn stop(&mut self) {
-        self.elapsed_cycles =
-            unsafe { core::arch::x86_64::_rdtsc() }.saturating_sub(self.begin_cycles);
-    }
-}
-
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
-pub enum RelationId {
-    Root,
-    ChildOf(SpanId),
-    FollowFrom(SpanId),
-}
-
-#[must_use]
-pub struct SpanGuard {
-    span_index: usize,
-    _marker: PhantomData<*const ()>,
-}
-
-impl SpanGuard {
-    #[inline(always)]
-    pub(crate) unsafe fn enter<F>(tl: &mut TraceLocal, init: F) -> Self
-    where
-        F: FnOnce(&mut Span),
-    {
-        let id = tl.new_span_id();
-        tl.enter_stack.push(id);
-
-        let spans = &mut tl.span_set.spans;
-        spans.reserve(1);
-        let span_index = spans.len();
-        spans.set_len(span_index + 1);
-
-        let span = spans.get_unchecked_mut(span_index);
-        span.id = id;
-        span.begin_cycles = unsafe { core::arch::x86_64::_rdtsc() };
-        init(span);
-
-        Self {
-            span_index,
-            _marker: PhantomData,
-        }
-    }
-}
-
-impl Drop for SpanGuard {
-    fn drop(&mut self) {
-        let trace = TRACE_LOCAL.with(|trace| trace.get());
-        let tl = unsafe { &mut *trace };
-
-        tl.enter_stack.pop().unwrap();
-        unsafe {
-            tl.span_set.spans.get_unchecked_mut(self.span_index).stop();
-        }
-    }
-}
+// impl Span {
+//     #[inline]
+//     pub(crate) fn stop(&mut self) {
+//         self.elapsed_cycles = minstant::now().saturating_sub(self.begin_cycles);
+//     }
+// }
 
 #[must_use]
 pub struct ScopeGuard {
-    span_index: usize,
-    _marker: PhantomData<*const ()>,
-}
-
-impl ScopeGuard {
-    #[inline(always)]
-    pub(crate) unsafe fn enter<F>(tl: &mut TraceLocal, init: F) -> Self
-    where
-        F: FnOnce(&mut Span),
-    {
-        let id = tl.new_span_id();
-        tl.enter_stack.push(id);
-
-        let spans = &mut tl.span_set.spans;
-        spans.reserve(1);
-        let span_index = spans.len();
-        spans.set_len(span_index + 1);
-
-        let span = spans.get_unchecked_mut(span_index);
-        span.id = id;
-        span.begin_cycles = unsafe { core::arch::x86_64::_rdtsc() };
-        init(span);
-
-        Self {
-            span_index,
-            _marker: PhantomData,
-        }
-    }
+    inner: SpanGuardInner,
 }
 
 impl Drop for ScopeGuard {
+    #[inline]
     fn drop(&mut self) {
         let trace = TRACE_LOCAL.with(|trace| trace.get());
         let tl = unsafe { &mut *trace };
 
-        tl.enter_stack.pop().unwrap();
-        unsafe {
-            tl.span_set.spans.get_unchecked_mut(self.span_index).stop();
-        }
+        self.inner.exit(tl);
 
         (*SPAN_COLLECTOR).push(tl.span_set.take());
     }
 }
 
-pub fn append_property<F, B>(f: F)
+#[must_use]
+pub struct SpanGuard {
+    pub(crate) inner: SpanGuardInner,
+}
+
+impl Drop for SpanGuard {
+    #[inline]
+    fn drop(&mut self) {
+        let trace = TRACE_LOCAL.with(|trace| trace.get());
+        let tl = unsafe { &mut *trace };
+
+        self.inner.exit(tl);
+    }
+}
+
+#[must_use]
+pub struct SpanGuardInner {
+    span_index: usize,
+    _marker: PhantomData<*const ()>,
+}
+
+impl SpanGuardInner {
+    #[inline]
+    pub fn enter(span: Span, tl: &mut TraceLocal) -> Self {
+        tl.enter_stack.push(span.id);
+        tl.span_set.spans.push(span);
+
+        Self {
+            span_index: tl.span_set.spans.len() - 1,
+            _marker: PhantomData,
+        }
+    }
+
+    #[inline]
+    pub fn exit(&mut self, tl: &mut TraceLocal) -> u64 {
+        debug_assert_eq!(
+            *tl.enter_stack.last().unwrap(),
+            tl.span_set.spans[self.span_index].id
+        );
+
+        tl.enter_stack.pop();
+
+        let now_cycle = minstant::now();
+        let span = &mut tl.span_set.spans[self.span_index];
+        span.elapsed_cycles = now_cycle.saturating_sub(span.begin_cycles);
+
+        now_cycle
+    }
+}
+
+fn append_property<F, B>(f: F)
 where
     B: AsRef<[u8]>,
     F: FnOnce() -> B,

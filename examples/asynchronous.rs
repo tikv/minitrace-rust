@@ -1,6 +1,7 @@
 // Copyright 2020 TiKV Project Authors. Licensed under Apache-2.0.
 
-// mod common;
+mod common;
+
 use minitrace::future::FutureExt as _;
 
 #[derive(Debug)]
@@ -45,23 +46,27 @@ async fn other_job() {
 
 #[tokio::main]
 async fn main() {
-    let _root = minitrace::start_trace(AsyncJob::Root);
+    let root = minitrace::start_trace(AsyncJob::Root);
 
-    let _ = async {
-        minitrace::new_property(b"sample property:it works");
-        let jhs = parallel_job();
-        other_job().await;
+    let _ = tokio::spawn(
+        async {
+            minitrace::new_property(b"sample property:it works");
+            let jhs = parallel_job();
+            other_job().await;
 
-        for jh in jhs {
-            jh.await.unwrap();
+            for jh in jhs {
+                jh.await.unwrap();
+            }
         }
-    }
-    .in_new_span(AsyncJob::Loop)
+        .in_new_span(AsyncJob::Loop),
+    )
     .await;
+
+    drop(root);
 
     let trace_result = minitrace::collect_all();
 
-    dbg!(trace_result);
+    dbg!(&trace_result);
 
     // use std::net::SocketAddr;
     // let mut buf = Vec::with_capacity(2048);
@@ -87,5 +92,5 @@ async fn main() {
     //     let _ = socket.send_to(&buf, "127.0.0.1:6831").await;
     // }
 
-    // crate::common::draw_stdout(trace_result);
+    crate::common::draw_stdout(trace_result);
 }
