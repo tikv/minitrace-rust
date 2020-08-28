@@ -1,13 +1,13 @@
 // Copyright 2020 TiKV Project Authors. Licensed under Apache-2.0.
 
 use std::marker::PhantomData;
-use std::sync::atomic::{AtomicU32, Ordering};
+use std::sync::atomic::{AtomicU16, Ordering};
 
 use crate::collector::{SpanSet, SPAN_COLLECTOR};
 
-pub type SpanId = u64;
+pub type SpanId = u32;
 
-static GLOBAL_ID_COUNTER: AtomicU32 = AtomicU32::new(1);
+static GLOBAL_ID_COUNTER: AtomicU16 = AtomicU32::new(1);
 
 thread_local! {
     pub static TRACE_LOCAL: std::cell::UnsafeCell<TraceLocal> = std::cell::UnsafeCell::new(TraceLocal {
@@ -19,7 +19,7 @@ thread_local! {
     });
 }
 
-fn next_global_id_prefix() -> u32 {
+fn next_global_id_prefix() -> u16 {
     GLOBAL_ID_COUNTER.fetch_add(1, Ordering::AcqRel)
 }
 
@@ -91,8 +91,8 @@ where
 
 pub struct TraceLocal {
     /// For id construction
-    pub id_prefix: u32,
-    pub id_suffix: u32,
+    pub id_prefix: u16,
+    pub id_suffix: u16,
 
     /// For parent-child relation construction. The last span, when exits, is
     /// responsible to submit the local span sets.
@@ -104,9 +104,9 @@ pub struct TraceLocal {
 impl TraceLocal {
     #[inline]
     pub fn new_span_id(&mut self) -> SpanId {
-        let id = ((self.id_prefix as u64) << 32) | self.id_suffix as u64;
+        let id = ((self.id_prefix as u32) << 16) | self.id_suffix as u32;
 
-        if self.id_suffix == std::u32::MAX {
+        if self.id_suffix == std::u16::MAX {
             self.id_suffix = 0;
             self.id_prefix = next_global_id_prefix();
         } else {
@@ -127,7 +127,7 @@ pub enum State {
 pub struct Span {
     pub id: SpanId,
     pub state: State,
-    pub parent_id: u64,
+    pub parent_id: u32,
     pub begin_cycles: u64,
     pub elapsed_cycles: u64,
     pub event: u32,
