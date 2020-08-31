@@ -433,8 +433,8 @@ mod tests {
 
     #[test]
     fn it_works() {
-        let res = {
-            let (_root, tracker) = minitrace::start_trace(0u32).unwrap();
+        let trace_result = {
+            let (_root, collector) = minitrace::start_trace(0, 0u32);
             minitrace::new_property(b"test property:a root span");
 
             std::thread::sleep(std::time::Duration::from_millis(20));
@@ -446,9 +446,10 @@ mod tests {
             }
 
             minitrace::new_property(b"another test property:done");
-            tracker.finish()
+
+            collector
         }
-        .collect();
+        .finish();
 
         let mut buf = Vec::with_capacity(1024);
         thrift_compact_encode(
@@ -456,7 +457,7 @@ mod tests {
             "test_minitrace",
             rand::random(),
             rand::random(),
-            &res,
+            &trace_result,
             |s| JaegerSpanInfo {
                 self_id: s.id as _,
                 parent_id: s.parent_id as _,

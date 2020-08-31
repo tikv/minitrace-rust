@@ -7,13 +7,10 @@ mod collector;
 mod trace;
 mod utils;
 
-pub use crate::collector::{Collector, Properties, TraceResult, Tracker};
+pub use crate::collector::{Collector, Properties, TraceResult};
 pub use crate::trace::{
     new_property, new_property_with, new_span, start_trace, ScopeGuard, Span, SpanGuard, SpanId,
     State,
 };
 
 pub use minitrace_macro::{trace, trace_async};
-
-// #[cfg(test)]
-// mod tests;

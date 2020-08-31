@@ -48,7 +48,7 @@ async fn other_job() {
 
 #[tokio::main]
 async fn main() {
-    let (root, tracker) = minitrace::start_trace(AsyncJob::Root).unwrap();
+    let (root, tracker) = minitrace::start_trace(0, AsyncJob::Root);
 
     let f = async {
         minitrace::new_property(b"sample property:it works");
@@ -64,7 +64,7 @@ async fn main() {
     drop(root);
     f.await;
 
-    let trace_result = tracker.finish().collect();
+    let trace_result = tracker.finish();
 
     use std::net::SocketAddr;
     let mut buf = Vec::with_capacity(2048);

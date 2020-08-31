@@ -56,14 +56,14 @@ fn minitrace_harness() {
         }
     }
 
-    let (root, tracker) = minitrace::start_trace(PARENT).unwrap();
+    let (root, collector) = minitrace::start_trace(0, PARENT);
 
     {
         let _guard = root;
         dummy_minitrace();
     }
 
-    let _r = tracker.finish().collect();
+    let _r = collector.finish();
 }
 
 #[derive(Debug)]

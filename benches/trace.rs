@@ -23,13 +23,13 @@ fn trace_wide_bench(c: &mut Criterion) {
         "trace_wide",
         |b, len| {
             b.iter(|| {
-                let (_root, tracker) = minitrace::start_trace(0u32).unwrap();
+                let (_root, collector) = minitrace::start_trace(0, 0u32);
 
                 if *len > 1 {
                     dummy_iter(*len);
                 }
 
-                tracker.finish().collect();
+                collector.finish();
             });
         },
         vec![1, 10, 100, 1000, 10000],
@@ -41,13 +41,13 @@ fn trace_deep_bench(c: &mut Criterion) {
         "trace_deep",
         |b, len| {
             b.iter(|| {
-                let (_root, tracker) = minitrace::start_trace(0u32).unwrap();
+                let (_root, collector) = minitrace::start_trace(0, 0u32);
 
                 if *len > 1 {
                     dummy_rec(*len);
                 }
 
-                tracker.finish().collect();
+                collector.finish();
             });
         },
         vec![1, 10, 100, 1000, 10000],
@@ -67,11 +67,11 @@ fn trace_future_bench(c: &mut Criterion) {
         "trace_future",
         |b, len| {
             b.iter(|| {
-                let (_root, tracker) = minitrace::start_trace(0u32).unwrap();
+                let (_root, collector) = minitrace::start_trace(0, 0u32);
 
-                let _ = futures_03::executor::block_on(f(*len).in_new_span(0u32));
+                let _ = futures_03::executor::block_on(f(*len).in_new_scope(0u32));
 
-                tracker.finish().collect();
+                collector.finish();
             });
         },
         vec![1, 10, 100, 1000, 10000],
@@ -83,13 +83,13 @@ fn trace_start_context(c: &mut Criterion) {
         "trace_context",
         |b, len| {
             b.iter(|| {
-                let (_root, tracker) = minitrace::start_trace(0u32).unwrap();
+                let (_root, collector) = minitrace::start_trace(0, 0u32);
 
                 for _ in 0..*len {
                     let _guard = black_box(minitrace::thread::new_async_handle());
                 }
 
-                tracker.finish().collect();
+                collector.finish();
             });
         },
         vec![1, 10, 100, 1000, 10000],

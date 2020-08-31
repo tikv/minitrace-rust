@@ -6,7 +6,7 @@ use std::sync::Arc;
 
 use crossbeam::channel::Sender;
 
-use crate::collector::{SpanSet, Tracker};
+use crate::collector::{Collector, SpanSet};
 
 pub type SpanId = u32;
 
@@ -26,12 +26,12 @@ fn next_global_id_prefix() -> u16 {
     GLOBAL_ID_COUNTER.fetch_add(1, Ordering::AcqRel)
 }
 
-pub fn start_trace<T: Into<u32>>(root_event: T) -> Option<(ScopeGuard, Tracker)> {
+pub fn start_trace<T: Into<u32>>(trace_id: u64, root_event: T) -> (ScopeGuard, Collector) {
     let trace = TRACE_LOCAL.with(|trace| trace.get());
     let tl = unsafe { &mut *trace };
 
     if !tl.enter_stack.is_empty() {
-        return None;
+        panic!("Trying to start trace within an existing trace scope.");
     }
 
     let span_inner = SpanGuardInner::enter(
@@ -49,7 +49,10 @@ pub fn start_trace<T: Into<u32>>(root_event: T) -> Option<(ScopeGuard, Tracker)>
     let (tx, rx) = crossbeam::channel::unbounded();
     tl.cur_collector = Some(Arc::new(tx));
 
-    Some((ScopeGuard { inner: span_inner }, Tracker::new(rx)))
+    (
+        ScopeGuard { inner: span_inner },
+        Collector::new(trace_id, rx),
+    )
 }
 
 pub fn new_span<T: Into<u32>>(event: T) -> Option<SpanGuard> {
