@@ -10,12 +10,12 @@ use crate::collector::{Collector, SpanSet};
 
 pub type SpanId = u32;
 
-static GLOBAL_ID_COUNTER: AtomicU16 = AtomicU16::new(1);
+static GLOBAL_ID_COUNTER: AtomicU16 = AtomicU16::new(0);
 
 thread_local! {
     pub static TRACE_LOCAL: std::cell::UnsafeCell<TraceLocal> = std::cell::UnsafeCell::new(TraceLocal {
         id_prefix: next_global_id_prefix(),
-        id_suffix: 0,
+        id_suffix: 1,
         enter_stack: Vec::with_capacity(1024),
         span_set: SpanSet::with_capacity(),
         cur_collector: None,
@@ -121,7 +121,7 @@ impl TraceLocal {
         let id = ((self.id_prefix as u32) << 16) | self.id_suffix as u32;
 
         if self.id_suffix == std::u16::MAX {
-            self.id_suffix = 0;
+            self.id_suffix = 1;
             self.id_prefix = next_global_id_prefix();
         } else {
             self.id_suffix += 1;
