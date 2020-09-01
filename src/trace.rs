@@ -95,7 +95,7 @@ where
     append_property(f);
 }
 
-pub fn is_in_scope() -> bool {
+pub fn is_tracing() -> bool {
     let trace = TRACE_LOCAL.with(|trace| trace.get());
     let tl = unsafe { &mut *trace };
 
