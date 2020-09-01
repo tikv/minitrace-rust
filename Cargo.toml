@@ -10,7 +10,6 @@ edition = "2018"
 pin-project = "0.4"
 minitrace-macro = { path = "crates/minitrace-macro" }
 lazy_static = "1.4.0"
-daggy = "0.7"
 crossbeam = "0.7"
 minstant = { git = "https://github.com/zhongzc/minstant.git" }
 
@@ -25,6 +24,7 @@ package = "futures"
 [dev-dependencies]
 minitrace-jaeger = { path = "crates/minitrace-jaeger" }
 tokio = { version = "0.2", features = ["full"] }
+daggy = "0.7"
 criterion = "0.3"
 rustracing = "0.4"
 opentelemetry = "0.5"

@@ -95,6 +95,13 @@ where
     append_property(f);
 }
 
+pub fn is_in_scope() -> bool {
+    let trace = TRACE_LOCAL.with(|trace| trace.get());
+    let tl = unsafe { &mut *trace };
+
+    !tl.enter_stack.is_empty()
+}
+
 pub struct TraceLocal {
     /// For id construction
     pub id_prefix: u16,
@@ -156,7 +163,7 @@ impl Drop for ScopeGuard {
         tl.cur_collector
             .as_ref()
             .unwrap()
-            .send(tl.span_set.take())
+            .try_send(tl.span_set.take())
             .ok();
         tl.cur_collector = None;
     }

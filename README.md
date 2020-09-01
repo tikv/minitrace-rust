@@ -24,7 +24,7 @@ minitrace::new_property(b"tracing started");
 }
 
 drop(root_guard);
-let trace_results = collector.unwrap().collect();
+let trace_results = collector.finish();
 ```
 
 ### In Asynchronous Code
@@ -33,6 +33,8 @@ Futures:
 
 ```rust
 use minitrace::future::FutureExt as _;
+
+let (root_guard, collector) = minitrace::start_trace(0, 0u32);
 
 let task = async {
     let guard = minitrace::new_span(1u32);
@@ -56,8 +58,8 @@ let task = async {
     }.in_new_span(4u32).await;
 };
 
-let (collector, value) = runtime::block_on(task.collect_trace(0u32));
-let trace_results = collector.unwrap().collect();
+runtime::block_on(task.in_new_scope(0u32));
+let trace_results = collector.finish();
 ```
 
 Threads:
@@ -78,7 +80,7 @@ let th = std::thread::spawn(move || {
 drop(root);
 
 th.join().unwrap();
-let trace_results = collector.unwrap().collect();
+let trace_results = collector.collect();
 ```
 
 
@@ -120,20 +122,50 @@ $ cargo run --example synchronous
 ### Run Asynchronous Example
 ```sh
 $ cargo run --example asynchronous
-============================                                            21.81 ms
-==============                                                          10.84 ms
-============================                                            21.67 ms
-==============                                                          10.84 ms
-              ==============                                            10.77 ms
-============= ============================                              31.50 ms
-              ==============                                            10.70 ms
-                            ==============                              10.65 ms
-========================================= ==============                41.52 ms
-                           ==============                               10.72 ms
-                                          ==============                10.63 ms
-======================================== ============================   51.34 ms
-                                         ==============                 10.60 ms
-                                                       ==============   10.61 ms
-              ==============                                            10.74 ms
+======================================================================  63.81 ms
+                                                                         0.14 ms
+===========                                                             10.88 ms
+                                                                         0.11 ms
+                                                                         0.00 ms
+                                                                         0.03 ms
+===========                                                             10.82 ms
+===========                                                             10.82 ms
+                                                                         0.02 ms
+            ============                                                10.99 ms
+            ============                                                10.98 ms
+                                                                         0.07 ms
+===========                                                             10.09 ms
+                                                                         0.07 ms
+           ============                                                 10.97 ms
+           ============                                                 10.97 ms
+                                                                         0.04 ms
+                       ============                                     11.13 ms
+                       ============                                     11.13 ms
+                                                                         0.12 ms
+======================                                                  20.12 ms
+                                                                         0.08 ms
+                      ============                                      11.11 ms
+                      ============                                      11.11 ms
+                                                                         0.04 ms
+                                  ============                          11.18 ms
+                                  ============                          11.17 ms
+===========                                                             10.88 ms
+            =================================                           30.12 ms
+                                                                         0.07 ms
+                                             ============               11.08 ms
+                                             ============               11.07 ms
+                                                                         0.10 ms
+                                                         ============   11.24 ms
+                                                         ============   11.23 ms
+===========                                                             10.84 ms
+                                                                         0.10 ms
+            ============                                                11.03 ms
+            ============                                                11.02 ms
+                        ===========                                     10.40 ms
+                                                                         0.01 ms
+                                   ===========                          10.29 ms
+                                                                         0.01 ms
+                                               ======================   20.86 ms
+                                                                         0.01 ms
 ```
 ![Jaeger Asynchronous](img/jaeger-asynchronous.png)

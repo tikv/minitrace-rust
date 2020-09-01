@@ -25,7 +25,7 @@ impl Into<u32> for AsyncJob {
 fn parallel_job() -> Vec<tokio::task::JoinHandle<()>> {
     let mut v = Vec::with_capacity(4);
     for i in 0..4 {
-        v.push(tokio::spawn(iter_job(i).in_new_span(AsyncJob::IterJob)));
+        v.push(tokio::spawn(iter_job(i).in_new_scope(AsyncJob::IterJob)));
     }
     v
 }
@@ -59,10 +59,10 @@ async fn main() {
             jh.await.unwrap();
         }
     }
-    .in_new_span(AsyncJob::Loop);
+    .in_new_scope(AsyncJob::Loop);
+    tokio::spawn(f).await.unwrap();
 
     drop(root);
-    f.await;
 
     let trace_result = tracker.finish();
 

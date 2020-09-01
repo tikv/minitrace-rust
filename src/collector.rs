@@ -20,8 +20,8 @@ impl Collector {
         Collector {
             rx,
             trace_id,
-            start_time_ns: real_time_ns(),
             start_time_cycles: minstant::now(),
+            start_time_ns: real_time_ns(),
         }
     }
 
@@ -128,26 +128,6 @@ impl SpanSet {
             },
         }
     }
-
-    // pub fn from_span(span: Span) -> Self {
-    //     let mut span_set = SpanSet {
-    //         spans: Vec::with_capacity(1),
-    //         properties: Properties {
-    //             span_ids: Vec::with_capacity(0),
-    //             property_lens: Vec::with_capacity(0),
-    //             payload: Vec::with_capacity(0),
-    //         },
-    //     };
-    //     span_set.spans.push(span);
-    //     span_set
-    // }
-
-    // pub fn is_empty(&self) -> Self {
-    //     self.spans.is_empty() &&
-    //     self.properties.span_ids.is_empty() &&
-    //     self.properties.property_lens.is_empty() &&
-    //     self.properties.payload.is_empty()
-    // }
 
     pub fn take(&mut self) -> Self {
         SpanSet {

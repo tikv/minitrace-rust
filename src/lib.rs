@@ -9,8 +9,8 @@ mod utils;
 
 pub use crate::collector::{Collector, Properties, TraceResult};
 pub use crate::trace::{
-    new_property, new_property_with, new_span, start_trace, ScopeGuard, Span, SpanGuard, SpanId,
-    State,
+    is_in_scope, new_property, new_property_with, new_span, start_trace, ScopeGuard, Span,
+    SpanGuard, SpanId, State,
 };
 
 pub use minitrace_macro::{trace, trace_async};

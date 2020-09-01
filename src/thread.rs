@@ -147,7 +147,10 @@ impl<'a> Drop for AsyncScopeGuard<'a> {
 
         let now_cycle = self.span_inner.exit(tl);
         self.handle_inner.begin_cycles = now_cycle;
-        self.handle_inner.collector.send(tl.span_set.take()).ok();
+        self.handle_inner
+            .collector
+            .try_send(tl.span_set.take())
+            .ok();
 
         tl.cur_collector = None;
     }
