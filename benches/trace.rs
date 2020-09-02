@@ -86,7 +86,7 @@ fn trace_start_context(c: &mut Criterion) {
                 let (_root, collector) = minitrace::start_trace(0, 0u32);
 
                 for _ in 0..*len {
-                    let _guard = black_box(minitrace::thread::new_async_handle());
+                    let _guard = black_box(minitrace::thread::new_async_scope());
                 }
 
                 collector.finish();

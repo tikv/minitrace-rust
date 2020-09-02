@@ -2,7 +2,7 @@
 
 use std::task::Poll;
 
-use crate::thread::{new_async_handle, AsyncHandle};
+use crate::thread::{new_async_scope, AsyncHandle};
 use crate::trace::new_span;
 
 impl<T: Sized> FutureExt for T {}
@@ -13,7 +13,7 @@ pub trait FutureExt: Sized {
         NewScope {
             inner: self,
             event: event.into(),
-            async_handle: new_async_handle(),
+            async_handle: new_async_scope(),
         }
     }
 
@@ -39,7 +39,7 @@ impl<T: std::future::Future> std::future::Future for NewScope<T> {
 
     fn poll(self: std::pin::Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> Poll<Self::Output> {
         let this = self.project();
-        let _guard = this.async_handle.start_trace(*this.event);
+        let _guard = this.async_handle.start_scope(*this.event);
         this.inner.poll(cx)
     }
 }
@@ -49,7 +49,7 @@ impl<T: futures_01::Future> futures_01::Future for NewScope<T> {
     type Error = T::Error;
 
     fn poll(&mut self) -> futures_01::Poll<Self::Item, Self::Error> {
-        let _guard = self.async_handle.start_trace(self.event);
+        let _guard = self.async_handle.start_scope(self.event);
         self.inner.poll()
     }
 }

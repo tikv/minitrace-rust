@@ -70,7 +70,7 @@ let (root, collector) = minitrace::start_trace(0, 0u32);
 let mut handle = minitrace::thread::new_async_scope();
 
 let th = std::thread::spawn(move || {
-    let _parent_guard = handle.start_trace(0, 1u32);
+    let _parent_guard = handle.start_scope(0, 1u32);
 
     {
         let _child_guard = minitrace::new_span(2u32);

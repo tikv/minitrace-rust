@@ -10,16 +10,16 @@ use crate::trace::*;
 /// Bind the current tracing context to another executing context.
 ///
 /// ```
-/// # use minitrace::thread::new_async_handle;
+/// # use minitrace::thread::new_async_scope;
 /// # use std::thread;
 /// #
-/// let mut handle = new_async_handle();
+/// let mut handle = new_async_scope();
 /// thread::spawn(move || {
-///     let _g = handle.start_trace(0u32);
+///     let _g = handle.start_scope(0u32);
 /// });
 /// ```
 #[inline]
-pub fn new_async_handle() -> AsyncHandle {
+pub fn new_async_scope() -> AsyncHandle {
     let trace = TRACE_LOCAL.with(|trace| trace.get());
     let tl = unsafe { &mut *trace };
 
@@ -50,7 +50,7 @@ pub struct AsyncHandle {
 }
 
 impl AsyncHandle {
-    pub fn start_trace<T: Into<u32>>(&mut self, event: T) -> Option<AsyncGuard<'_>> {
+    pub fn start_scope<T: Into<u32>>(&mut self, event: T) -> Option<AsyncGuard<'_>> {
         let inner = self.inner.as_mut()?;
 
         let trace = TRACE_LOCAL.with(|trace| trace.get());
