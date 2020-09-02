@@ -30,10 +30,10 @@ jobs:
       run: cargo clippy --all-targets --all-features -- --deny warnings
     - name: Build
       run: cargo build --workspace --all-targets
+    - name: Build benches
+      run: cargo bench --workspace --all-targets --no-run
     - name: Run tests
       run: cargo test --workspace --all-targets -- --nocapture
-    - name: Run benches
-      run: cargo bench --workspace --all-targets
     - name: Run examples
       run: |
         cargo run --example asynchronous
