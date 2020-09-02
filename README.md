@@ -51,7 +51,7 @@ let task = async {
     runtime::spawn(async {
         // new future ...
         minitrace::new_property(b"spawned to some runtime");
-    }.in_new_span(3u32));
+    }.in_new_scope(3u32));
 
     async {
         // current future ...
