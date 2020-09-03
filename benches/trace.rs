@@ -23,17 +23,13 @@ fn trace_wide_bench(c: &mut Criterion) {
         "trace_wide",
         |b, len| {
             b.iter(|| {
-                let collector = {
-                    let (_guard, collector) = minitrace::trace_enable(0u32);
+                let (_root, collector) = minitrace::start_trace(0, 0u32);
 
-                    if *len > 1 {
-                        dummy_iter(*len);
-                    }
+                if *len > 1 {
+                    dummy_iter(*len);
+                }
 
-                    collector
-                };
-
-                let _r = black_box(collector.collect());
+                collector.finish();
             });
         },
         vec![1, 10, 100, 1000, 10000],
@@ -45,17 +41,13 @@ fn trace_deep_bench(c: &mut Criterion) {
         "trace_deep",
         |b, len| {
             b.iter(|| {
-                let collector = {
-                    let (_guard, collector) = minitrace::trace_enable(0u32);
+                let (_root, collector) = minitrace::start_trace(0, 0u32);
 
-                    if *len > 1 {
-                        dummy_rec(*len);
-                    }
+                if *len > 1 {
+                    dummy_rec(*len);
+                }
 
-                    collector
-                };
-
-                let _r = black_box(collector.collect());
+                collector.finish();
             });
         },
         vec![1, 10, 100, 1000, 10000],
@@ -63,11 +55,11 @@ fn trace_deep_bench(c: &mut Criterion) {
 }
 
 fn trace_future_bench(c: &mut Criterion) {
-    use minitrace::prelude::*;
+    use minitrace::future::FutureExt;
 
     async fn f(i: u32) {
         for i in 0..i - 1 {
-            async {}.trace_async(black_box(i)).await
+            async {}.in_new_span(black_box(i)).await
         }
     }
 
@@ -75,10 +67,11 @@ fn trace_future_bench(c: &mut Criterion) {
         "trace_future",
         |b, len| {
             b.iter(|| {
-                let (collector, _) =
-                    futures_03::executor::block_on(f(*len).future_trace_enable(0u32));
+                let (_root, collector) = minitrace::start_trace(0, 0u32);
 
-                black_box(collector.collect());
+                let _ = futures_03::executor::block_on(f(*len).in_new_scope(0u32));
+
+                collector.finish();
             });
         },
         vec![1, 10, 100, 1000, 10000],
@@ -90,17 +83,13 @@ fn trace_start_context(c: &mut Criterion) {
         "trace_context",
         |b, len| {
             b.iter(|| {
-                let collector = {
-                    let (_guard, collector) = minitrace::trace_enable(0u32);
+                let (_root, collector) = minitrace::start_trace(0, 0u32);
 
-                    for _i in 0..len - 1 {
-                        black_box(minitrace::trace_binder());
-                    }
+                for _ in 0..*len {
+                    let _guard = black_box(minitrace::thread::new_async_scope());
+                }
 
-                    collector
-                };
-
-                black_box(collector.collect());
+                collector.finish();
             });
         },
         vec![1, 10, 100, 1000, 10000],
@@ -112,6 +101,6 @@ criterion_group!(
     trace_wide_bench,
     trace_deep_bench,
     trace_future_bench,
-    trace_start_context,
+    trace_start_context
 );
 criterion_main!(benches);

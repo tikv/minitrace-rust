@@ -1,5 +1,5 @@
 [package]
-name = "minitrace-attribute"
+name = "minitrace-macro"
 version = "0.1.0"
 authors = ["The TiKV Project Authors"]
 license = "Apache-2.0"

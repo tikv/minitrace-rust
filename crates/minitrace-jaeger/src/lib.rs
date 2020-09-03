@@ -1,4 +1,4 @@
-use crate::{Properties, Span, TraceDetails};
+use minitrace::{Properties, Span, TraceResult};
 use std::collections::HashMap;
 
 #[repr(i32)]
@@ -24,13 +24,13 @@ pub fn thrift_compact_encode<'a, S0: AsRef<str>, S1: AsRef<str>, S2: AsRef<str>>
     service_name: &str,
     trace_id_high: i64,
     trace_id_low: i64,
-    TraceDetails {
+    TraceResult {
         start_time_ns,
         cycles_per_second,
         spans,
         properties,
         ..
-    }: &'a TraceDetails,
+    }: &'a TraceResult,
     span_remap: impl Fn(&'a Span) -> JaegerSpanInfo<S0>,
     property_to_kv: impl Fn(&'a [u8]) -> (S1, S2),
 ) {
@@ -266,7 +266,7 @@ pub fn thrift_compact_encode<'a, S0: AsRef<str>, S1: AsRef<str>, S2: AsRef<str>>
         // const I64_TYPE: u8 = 6;property_lens
         buf.push(0x16);
         // start time data
-        let delta_cycles = begin_cycles.saturating_sub(anchor_cycles);
+        let delta_cycles = begin_cycles.wrapping_sub(anchor_cycles);
         let delta_us = delta_cycles as f64 / *cycles_per_second as f64 * 1_000_000.0;
         encode::varint(
             buf,
@@ -430,26 +430,26 @@ mod zigzag {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::State;
 
     #[test]
     fn it_works() {
-        let res = {
-            let (_g, collector) = crate::trace_enable(0u32);
-            crate::property(b"test property:a root span");
+        let trace_result = {
+            let (_root, collector) = minitrace::start_trace(0, 0u32);
+            minitrace::new_property(b"test property:a root span");
 
             std::thread::sleep(std::time::Duration::from_millis(20));
 
             {
-                let _g = crate::new_span(1u32);
-                crate::property(b"where am i:in child");
+                let _g = minitrace::new_span(1u32);
+                minitrace::new_property(b"where am i:in child");
                 std::thread::sleep(std::time::Duration::from_millis(10));
             }
 
-            crate::property(b"another test property:done");
+            minitrace::new_property(b"another test property:done");
+
             collector
         }
-        .collect();
+        .finish();
 
         let mut buf = Vec::with_capacity(1024);
         thrift_compact_encode(
@@ -457,17 +457,11 @@ mod tests {
             "test_minitrace",
             rand::random(),
             rand::random(),
-            &res,
+            &trace_result,
             |s| JaegerSpanInfo {
                 self_id: s.id as _,
-                parent_id: s.related_id as _,
-                reference_type: match s.state {
-                    State::Root => ReferenceType::ChildOf,
-                    State::Local => ReferenceType::ChildOf,
-                    State::Spawning => ReferenceType::FollowFrom,
-                    State::Scheduling => ReferenceType::FollowFrom,
-                    State::Settle => ReferenceType::FollowFrom,
-                },
+                parent_id: s.parent_id as _,
+                reference_type: ReferenceType::FollowFrom,
                 operation_name: if s.event == 0 { "Parent" } else { "Child" },
             },
             |property| {

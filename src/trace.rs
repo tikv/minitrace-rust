@@ -1,120 +1,245 @@
 // Copyright 2020 TiKV Project Authors. Licensed under Apache-2.0.
 
-#[must_use]
-#[inline]
-pub fn trace_enable<T: Into<u32>>(
-    event: T,
-) -> (
-    crate::trace_local::LocalTraceGuard,
-    crate::collector::Collector,
-) {
-    let event = event.into();
-    trace_enable_fine(event, event)
+use std::marker::PhantomData;
+use std::sync::atomic::{AtomicU16, Ordering};
+use std::sync::Arc;
+
+use crossbeam::channel::Sender;
+
+use crate::collector::{Collector, SpanSet};
+
+pub type SpanId = u32;
+
+static GLOBAL_ID_COUNTER: AtomicU16 = AtomicU16::new(0);
+
+thread_local! {
+    pub static TRACE_LOCAL: std::cell::UnsafeCell<TraceLocal> = std::cell::UnsafeCell::new(TraceLocal {
+        id_prefix: next_global_id_prefix(),
+        id_suffix: 1,
+        enter_stack: Vec::with_capacity(1024),
+        span_set: SpanSet::with_capacity(),
+        cur_collector: None,
+    });
 }
 
-#[must_use]
-#[inline]
-pub fn trace_enable_fine<E1: Into<u32>, E2: Into<u32>>(
-    pending_event: E1,
-    settle_event: E2,
-) -> (
-    crate::trace_local::LocalTraceGuard,
-    crate::collector::Collector,
-) {
-    let now_cycles = minstant::now();
-    let collector = crate::collector::Collector::new(crate::time::real_time_ns());
-
-    let (trace_guard, _) = crate::trace_local::LocalTraceGuard::new(
-        collector.inner.clone(),
-        now_cycles,
-        crate::LeadingSpan {
-            state: crate::State::Root,
-            related_id: 0,
-            begin_cycles: now_cycles,
-            elapsed_cycles: 0,
-            event: pending_event.into(),
-        },
-        settle_event.into(),
-    )
-    .unwrap(); // It's safe to unwrap because the collector always exists at present.
-
-    (trace_guard, collector)
+fn next_global_id_prefix() -> u16 {
+    GLOBAL_ID_COUNTER.fetch_add(1, Ordering::AcqRel)
 }
 
-#[must_use]
-#[inline]
-pub fn trace_may_enable<T: Into<u32>>(
-    enable: bool,
-    event: T,
-) -> (
-    Option<crate::trace_local::LocalTraceGuard>,
-    Option<crate::collector::Collector>,
-) {
-    let event = event.into();
-    trace_may_enable_fine(enable, event, event)
-}
+pub fn start_trace<T: Into<u32>>(trace_id: u64, root_event: T) -> (ScopeGuard, Collector) {
+    let trace = TRACE_LOCAL.with(|trace| trace.get());
+    let tl = unsafe { &mut *trace };
 
-#[must_use]
-#[inline]
-pub fn trace_may_enable_fine<E1: Into<u32>, E2: Into<u32>>(
-    enable: bool,
-    pending_event: E1,
-    settle_event: E2,
-) -> (
-    Option<crate::trace_local::LocalTraceGuard>,
-    Option<crate::collector::Collector>,
-) {
-    if enable {
-        let (guard, collector) = trace_enable_fine(pending_event, settle_event);
-        (Some(guard), Some(collector))
-    } else {
-        (None, None)
+    if !tl.enter_stack.is_empty() {
+        panic!("Trying to start trace within an existing trace scope.");
     }
+
+    let span_inner = SpanGuardInner::enter(
+        Span {
+            id: tl.new_span_id(),
+            state: State::Normal,
+            parent_id: 0,
+            begin_cycles: minstant::now(),
+            elapsed_cycles: 0,
+            event: root_event.into(),
+        },
+        tl,
+    );
+
+    let (tx, rx) = crossbeam::channel::unbounded();
+    tl.cur_collector = Some(Arc::new(tx));
+
+    (
+        ScopeGuard { inner: span_inner },
+        Collector::new(trace_id, rx),
+    )
 }
 
-#[must_use]
-#[inline]
-pub fn new_span<T: Into<u32>>(event: T) -> Option<crate::trace_local::SpanGuard> {
-    crate::trace_local::SpanGuard::new(event.into())
-}
+pub fn new_span<T: Into<u32>>(event: T) -> Option<SpanGuard> {
+    let trace = TRACE_LOCAL.with(|trace| trace.get());
+    let tl = unsafe { &mut *trace };
 
-/// Bind the current tracing context to another executing context (e.g. a closure).
-///
-/// ```
-/// # use minitrace::trace_binder;
-/// # use std::thread;
-/// #
-/// let mut handle = trace_binder();
-/// thread::spawn(move || {
-///     let _g = handle.trace_enable(EVENT);
-/// });
-/// ```
-#[must_use]
-#[inline]
-pub fn trace_binder() -> crate::trace_async::TraceHandle {
-    crate::trace_async::TraceHandle::new(None)
-}
+    if tl.enter_stack.is_empty() {
+        return None;
+    }
 
-#[must_use]
-#[inline]
-pub fn trace_binder_fine<E: Into<u32>>(pending_event: E) -> crate::trace_async::TraceHandle {
-    crate::trace_async::TraceHandle::new(Some(pending_event.into()))
+    let parent_id = *tl.enter_stack.last().unwrap();
+    let span_inner = SpanGuardInner::enter(
+        Span {
+            id: tl.new_span_id(),
+            state: State::Normal,
+            parent_id,
+            begin_cycles: minstant::now(),
+            elapsed_cycles: 0,
+            event: event.into(),
+        },
+        tl,
+    );
+
+    Some(SpanGuard { inner: span_inner })
 }
 
 /// The property is in bytes format, so it is not limited to be a key-value pair but
 /// anything intended. However, the downside of flexibility is that manual encoding
 /// and manual decoding need to consider.
-#[inline]
-pub fn property<B: AsRef<[u8]>>(p: B) {
-    crate::trace_local::append_property(|| p);
+pub fn new_property<B: AsRef<[u8]>>(p: B) {
+    append_property(|| p);
 }
 
 /// `property` of closure version
-#[inline]
-pub fn property_closure<F, B>(f: F)
+pub fn new_property_with<F, B>(f: F)
 where
     B: AsRef<[u8]>,
     F: FnOnce() -> B,
 {
-    crate::trace_local::append_property(f);
+    append_property(f);
+}
+
+pub fn is_tracing() -> bool {
+    let trace = TRACE_LOCAL.with(|trace| trace.get());
+    let tl = unsafe { &mut *trace };
+
+    !tl.enter_stack.is_empty()
+}
+
+pub struct TraceLocal {
+    /// For id construction
+    pub id_prefix: u16,
+    pub id_suffix: u16,
+
+    /// For parent-child relation construction. The last span, when exits, is
+    /// responsible to submit the local span sets.
+    pub enter_stack: Vec<SpanId>,
+    pub span_set: SpanSet,
+
+    pub cur_collector: Option<Arc<Sender<SpanSet>>>,
+}
+
+impl TraceLocal {
+    #[inline]
+    pub fn new_span_id(&mut self) -> SpanId {
+        let id = ((self.id_prefix as u32) << 16) | self.id_suffix as u32;
+
+        if self.id_suffix == std::u16::MAX {
+            self.id_suffix = 1;
+            self.id_prefix = next_global_id_prefix();
+        } else {
+            self.id_suffix += 1;
+        }
+
+        id
+    }
+}
+
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+pub enum State {
+    Normal,
+    Pending,
+}
+
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+pub struct Span {
+    pub id: SpanId,
+    pub state: State,
+    pub parent_id: u32,
+    pub begin_cycles: u64,
+    pub elapsed_cycles: u64,
+    pub event: u32,
+}
+
+#[must_use]
+pub struct ScopeGuard {
+    inner: SpanGuardInner,
+}
+
+impl Drop for ScopeGuard {
+    #[inline]
+    fn drop(&mut self) {
+        let trace = TRACE_LOCAL.with(|trace| trace.get());
+        let tl = unsafe { &mut *trace };
+
+        self.inner.exit(tl);
+
+        tl.cur_collector
+            .as_ref()
+            .unwrap()
+            .try_send(tl.span_set.take())
+            .ok();
+        tl.cur_collector = None;
+    }
+}
+
+#[must_use]
+pub struct SpanGuard {
+    pub(crate) inner: SpanGuardInner,
+}
+
+impl Drop for SpanGuard {
+    #[inline]
+    fn drop(&mut self) {
+        let trace = TRACE_LOCAL.with(|trace| trace.get());
+        let tl = unsafe { &mut *trace };
+
+        self.inner.exit(tl);
+    }
+}
+
+#[must_use]
+pub struct SpanGuardInner {
+    span_index: usize,
+    _marker: PhantomData<*const ()>,
+}
+
+impl SpanGuardInner {
+    #[inline]
+    pub fn enter(span: Span, tl: &mut TraceLocal) -> Self {
+        tl.enter_stack.push(span.id);
+        tl.span_set.spans.push(span);
+
+        Self {
+            span_index: tl.span_set.spans.len() - 1,
+            _marker: PhantomData,
+        }
+    }
+
+    #[inline]
+    pub fn exit(&mut self, tl: &mut TraceLocal) -> u64 {
+        debug_assert_eq!(
+            *tl.enter_stack.last().unwrap(),
+            tl.span_set.spans[self.span_index].id
+        );
+
+        tl.enter_stack.pop();
+
+        let now_cycle = minstant::now();
+        let span = &mut tl.span_set.spans[self.span_index];
+        span.elapsed_cycles = now_cycle.wrapping_sub(span.begin_cycles);
+
+        now_cycle
+    }
+}
+
+fn append_property<F, B>(f: F)
+where
+    B: AsRef<[u8]>,
+    F: FnOnce() -> B,
+{
+    let trace = TRACE_LOCAL.with(|trace| trace.get());
+    let tl = unsafe { &mut *trace };
+
+    if tl.enter_stack.is_empty() {
+        return;
+    }
+
+    let cur_span_id = *tl.enter_stack.last().unwrap();
+    let payload = f();
+    let payload = payload.as_ref();
+    let payload_len = payload.len();
+
+    tl.span_set.properties.span_ids.push(cur_span_id);
+    tl.span_set
+        .properties
+        .property_lens
+        .push(payload_len as u64);
+    tl.span_set.properties.payload.extend_from_slice(payload);
 }

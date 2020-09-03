@@ -6,13 +6,9 @@ description = "A high-performance timeline tracing library for Rust, used by TiK
 license = "Apache-2.0"
 edition = "2018"
 
-[features]
-default = []
-jaeger = []
-
 [dependencies]
 pin-project = "0.4"
-minitrace-attribute = { path = "crates/attribute" }
+minitrace-macro = { path = "crates/minitrace-macro" }
 lazy_static = "1.4.0"
 crossbeam = "0.7"
 minstant = { git = "https://github.com/zhongzc/minstant.git" }
@@ -26,7 +22,9 @@ version = "0.3.1"
 package = "futures"
 
 [dev-dependencies]
+minitrace-jaeger = { path = "crates/minitrace-jaeger" }
 tokio = { version = "0.2", features = ["full"] }
+daggy = "0.7"
 criterion = "0.3"
 rustracing = "0.4"
 opentelemetry = "0.5"
@@ -38,12 +36,16 @@ tracing-subscriber = "0.2"
 rand = "0.7"
 
 [[bench]]
-name = "trace"
+name = "compare"
 harness = false
 
 [[bench]]
-name = "compare"
+name = "trace"
 harness = false
 
 [workspace]
 members = [ "crates/*" ]
+
+[profile.bench]
+opt-level = 3
+lto = true

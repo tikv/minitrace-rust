@@ -95,14 +95,14 @@ pub fn trace_async(args: TokenStream, item: TokenStream) -> TokenStream {
         let await_kwd = syn::Ident::new("await", block.span());
         quote::quote_spanned! {block.span() =>
             #async_kwd move { #block }
-                .trace_async(#event)
+                .in_new_span(#event)
                 .#await_kwd
         }
     } else {
         // hack for `async_trait`
         // See https://docs.rs/async-trait/0.1.31/async_trait/
         quote::quote_spanned! {block.span() =>
-            std::boxed::Box::pin(#block.trace_async(#event))
+            std::boxed::Box::pin(#block.in_new_span(#event))
         }
     };
 
@@ -111,7 +111,7 @@ pub fn trace_async(args: TokenStream, item: TokenStream) -> TokenStream {
         #vis #constness #unsafety #asyncness #abi fn #ident<#gen_params>(#params) #return_type
         #where_clause
         {
-            use minitrace::prelude::*;
+            use minitrace::future::FutureExt as _;
             #body
         }
     )
