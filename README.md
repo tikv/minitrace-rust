@@ -26,7 +26,7 @@ A high-performance, ergonomic timeline tracing library for Rust.
 
 ### Scope
 
-  A `Scope` is used to trace a task during the execution of the task.
+  A `Scope` is used to trace the execution of a task.
   
   `Scope` is thread-safe so it's okay to send or access across threads. Cloning a `Scope` will produce another `Scope` 
   which will trace the same task. After dropping all `Scope`s related to a task, a `Span`, representing the whole execution
