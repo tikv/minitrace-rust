@@ -22,27 +22,26 @@ A high-performance, ergonomic timeline tracing library for Rust.
   A `LocalSpanGuard` is thread-local and can be created by function `new_span()`.
 
   *Note: The relation between `Span`s is constructed implicitly. Even within a deeply nested function calls, the inner
-  `LocalSpanGuard` can automatically figure out its parent without explicitly passing the tracing context as a parameter
-  of functions.*
+  `LocalSpanGuard` can automatically figure out its parent without explicitly passing any tracing context as a parameter.*
 
 ### Scope
 
   A `Scope` is used to trace a task during the execution of the task.
   
   `Scope` is thread-safe so it's okay to send or access across threads. Cloning a `Scope` will produce another `Scope` 
-  which traces the same task. After dropping all `Scope`s related to a task, a `Span`, representing the whole execution
+  which will trace the same task. After dropping all `Scope`s related to a task, a `Span`, representing the whole execution
   of the task, will be recorded.
 
-  A new `Scope` can be created by function `root_scope()` and `merge_local_scopes()`.
+  A new `Scope` can be created by function `root_scope()` and `merge_local_scopes()`, as mentioned [here](#Asynchronous Example).
 
 ### Local Scope Guard
 
-  A `LocalScopeGuard` can gather spans on a thread during its lifetime. Generally, the `LocalScopeGuard` should be held
-  until the next run of the thread no longer belongs to the task.
+  A `LocalScopeGuard` can gather spans on a thread during its own lifetime. Generally, the `LocalScopeGuard` should be held
+  until the thread will not run for the task.
   
   A `LocalScopeGuard` is thread-local and can be created by `Scope`'s method `start_scope()`.
   
-  *Note: Multiple `Scope`s can `start_scope` on the same thread. In which case, spans will be recorded for all `Scope`s.*
+  *Note: Multiple `Scope`s can `start_scope` on the same thread. In which case, recorded spans will be shared for all `Scope`s.*
 
 
 ### Collector
@@ -87,8 +86,8 @@ let _span_guard = new_span("my event").with_properties(|| {
 
 A common pattern to trace synchronous code:
 
-- Call `root_scope` to create a root `Scope` and a `Collector` and call root `Scope`'s `start_scope` immediately.
-- Leave `new_span` somewhere, e.g. at the beginning of a code scope, at the beginning of a function, to record spans.
+- Create a root `Scope` and a `Collector` via `root_scope`, then create `LocalScopeGuard` via `start_scope`.
+- Add `new_span`s somewhere, e.g. at the beginning of a code scope, at the beginning of a function, to record spans.
 - Make sure the root `Scope` and all guards are dropped, then call `Collector`'s `collect` to get all `Span`s.
 
 
@@ -111,9 +110,9 @@ let spans: Vec<Span> = collector.collect(true, None, None);
 
 ### Asynchronous Example
 
-To trace asynchronous code, we should transmit `Scope` from one thread to another thread.
+To trace asynchronous codes, we usually transmit `Scope` from one thread to another thread.
 
-The transmitted `Scope` is of one of the following type:
+The transmitted `Scope` is of one of the following types:
 
 - Clone from an existing `Scope`, will trace the same task as the origin `Scope`
 - Create via `merge_local_scopes`, will trace a new task related to the origin task
@@ -158,8 +157,8 @@ let spans: Vec<Span> = collector.collect(true, None, None);
 We provide three future adaptors:
 
 - `in_new_span`: will call `new_span` at every poll
-- `in_new_scope`: create a new scope via `merge_local_scopes`, and will call `start_scope` at every poll
-- `with_scope`: accept a `Scope`, and will call `start_scope` at every poll
+- `in_new_scope`: create a new scope via `merge_local_scopes`, will call `start_scope` at every poll
+- `with_scope`: accept a `Scope`, will call `start_scope` at every poll
 
 The last two adaptors are mostly used on a `Future` submitting to a runtime.
 
@@ -247,7 +246,7 @@ async fn amazing_async_func() {
 }
 ```
 
-To access these macros, dependency should be added as:
+To access these macros, a dependency should be added as:
 
 ```toml
 [dependencies]
@@ -258,7 +257,7 @@ minitrace-macro = { git = "https://github.com/tikv/minitrace-rust.git" }
 
 We support visualization provided by an amazing tracing platform [Jaeger](https://www.jaegertracing.io/).
 
-To experience, dependency should be added as:
+To experience, a dependency should be added as:
                
 ```toml
 [dependencies]
