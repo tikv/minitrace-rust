@@ -7,11 +7,10 @@ license = "Apache-2.0"
 edition = "2018"
 
 [dependencies]
-pin-project = "0.4"
-minitrace-macro = { path = "crates/minitrace-macro" }
-lazy_static = "1.4.0"
-crossbeam = "0.7"
+slab = "0.4.2"
 minstant = { git = "https://github.com/zhongzc/minstant.git" }
+crossbeam-channel = "0.5"
+pin-project = "0.4"
 
 [dependencies.futures_01]
 version = "0.1"
@@ -22,10 +21,11 @@ version = "0.3.1"
 package = "futures"
 
 [dev-dependencies]
-minitrace-jaeger = { path = "crates/minitrace-jaeger" }
-tokio = { version = "0.2", features = ["full"] }
-daggy = "0.7"
 criterion = "0.3"
+crossbeam-utils = "0.8"
+minitrace-jaeger = { path = "crates/minitrace-jaeger" }
+minitrace-macro = { path = "crates/minitrace-macro" }
+tokio = { version = "0.2", features = ["full"] }
 rustracing = "0.4"
 opentelemetry = "0.5"
 opentelemetry-jaeger = "0.4"
@@ -34,13 +34,14 @@ tracing = "0.1"
 tracing-core = "0.1"
 tracing-subscriber = "0.2"
 rand = "0.7"
-
-[[bench]]
-name = "compare"
-harness = false
+crossbeam = "0.7"
 
 [[bench]]
 name = "trace"
+harness = false
+
+[[bench]]
+name = "compare"
 harness = false
 
 [workspace]

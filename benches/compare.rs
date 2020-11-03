@@ -47,23 +47,21 @@ fn opentelemetry_harness() {
 }
 
 fn minitrace_harness() {
-    const PARENT: u32 = 0;
-    const CHILD: u32 = 1;
-
     fn dummy_minitrace() {
         for _ in 0..99 {
-            let _guard = minitrace::new_span(CHILD);
+            let _guard = minitrace::new_span("child");
         }
     }
 
-    let (root, collector) = minitrace::start_trace(0, PARENT);
-
     {
-        let _guard = root;
-        dummy_minitrace();
-    }
+        let (root, collector) = minitrace::root_scope("parent");
+        let _g = root.start_scope();
 
-    let _r = collector.finish();
+        dummy_minitrace();
+
+        collector
+    }
+    .collect(false, None, None);
 }
 
 #[derive(Debug)]

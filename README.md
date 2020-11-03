@@ -1,171 +1,306 @@
 # Minitrace
-[![Actions Status](https://github.com/pingcap-incubator/minitrace/workflows/CI/badge.svg)](https://github.com/pingcap-incubator/minitrace/actions)
-[![LICENSE](https://img.shields.io/github/license/pingcap-incubator/minitrace.svg)](https://github.com/pingcap-incubator/minitrace/blob/master/LICENSE)
+[![Actions Status](https://github.com/tikv/minitrace/workflows/CI/badge.svg)](https://github.com/tikv/minitrace/actions)
+[![LICENSE](https://img.shields.io/github/license/tikv/minitrace.svg)](https://github.com/tikv/minitrace/blob/master/LICENSE)
 
 A high-performance, ergonomic timeline tracing library for Rust.
+
+
+## Concepts
+
+### Span
+
+  A `Span` represents an individual unit of work done. It contains:
+  - An operation name
+  - A start timestamp and finish timestamp
+  - A set of key-value properties
+
+### Local Span Guard
+
+  A `LocalSpanGuard` is used to record a `Span`. Its creation means a `Span`'s begin and its destruction means a `Span`'s
+  end.
+  
+  A `LocalSpanGuard` is thread-local and can be created by function `new_span()`.
+
+  *Note: The relation between `Span`s is constructed implicitly. Even within a deeply nested function calls, the inner
+  `LocalSpanGuard` can automatically figure out its parent without explicitly passing the tracing context as a parameter
+  of functions.*
+
+### Scope
+
+  A `Scope` is used to trace a task during the execution of the task.
+  
+  `Scope` is thread-safe so it's okay to send or access across threads. Cloning a `Scope` will produce another `Scope` 
+  which traces the same task. After dropping all `Scope`s related to a task, a `Span`, representing the whole execution
+  of the task, will be recorded.
+
+  A new `Scope` can be created by function `root_scope()` and `merge_local_scopes()`.
+
+### Local Scope Guard
+
+  A `LocalScopeGuard` can gather spans on a thread during its lifetime. Generally, the `LocalScopeGuard` should be held
+  until the next run of the thread no longer belongs to the task.
+  
+  A `LocalScopeGuard` is thread-local and can be created by `Scope`'s method `start_scope()`.
+  
+  *Note: Multiple `Scope`s can `start_scope` on the same thread. In which case, spans will be recorded for all `Scope`s.*
+
+
+### Collector
+
+  A `Collector` associated to a root `Scope` is used to collect all spans related to a request.
 
 
 ## Usage
 
 ```toml
 [dependencies]
-minitrace = { git = "https://github.com/pingcap-incubator/minitrace-rust.git" }
+minitrace = { git = "https://github.com/tikv/minitrace-rust.git" }
 ```
 
-### In Synchronous Code
+### Record a Span
+
+To record a common span:
+```rust
+use minitrace::new_span;
+
+let _span_guard = new_span("my event");
+```
+
+To add properties:
 
 ```rust
-let (root_guard, collector) = minitrace::start_trace(0, 0u32);
-minitrace::new_property(b"tracing started");
+use minitrace::new_span;
 
-{
-    let _child_guard = minitrace::new_span(1u32);
-    minitrace::new_property(b"in child");
-}
+// add a property for a span
+let _span_guard = new_span("my event").with_property(|| ("key", String::from("value")));
 
-drop(root_guard);
-let trace_results = collector.finish();
+// or add multiple properties for a span
+let _span_guard = new_span("my event").with_properties(|| {
+    vec![
+        ("key1", String::from("value1")),
+        ("key2", String::from("value2")),
+    ]
+});
 ```
 
-### In Asynchronous Code
+###  Synchronous Example
 
-Futures:
+A common pattern to trace synchronous code:
+
+- Call `root_scope` to create a root `Scope` and a `Collector` and call root `Scope`'s `start_scope` immediately.
+- Leave `new_span` somewhere, e.g. at the beginning of a code scope, at the beginning of a function, to record spans.
+- Make sure the root `Scope` and all guards are dropped, then call `Collector`'s `collect` to get all `Span`s.
+
+
+```rust
+use minitrace::{new_span, root_scope, Span};
+
+let collector = {
+    let (root_scope, collector) = root_scope("root");
+    let _scope_guard = root_scope.start_scope();
+
+    let _span_guard = new_span("child");
+
+    // do something ...
+
+    collector
+};
+
+let spans: Vec<Span> = collector.collect(true, None, None);
+```
+
+### Asynchronous Example
+
+To trace asynchronous code, we should transmit `Scope` from one thread to another thread.
+
+The transmitted `Scope` is of one of the following type:
+
+- Clone from an existing `Scope`, will trace the same task as the origin `Scope`
+- Create via `merge_local_scopes`, will trace a new task related to the origin task
+
+You can choose one of the variants to satisfy the semantic of your application.
+
+#### Threads
+
+```rust
+use minitrace::{merge_local_scopes, new_span, root_scope, Span};
+
+let collector = {
+    let (root_scope, collector) = root_scope("task1");
+    let _scope_guard = root_scope.start_scope();
+
+    let _span_guard = new_span("span of task1");
+    
+    // To trace the same task
+    let scope = root_scope.clone();
+    std::thread::spawn(move || {
+        let _scope_guard = scope.start_scope();
+
+        let _span_guard = new_span("span of also task1");
+    });
+    
+    // To trace a new task
+    let scope = merge_local_scopes("task2");
+    std::thread::spawn(move || {
+        let _scope_guard = scope.start_scope();
+
+        let _span_guard = new_span("span of also task2");
+    });
+
+    collector
+};
+
+let spans: Vec<Span> = collector.collect(true, None, None);
+```
+
+#### Futures
+
+We provide three future adaptors:
+
+- `in_new_span`: will call `new_span` at every poll
+- `in_new_scope`: create a new scope via `merge_local_scopes`, and will call `start_scope` at every poll
+- `with_scope`: accept a `Scope`, and will call `start_scope` at every poll
+
+The last two adaptors are mostly used on a `Future` submitting to a runtime.
 
 ```rust
 use minitrace::future::FutureExt as _;
+use minitrace::{root_scope, Span};
 
-let (root_guard, collector) = minitrace::start_trace(0, 0u32);
+let collector = {
+    let (root_scope, collector) = root_scope("root");
+    let _scope_guard = root_scope.start_scope();
 
-let task = async {
-    let guard = minitrace::new_span(1u32);
-    // current future ...
-
-    // should drop here or it would fail compilation
-    // because local guards cannot across threads.
-    drop(guard);
-
-    async {
-        // current future ...
-    }.in_new_span(2u32).await;
-
+    // To trace the same task
+    let scope = root_scope.clone();
     runtime::spawn(async {
-        // new future ...
-        minitrace::new_property(b"spawned to some runtime");
-    }.in_new_scope(3u32));
+        
+        let _ = async {
+            // some works
+        }.in_new_span("");
+        
+    }.with_scope(scope));
 
-    async {
-        // current future ...
-    }.in_new_span(4u32).await;
+    // To trace another task
+    runtime::spawn(async {
+        
+        let _ = async {
+            // some works
+        }.in_new_span("");
+        
+    }.in_new_scope("new task"));
+
+    collector
 };
 
-runtime::block_on(task.in_new_scope(0u32));
-let trace_results = collector.finish();
+let spans: Vec<Span> = collector.collect(true, None, None);
 ```
 
-Threads:
+### Macros
+
+We provide two macro for functions to reduce some boilerplate codes:
+
+- trace
+- trace_async
+
+For normal functions, you can change:
+```rust
+use minitrace::*;
+
+fn amazing_func() {
+    let _span_guard = new_span("wow");
+
+    // some works
+}
+```
+to
+```rust
+use minitrace::*;
+use minitrace_macro::trace;
+
+#[trace("wow")]
+fn amazing_func() {
+    // some works
+}
+```
+
+For async functions, you can change:
+```rust
+use minitrace::*;
+
+async fn amazing_async_func() {
+    async {
+        // some works
+    }
+    .in_new_span("wow")
+    .await
+}
+```
+to
+```rust
+use minitrace::*;
+use minitrace_macro::trace_async;
+
+#[trace_async("wow")]
+async fn amazing_async_func() {
+    // some works
+}
+```
+
+To access these macros, dependency should be added as:
+
+```toml
+[dependencies]
+minitrace-macro = { git = "https://github.com/tikv/minitrace-rust.git" }
+```
+
+## UI
+
+We support visualization provided by an amazing tracing platform [Jaeger](https://www.jaegertracing.io/).
+
+To experience, dependency should be added as:
+               
+```toml
+[dependencies]
+minitrace-jaeger = { git = "https://github.com/tikv/minitrace-rust.git" }
+```
+
+### Report to Jaeger
 
 ```rust
-let (root, collector) = minitrace::start_trace(0, 0u32);
+use minitrace_jaeger::Reporter;
+use std::net::{Ipv4Addr, SocketAddr};
 
-let mut handle = minitrace::thread::new_async_scope();
+let spans = /* collect from a collector */;
 
-let th = std::thread::spawn(move || {
-    let _parent_guard = handle.start_scope(0, 1u32);
+let socket = SocketAddr::new(Ipv4Addr::new(127, 0, 0, 1).into(), 6831);
+let reporter = Reporter::new(socket, "service name");
 
-    {
-        let _child_guard = minitrace::new_span(2u32);
-    }
-});
-
-drop(root);
-
-th.join().unwrap();
-let trace_results = collector.collect();
+const TRACE_ID: u64 = 42;
+reporter.report(TRACE_ID, spans).expect("report error");
 ```
 
-
-## Timeline Examples
-
-
-### Setup JaegerUI
+### Setup Jaeger
 ```sh
-$ docker run --rm -d -p6831:6831/udp -p6832:6832/udp -p16686:16686 jaegertracing/all-in-one:latest
+docker run --rm -d -p6831:6831/udp -p16686:16686 --name jaeger jaegertracing/all-in-one:latest
 ```
 
 ### Run Synchronous Example
+
 ```sh
-$ cargo run --example synchronous
-====================================================================== 111.69 ms
-=                                                                        2.13 ms
-                                                                         1.06 ms
- ==                                                                      4.14 ms
-  =                                                                      2.07 ms
-   ===                                                                   6.16 ms
-     =                                                                   3.08 ms
-       =====                                                             8.18 ms
-          ==                                                             4.09 ms
-            ======                                                      10.20 ms
-                ===                                                      5.10 ms
-                   =======                                              12.18 ms
-                       ===                                               6.09 ms
-                          ========                                      14.15 ms
-                               ====                                      7.08 ms
-                                   ==========                           16.16 ms
-                                        =====                            8.08 ms
-                                             ===========                18.17 ms
-                                                   =====                 9.08 ms
-                                                         ============   20.17 ms
-                                                               ======   10.08 ms
+cargo run --example synchronous
 ```
+
+Open http://localhost:16686 to see the results.
+
 ![Jaeger Synchronous](img/jaeger-synchronous.png)
 
 ### Run Asynchronous Example
+
 ```sh
-$ cargo run --example asynchronous
-======================================================================  63.81 ms
-                                                                         0.14 ms
-===========                                                             10.88 ms
-                                                                         0.11 ms
-                                                                         0.00 ms
-                                                                         0.03 ms
-===========                                                             10.82 ms
-===========                                                             10.82 ms
-                                                                         0.02 ms
-            ============                                                10.99 ms
-            ============                                                10.98 ms
-                                                                         0.07 ms
-===========                                                             10.09 ms
-                                                                         0.07 ms
-           ============                                                 10.97 ms
-           ============                                                 10.97 ms
-                                                                         0.04 ms
-                       ============                                     11.13 ms
-                       ============                                     11.13 ms
-                                                                         0.12 ms
-======================                                                  20.12 ms
-                                                                         0.08 ms
-                      ============                                      11.11 ms
-                      ============                                      11.11 ms
-                                                                         0.04 ms
-                                  ============                          11.18 ms
-                                  ============                          11.17 ms
-===========                                                             10.88 ms
-            =================================                           30.12 ms
-                                                                         0.07 ms
-                                             ============               11.08 ms
-                                             ============               11.07 ms
-                                                                         0.10 ms
-                                                         ============   11.24 ms
-                                                         ============   11.23 ms
-===========                                                             10.84 ms
-                                                                         0.10 ms
-            ============                                                11.03 ms
-            ============                                                11.02 ms
-                        ===========                                     10.40 ms
-                                                                         0.01 ms
-                                   ===========                          10.29 ms
-                                                                         0.01 ms
-                                               ======================   20.86 ms
-                                                                         0.01 ms
+cargo run --example asynchronous
 ```
+
+Open http://localhost:16686 to see the results.
+
 ![Jaeger Asynchronous](img/jaeger-asynchronous.png)
