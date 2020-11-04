@@ -1,31 +1,15 @@
 // Copyright 2020 TiKV Project Authors. Licensed under Apache-2.0.
 
-mod common;
-
-use minitrace::future::FutureExt as _;
-use minitrace::State;
-use minitrace_jaeger::{JaegerSpanInfo, ReferenceType};
-
-#[derive(Debug)]
-enum AsyncJob {
-    #[allow(dead_code)]
-    Unknown,
-    Root,
-    Loop,
-    IterJob,
-    OtherJob,
-}
-
-impl Into<u32> for AsyncJob {
-    fn into(self) -> u32 {
-        self as u32
-    }
-}
+use minitrace::future::FutureExt;
+use minitrace::*;
+use minitrace_jaeger::Reporter;
+use minitrace_macro::trace_async;
+use std::net::{Ipv4Addr, SocketAddr};
 
 fn parallel_job() -> Vec<tokio::task::JoinHandle<()>> {
     let mut v = Vec::with_capacity(4);
     for i in 0..4 {
-        v.push(tokio::spawn(iter_job(i).in_new_scope(AsyncJob::IterJob)));
+        v.push(tokio::spawn(iter_job(i).in_new_scope("iter job")));
     }
     v
 }
@@ -36,7 +20,7 @@ async fn iter_job(iter: u64) {
     other_job().await;
 }
 
-#[minitrace::trace_async(AsyncJob::OtherJob)]
+#[trace_async("other job")]
 async fn other_job() {
     for i in 0..20 {
         if i == 10 {
@@ -48,59 +32,26 @@ async fn other_job() {
 
 #[tokio::main]
 async fn main() {
-    let (root, tracker) = minitrace::start_trace(0, AsyncJob::Root);
+    let (scope, collector) = root_scope("root");
 
     let f = async {
-        minitrace::new_property(b"sample property:it works");
-        let jhs = parallel_job();
+        let jhs = {
+            let _s = new_span("a span").with_property(|| ("a property", "a value".to_owned()));
+            parallel_job()
+        };
+
         other_job().await;
 
         for jh in jhs {
             jh.await.unwrap();
         }
     }
-    .in_new_scope(AsyncJob::Loop);
+    .with_scope(scope);
+
     tokio::spawn(f).await.unwrap();
 
-    drop(root);
-
-    let trace_result = tracker.finish();
-
-    use std::net::SocketAddr;
-    let mut buf = Vec::with_capacity(2048);
-    minitrace_jaeger::thrift_compact_encode(
-        &mut buf,
-        "Async Example",
-        rand::random(),
-        rand::random(),
-        &trace_result,
-        |s| JaegerSpanInfo {
-            self_id: s.id as _,
-            parent_id: s.parent_id as _,
-            reference_type: ReferenceType::FollowFrom,
-            operation_name: {
-                format!(
-                    "{}{:?}",
-                    match s.state {
-                        State::Pending => "[Pending] ",
-                        State::Normal => "",
-                    },
-                    unsafe { std::mem::transmute::<_, AsyncJob>(s.event as u8) }
-                )
-            },
-        },
-        |property| {
-            let mut split = property.splitn(2, |b| *b == b':');
-            let key = String::from_utf8_lossy(split.next().unwrap()).to_owned();
-            let value = String::from_utf8_lossy(split.next().unwrap()).to_owned();
-            (key, value)
-        },
-    );
-
-    let local_addr: SocketAddr = "0.0.0.0:0".parse().unwrap();
-    if let Ok(mut socket) = tokio::net::UdpSocket::bind(local_addr).await {
-        let _ = socket.send_to(&buf, "127.0.0.1:6831").await;
-    }
-
-    crate::common::draw_stdout(trace_result);
+    let spans = collector.collect(true, None, None);
+    let socket = SocketAddr::new(Ipv4Addr::new(127, 0, 0, 1).into(), 6831);
+    let reporter = Reporter::new(socket, "asynchronous");
+    reporter.report(rand::random(), spans).ok();
 }

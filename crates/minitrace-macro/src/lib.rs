@@ -53,7 +53,7 @@ pub fn trace(args: TokenStream, item: TokenStream) -> TokenStream {
         #vis #constness #unsafety #asyncness #abi fn #ident<#gen_params>(#params) #return_type
         #where_clause
         {
-            let _guard = minitrace::new_span(#event);
+            let _guard = new_span(#event);
             #block
         }
     )
@@ -111,7 +111,6 @@ pub fn trace_async(args: TokenStream, item: TokenStream) -> TokenStream {
         #vis #constness #unsafety #asyncness #abi fn #ident<#gen_params>(#params) #return_type
         #where_clause
         {
-            use minitrace::future::FutureExt as _;
             #body
         }
     )
