@@ -1,6 +1,6 @@
 # Minitrace
-[![Actions Status](https://github.com/tikv/minitrace/workflows/CI/badge.svg)](https://github.com/tikv/minitrace/actions)
-[![LICENSE](https://img.shields.io/github/license/tikv/minitrace.svg)](https://github.com/tikv/minitrace/blob/master/LICENSE)
+[![Actions Status](https://github.com/tikv/minitrace-rust/workflows/CI/badge.svg)](https://github.com/tikv/minitrace-rust/actions)
+[![LICENSE](https://img.shields.io/github/license/tikv/minitrace-rust.svg)](https://github.com/tikv/minitrace-rust/blob/master/LICENSE)
 
 A high-performance, ergonomic timeline tracing library for Rust.
 
@@ -84,7 +84,7 @@ let _span_guard = new_span("my event").with_properties(|| {
 
 ###  Synchronous Example
 
-A common pattern to trace synchronous code:
+A common pattern to trace synchronous codes:
 
 - Create a root `Scope` and a `Collector` via `root_scope`, then create `LocalScopeGuard` via `start_scope`.
 - Add `new_span`s somewhere, e.g. at the beginning of a code scope, at the beginning of a function, to record spans.
@@ -163,7 +163,7 @@ We provide three future adaptors:
 The last two adaptors are mostly used on a `Future` submitting to a runtime.
 
 ```rust
-use minitrace::future::FutureExt as _;
+use minitrace::FutureExt as _;
 use minitrace::{root_scope, Span};
 
 let collector = {
@@ -253,7 +253,7 @@ To access these macros, a dependency should be added as:
 minitrace-macro = { git = "https://github.com/tikv/minitrace-rust.git" }
 ```
 
-## UI
+## User Interface
 
 We support visualization provided by an amazing tracing platform [Jaeger](https://www.jaegertracing.io/).
 

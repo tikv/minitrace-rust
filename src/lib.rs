@@ -6,19 +6,18 @@
 use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
 
-use crate::span::span_id::DefaultIdGenerator;
-
+pub use crate::future::FutureExt;
 pub use crate::local::scope_guard::LocalScopeGuard;
 pub use crate::local::span_guard::LocalSpanGuard;
 pub use crate::span::cycle::DefaultClock;
-pub use crate::span::span_id::SpanId;
+pub use crate::span::span_id::{DefaultIdGenerator, SpanId};
 pub use crate::span::Span;
 pub use crate::trace::collector::Collector;
 pub use crate::trace::scope::Scope;
 
 pub mod collections;
-pub mod future;
 
+pub(crate) mod future;
 pub(crate) mod local;
 pub(crate) mod span;
 pub(crate) mod trace;

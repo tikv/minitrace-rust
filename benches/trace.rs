@@ -1,7 +1,7 @@
 // Copyright 2020 TiKV Project Authors. Licensed under Apache-2.0.
 
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
-use minitrace::{new_span, root_scope};
+use minitrace::*;
 use minitrace_macro::trace;
 
 fn dummy_iter(i: usize) {
@@ -67,8 +67,6 @@ fn trace_deep_bench(c: &mut Criterion) {
 }
 
 fn trace_future_bench(c: &mut Criterion) {
-    use minitrace::future::FutureExt;
-
     async fn f(i: u32) {
         for _ in 0..i - 1 {
             async {}.in_new_span(black_box("")).await

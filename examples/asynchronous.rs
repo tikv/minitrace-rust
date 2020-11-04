@@ -1,6 +1,5 @@
 // Copyright 2020 TiKV Project Authors. Licensed under Apache-2.0.
 
-use minitrace::future::FutureExt;
 use minitrace::*;
 use minitrace_jaeger::Reporter;
 use minitrace_macro::trace_async;
