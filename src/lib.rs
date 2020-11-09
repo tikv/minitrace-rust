@@ -189,4 +189,31 @@ mod tests {
         assert_eq!(spans1.len(), 25);
         assert_eq!(spans2.len(), 25);
     }
+
+    #[test]
+    fn multiple_scopes_without_spans() {
+        let (spans1, spans2, spans3) = {
+            let (c1, c2, c3) = {
+                let (root_scope1, collector1) = root_scope("root1");
+                let (root_scope2, collector2) = root_scope("root2");
+                let (root_scope3, collector3) = root_scope("root3");
+
+                let _sg1 = root_scope1.start_scope();
+                let _sg2 = root_scope2.start_scope();
+                let _sg3 = root_scope3.start_scope();
+
+                (collector1, collector2, collector3)
+            };
+
+            (
+                c1.collect(true, None, None),
+                c2.collect(true, None, None),
+                c3.collect(true, None, None),
+            )
+        };
+
+        assert_eq!(spans1.len(), 1);
+        assert_eq!(spans2.len(), 1);
+        assert_eq!(spans3.len(), 1);
+    }
 }
