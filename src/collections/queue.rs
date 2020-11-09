@@ -308,7 +308,7 @@ impl<T> FixedIndexQueue<T> {
         self.internal.clear();
     }
 
-    /// Removes values before `index`. Should make sure `index` is valid.
+    /// Removes values before `index`. Should make sure `index` is valid or is the next index.
     ///
     /// # Examples
     /// ```
@@ -321,15 +321,24 @@ impl<T> FixedIndexQueue<T> {
     ///
     /// queue.remove_before(2);
     /// assert_eq!(queue.len(), 1);
+    ///
+    /// assert_eq!(queue.push_back(44), 3);
+    /// queue.remove_before(4);
+    /// assert_eq!(queue.len(), 0);
     /// ```
     #[inline]
     pub fn remove_before(&mut self, index: usize) {
-        assert!(self.idx_is_valid(index), "index {} isn't valid", index);
+        assert!(
+            self.idx_is_valid(index) || index == self.next_index(),
+            "index {} is invalid",
+            index
+        );
 
         let mut count = index.wrapping_sub(self.offset);
         while count > 0 {
             self.internal.pop_front();
             count -= 1;
+            self.offset = self.offset.wrapping_add(1);
         }
     }
 
