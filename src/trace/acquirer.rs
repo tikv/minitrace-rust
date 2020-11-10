@@ -55,7 +55,7 @@ impl AcquirerGroup {
         }
     }
 
-    pub fn combine<'a, I: Iterator<Item = &'a AcquirerGroup>>(
+    pub fn combine<'a, I: Iterator<Item = &'a Self>>(
         iter: I,
         scope_span: ScopeSpan,
     ) -> Option<Self> {
@@ -96,12 +96,8 @@ impl AcquirerGroup {
 
 impl AcquirerGroup {
     fn submit_to_acquirers(&self, span_collection: SpanCollection) {
-        // save one clone
-        for acq in self.acquirers.iter().skip(1) {
+        for acq in &self.acquirers {
             acq.submit(span_collection.clone());
-        }
-        if let Some(acq) = self.acquirers.first() {
-            acq.submit(span_collection);
         }
     }
 }
