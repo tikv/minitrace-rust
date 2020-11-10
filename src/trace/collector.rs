@@ -1,14 +1,15 @@
 // Copyright 2020 TiKV Project Authors. Licensed under Apache-2.0.
 
-use crate::span::cycle::DefaultClock;
-use crate::span::span_id::SpanId;
-use crate::span::Span;
-use crate::trace::acquirer::SpanCollection;
 use crossbeam_channel::Receiver;
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
+
+use crate::span::cycle::DefaultClock;
+use crate::span::span_id::SpanId;
+use crate::span::Span;
+use crate::trace::acquirer::SpanCollection;
 
 pub struct Collector {
     receiver: Receiver<SpanCollection>,
@@ -35,7 +36,7 @@ impl Collector {
 
         if let Some(duration) = duration_threshold {
             if let Some(span) = span_collections.iter().find_map(|s| match s {
-                SpanCollection::ScopeSpan(s) => Some(s.clone()),
+                SpanCollection::ScopeSpan(s) => Some(*s),
                 _ => None,
             }) {
                 let anchor = DefaultClock::anchor();
@@ -43,7 +44,7 @@ impl Collector {
                     .epoch_time_ns
                     - DefaultClock::cycle_to_realtime(span.begin_cycle, anchor).epoch_time_ns;
                 if duration_ns < duration.as_nanos() as _ {
-                    return vec![span];
+                    return vec![span.into_span()];
                 }
             }
         }
@@ -77,7 +78,7 @@ impl Collector {
                     parent_span_id,
                 } => {
                     let mut remaining_descendant_count = 0;
-                    for mut span in local_spans {
+                    for span in &*local_spans {
                         if remaining_descendant_count > 0 {
                             remaining_descendant_count -= 1;
                             if span._is_spawn_span {
@@ -85,28 +86,28 @@ impl Collector {
                                 continue;
                             }
 
-                            spans.push(span);
+                            spans.push(span.clone());
                         } else if span.end_cycle.is_zero() {
                             continue;
                         } else {
-                            span.parent_id = parent_span_id;
-
                             if span._is_spawn_span {
-                                parent_ids_of_spawn_spans.insert(span.id, span.parent_id);
+                                parent_ids_of_spawn_spans.insert(span.id, parent_span_id);
                                 continue;
                             }
 
+                            let mut span = span.clone();
+                            span.parent_id = parent_span_id;
                             remaining_descendant_count = span._descendant_count;
                             spans.push(span);
                         }
                     }
                 }
                 SpanCollection::ScopeSpan(mut scope_span) => {
-                    if scope_span.is_root() {
+                    if scope_span.parent_id == SpanId::new(0) {
                         scope_span.parent_id = parent_id_of_root.unwrap_or_default();
-                        spans.push(scope_span);
+                        spans.push(scope_span.into_span());
                     } else {
-                        pending_scope_spans.push(scope_span);
+                        pending_scope_spans.push(scope_span.into_span());
                     }
                 }
             }

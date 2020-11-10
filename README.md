@@ -84,7 +84,7 @@ let _span_guard = new_span("my event").with_properties(|| {
 
 ###  Synchronous Example
 
-A common pattern to trace synchronous codes:
+A common pattern to trace synchronous code:
 
 - Create a root `Scope` and a `Collector` via `root_scope`, then create `LocalScopeGuard` via `start_scope`.
 - Add `new_span`s somewhere, e.g. at the beginning of a code scope, at the beginning of a function, to record spans.
@@ -110,7 +110,7 @@ let spans: Vec<Span> = collector.collect(true, None, None);
 
 ### Asynchronous Example
 
-To trace asynchronous codes, we usually transmit `Scope` from one thread to another thread.
+To trace asynchronous code, we usually transmit `Scope` from one thread to another thread.
 
 The transmitted `Scope` is of one of the following types:
 
@@ -197,7 +197,7 @@ let spans: Vec<Span> = collector.collect(true, None, None);
 
 ### Macros
 
-We provide two macro for functions to reduce some boilerplate codes:
+We provide two macros to help reduce boilerplate code:
 
 - trace
 - trace_async

@@ -57,23 +57,12 @@ impl Span {
     }
 }
 
-impl AsRef<Span> for Span {
-    fn as_ref(&self) -> &Span {
-        self
-    }
-}
-
-impl Into<Span> for &Span {
-    fn into(self) -> Span {
-        self.clone()
-    }
-}
-
 #[derive(Copy, Clone, Debug)]
 pub struct ScopeSpan {
     pub id: SpanId,
     pub parent_id: SpanId,
-    pub begin_cycles: Cycle,
+    pub begin_cycle: Cycle,
+    pub end_cycle: Cycle,
     pub event: &'static str,
 }
 
@@ -82,19 +71,20 @@ impl ScopeSpan {
         ScopeSpan {
             id,
             parent_id,
-            begin_cycles,
+            begin_cycle: begin_cycles,
+            end_cycle: Cycle::new(0),
             event,
         }
     }
 
-    pub fn to_span(&self, end_cycles: Cycle) -> Span {
+    pub fn into_span(self) -> Span {
         Span {
             id: self.id,
             parent_id: self.parent_id,
-            begin_cycle: self.begin_cycles,
+            begin_cycle: self.begin_cycle,
             event: self.event,
             properties: vec![],
-            end_cycle: end_cycles,
+            end_cycle: self.end_cycle,
             _descendant_count: 0,
             _is_spawn_span: false,
         }
