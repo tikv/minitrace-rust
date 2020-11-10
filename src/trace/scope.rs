@@ -1,24 +1,24 @@
 // Copyright 2020 TiKV Project Authors. Licensed under Apache-2.0.
 
+use crossbeam_channel::Sender;
+use std::sync::atomic::AtomicBool;
+use std::sync::Arc;
+
 use crate::local::acquirer_group::registered_acquirer_group;
 use crate::local::scope_guard::LocalScopeGuard;
 use crate::span::cycle::DefaultClock;
 use crate::span::span_id::{DefaultIdGenerator, SpanId};
 use crate::span::ScopeSpan;
 use crate::trace::acquirer::{Acquirer, AcquirerGroup, SpanCollection};
-use crossbeam_channel::Sender;
-
-use std::sync::atomic::AtomicBool;
-use std::sync::Arc;
 
 #[derive(Clone, Default)]
 pub struct Scope {
-    acquirer_group: Option<Arc<AcquirerGroup>>,
+    pub(crate) acquirer_group: Option<Arc<AcquirerGroup>>,
 }
 
 impl Scope {
     pub fn start_scope(&self) -> LocalScopeGuard {
-        LocalScopeGuard::new(self.acquirer_group.as_ref().cloned())
+        LocalScopeGuard::new(self.acquirer_group.clone())
     }
 }
 

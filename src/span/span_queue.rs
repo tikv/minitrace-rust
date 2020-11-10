@@ -1,10 +1,11 @@
 // Copyright 2020 TiKV Project Authors. Licensed under Apache-2.0.
 
+use std::collections::VecDeque;
+
 use crate::collections::queue::FixedIndexQueue;
 use crate::span::cycle::{Cycle, DefaultClock};
 use crate::span::span_id::{DefaultIdGenerator, SpanId};
 use crate::span::{ScopeSpan, Span};
-use std::collections::VecDeque;
 
 pub struct SpanQueue {
     span_queue: FixedIndexQueue<Span>,

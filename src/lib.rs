@@ -45,6 +45,11 @@ pub fn set_span_id_prefix(id_prefix: u32) {
     DefaultIdGenerator::set_prefix(id_prefix)
 }
 
+#[inline]
+pub fn start_scopes<'a, I: Iterator<Item = &'a Scope>>(iter: I) -> LocalScopeGuard {
+    LocalScopeGuard::new_from_scopes(iter)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

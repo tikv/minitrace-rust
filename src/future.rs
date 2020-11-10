@@ -1,7 +1,8 @@
 // Copyright 2020 TiKV Project Authors. Licensed under Apache-2.0.
 
-use crate::{merge_local_scopes, new_span, Scope};
 use std::task::Poll;
+
+use crate::{merge_local_scopes, new_span, Scope};
 
 impl<T: Sized> FutureExt for T {}
 

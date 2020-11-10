@@ -1,20 +1,21 @@
 // Copyright 2020 TiKV Project Authors. Licensed under Apache-2.0.
 
-use crate::span::cycle::DefaultClock;
-use crate::span::span_id::SpanId;
-use crate::span::{ScopeSpan, Span};
 use crossbeam_channel::Sender;
 use std::collections::VecDeque;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
+use crate::span::cycle::DefaultClock;
+use crate::span::span_id::SpanId;
+use crate::span::{ScopeSpan, Span};
+
 #[derive(Clone, Debug)]
 pub enum SpanCollection {
     LocalSpans {
-        spans: VecDeque<Span>,
+        spans: Arc<VecDeque<Span>>,
         parent_span_id: SpanId,
     },
-    ScopeSpan(Span),
+    ScopeSpan(ScopeSpan),
 }
 
 #[derive(Clone, Debug)]
@@ -81,14 +82,14 @@ impl AcquirerGroup {
         }
     }
 
-    pub fn submit(&self, spans: VecDeque<Span>) {
+    pub fn submit(&self, spans: Arc<VecDeque<Span>>) {
         self.submit_to_acquirers(SpanCollection::LocalSpans {
             spans,
             parent_span_id: self.scope_span.id,
         });
     }
 
-    pub fn submit_scope_span(&self, scope_span: Span) {
+    pub fn submit_scope_span(&self, scope_span: ScopeSpan) {
         self.submit_to_acquirers(SpanCollection::ScopeSpan(scope_span));
     }
 }
@@ -107,6 +108,7 @@ impl AcquirerGroup {
 
 impl Drop for AcquirerGroup {
     fn drop(&mut self) {
-        self.submit_scope_span(self.scope_span.to_span(DefaultClock::now()));
+        self.scope_span.end_cycle = DefaultClock::now();
+        self.submit_scope_span(self.scope_span);
     }
 }
