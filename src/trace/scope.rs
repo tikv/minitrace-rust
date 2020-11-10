@@ -4,7 +4,7 @@ use crossbeam_channel::Sender;
 use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
 
-use crate::local::acquirer_group::registered_acquirer_group;
+use crate::local::acquirer_group::merge_registered_local_acquirers;
 use crate::local::scope_guard::LocalScopeGuard;
 use crate::span::cycle::DefaultClock;
 use crate::span::span_id::{DefaultIdGenerator, SpanId};
@@ -44,7 +44,7 @@ impl Scope {
 
     pub(crate) fn merge_local_scopes(event: &'static str) -> Self {
         Self {
-            acquirer_group: registered_acquirer_group(event).map(Arc::new),
+            acquirer_group: merge_registered_local_acquirers(event).map(Arc::new),
         }
     }
 

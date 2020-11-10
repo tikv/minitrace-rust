@@ -44,7 +44,7 @@ impl SpanLine {
         self.span_queue.finish_span(span_handle);
     }
 
-    pub fn register_now(&mut self, acquirer_group: SmallVec<[Arc<AcquirerGroup>; 4]>) -> Listener {
+    pub fn register(&mut self, acquirer_group: SmallVec<[Arc<AcquirerGroup>; 4]>) -> Listener {
         debug_assert_eq!(
             self.local_acquirer_groups.len(),
             self.registry.len(),
@@ -87,7 +87,7 @@ impl SpanLine {
 
     /// Return `None` if there're no registered acquirers, or all acquirers
     /// combined into one group.
-    pub fn registered_acquirer_group(&mut self, event: &'static str) -> Option<AcquirerGroup> {
+    pub fn merge_registered_acquirers(&mut self, event: &'static str) -> Option<AcquirerGroup> {
         match self.start_scope_span("<spawn>", event) {
             None => None,
             Some(ss) => AcquirerGroup::combine(

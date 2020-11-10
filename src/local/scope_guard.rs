@@ -21,7 +21,7 @@ impl LocalScopeGuard {
             let mut span_line = span_line.borrow_mut();
             Self {
                 listener: acquirer_group
-                    .map(|acq_group| span_line.register_now(smallvec::smallvec![acq_group])),
+                    .map(|acq_group| span_line.register(smallvec::smallvec![acq_group])),
             }
         })
     }
@@ -36,7 +36,7 @@ impl LocalScopeGuard {
                 listener: if sv.is_empty() {
                     None
                 } else {
-                    Some(span_line.register_now(sv))
+                    Some(span_line.register(sv))
                 },
             }
         })
