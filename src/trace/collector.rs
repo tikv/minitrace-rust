@@ -36,7 +36,7 @@ impl Collector {
 
         if let Some(duration) = duration_threshold {
             if let Some(span) = span_collections.iter().find_map(|s| match s {
-                SpanCollection::ScopeSpan(s) => Some(s.clone()),
+                SpanCollection::ScopeSpan(s) => Some(*s),
                 _ => None,
             }) {
                 let anchor = DefaultClock::anchor();
