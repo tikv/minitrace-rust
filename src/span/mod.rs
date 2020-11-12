@@ -89,4 +89,9 @@ impl ScopeSpan {
             _is_spawn_span: false,
         }
     }
+
+    #[inline]
+    pub fn is_root(&self) -> bool {
+        self.parent_id == SpanId::new(0)
+    }
 }

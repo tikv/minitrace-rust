@@ -35,16 +35,17 @@ impl Collector {
         self.closed.store(true, Ordering::SeqCst);
 
         if let Some(duration) = duration_threshold {
-            if let Some(span) = span_collections.iter().find_map(|s| match s {
-                SpanCollection::ScopeSpan(s) => Some(*s),
+            // find the root span and check its duration
+            if let Some(scope_span) = span_collections.iter().find_map(|s| match s {
+                SpanCollection::ScopeSpan(s) if s.is_root() => Some(*s),
                 _ => None,
             }) {
                 let anchor = DefaultClock::anchor();
-                let duration_ns = DefaultClock::cycle_to_realtime(span.end_cycle, anchor)
+                let duration_ns = DefaultClock::cycle_to_realtime(scope_span.end_cycle, anchor)
                     .epoch_time_ns
-                    - DefaultClock::cycle_to_realtime(span.begin_cycle, anchor).epoch_time_ns;
+                    - DefaultClock::cycle_to_realtime(scope_span.begin_cycle, anchor).epoch_time_ns;
                 if duration_ns < duration.as_nanos() as _ {
-                    return vec![span.into_span()];
+                    return vec![scope_span.into_span()];
                 }
             }
         }
@@ -88,6 +89,7 @@ impl Collector {
 
                             spans.push(span.clone());
                         } else if span.end_cycle.is_zero() {
+                            // remove unfinished span
                             continue;
                         } else {
                             if span._is_spawn_span {
