@@ -32,7 +32,7 @@ A high-performance, ergonomic timeline tracing library for Rust.
   which will trace the same task. After dropping all `Scope`s related to a task, a `Span`, representing the whole execution
   of the task, will be recorded.
 
-  A new `Scope` can be created by function `root_scope()` and `merge_local_scopes()`, as mentioned [here](#Asynchronous Example).
+  A new `Scope` can be created by function `root_scope()` and `child_scope()`, as mentioned [here](#Asynchronous Example).
 
 ### Local Scope Guard
 
@@ -115,14 +115,14 @@ To trace asynchronous code, we usually transmit `Scope` from one thread to anoth
 The transmitted `Scope` is of one of the following types:
 
 - Clone from an existing `Scope`, will trace the same task as the origin `Scope`
-- Create via `merge_local_scopes`, will trace a new task related to the origin task
+- Create via `child_scope`, will trace a new task related to the origin task
 
 You can choose one of the variants to satisfy the semantic of your application.
 
 #### Threads
 
 ```rust
-use minitrace::{merge_local_scopes, new_span, root_scope, Span};
+use minitrace::{child_scope, new_span, root_scope, Span};
 
 let collector = {
     let (root_scope, collector) = root_scope("task1");
@@ -139,7 +139,7 @@ let collector = {
     });
     
     // To trace a new task
-    let scope = merge_local_scopes("task2");
+    let scope = child_scope("task2");
     std::thread::spawn(move || {
         let _scope_guard = scope.start_scope();
 
@@ -157,7 +157,7 @@ let spans: Vec<Span> = collector.collect(true, None, None);
 We provide three future adaptors:
 
 - `in_new_span`: will call `new_span` at every poll
-- `in_new_scope`: create a new scope via `merge_local_scopes`, will call `start_scope` at every poll
+- `in_new_scope`: create a new scope via `child_scope`, will call `start_scope` at every poll
 - `with_scope`: accept a `Scope`, will call `start_scope` at every poll
 
 The last two adaptors are mostly used on a `Future` submitting to a runtime.
