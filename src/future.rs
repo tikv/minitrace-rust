@@ -2,7 +2,7 @@
 
 use std::task::Poll;
 
-use crate::{merge_local_scopes, new_span, Scope};
+use crate::{child_scope, new_span, Scope};
 
 impl<T: Sized> FutureExt for T {}
 
@@ -11,7 +11,7 @@ pub trait FutureExt: Sized {
     fn in_new_scope(self, event: &'static str) -> WithScope<Self> {
         WithScope {
             inner: self,
-            scope: merge_local_scopes(event),
+            scope: child_scope(event),
         }
     }
 

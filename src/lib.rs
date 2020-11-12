@@ -31,7 +31,7 @@ pub fn root_scope(event: &'static str) -> (Scope, Collector) {
 }
 
 #[inline]
-pub fn merge_local_scopes(event: &'static str) -> Scope {
+pub fn child_scope(event: &'static str) -> Scope {
     Scope::merge_local_scopes(event)
 }
 
@@ -135,7 +135,7 @@ mod tests {
 
             for _ in 0..4 {
                 let wg = wg.clone();
-                let scope = merge_local_scopes("cross-thread");
+                let scope = child_scope("cross-thread");
                 std::thread::spawn(move || {
                     let _sg = scope.start_scope();
 
@@ -170,7 +170,7 @@ mod tests {
 
                 for _ in 0..4 {
                     let wg = wg.clone();
-                    let scope = merge_local_scopes("cross-thread");
+                    let scope = child_scope("cross-thread");
                     std::thread::spawn(move || {
                         let _sg = scope.start_scope();
 
