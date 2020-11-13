@@ -8,7 +8,9 @@ use std::net::{Ipv4Addr, SocketAddr};
 fn parallel_job() -> Vec<tokio::task::JoinHandle<()>> {
     let mut v = Vec::with_capacity(4);
     for i in 0..4 {
-        v.push(tokio::spawn(iter_job(i).in_new_scope("iter job")));
+        v.push(tokio::spawn(
+            iter_job(i).with_scope(Scope::child("iter job")),
+        ));
     }
     v
 }
@@ -31,11 +33,11 @@ async fn other_job() {
 
 #[tokio::main]
 async fn main() {
-    let (scope, collector) = root_scope("root");
+    let (scope, collector) = Scope::root("root");
 
     let f = async {
         let jhs = {
-            let _s = new_span("a span").with_property(|| ("a property", "a value".to_owned()));
+            let _s = start_span("a span").with_property(|| ("a property", "a value".to_owned()));
             parallel_job()
         };
 

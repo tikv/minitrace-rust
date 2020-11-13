@@ -1,12 +1,12 @@
 // Copyright 2020 TiKV Project Authors. Licensed under Apache-2.0.
 
-use minitrace::{new_span, root_scope};
+use minitrace::{start_scope, start_span, Scope};
 use minitrace_jaeger::Reporter;
 use minitrace_macro::trace;
 use std::net::{Ipv4Addr, SocketAddr};
 
 fn func1(i: u64) {
-    let _guard = new_span("func1");
+    let _guard = start_span("func1");
     std::thread::sleep(std::time::Duration::from_millis(i));
     func2(i);
 }
@@ -18,10 +18,11 @@ fn func2(i: u64) {
 
 fn main() {
     let spans = {
-        let (scope, collector) = root_scope("root");
+        let (scope, collector) = Scope::root("root");
 
-        let _scope_guard = scope.start_scope();
-        let _span_guard = new_span("a span").with_property(|| ("a property", "a value".to_owned()));
+        let _scope_guard = start_scope(&scope);
+        let _span_guard =
+            start_span("a span").with_property(|| ("a property", "a value".to_owned()));
 
         for i in 1..=10 {
             func1(i);

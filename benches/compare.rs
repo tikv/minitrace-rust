@@ -1,6 +1,7 @@
 // Copyright 2020 TiKV Project Authors. Licensed under Apache-2.0.
 
 use criterion::{criterion_group, criterion_main, Criterion};
+use minitrace::start_scope;
 
 fn rustracing_harness() {
     fn dummy_rustracing(span: &rustracing::span::Span<()>) {
@@ -49,13 +50,13 @@ fn opentelemetry_harness() {
 fn minitrace_harness() {
     fn dummy_minitrace() {
         for _ in 0..99 {
-            let _guard = minitrace::new_span("child");
+            let _guard = minitrace::start_span("child");
         }
     }
 
     {
-        let (root, collector) = minitrace::root_scope("parent");
-        let _g = root.start_scope();
+        let (root_scope, collector) = minitrace::Scope::root("parent");
+        let _g = start_scope(&root_scope);
 
         dummy_minitrace();
 

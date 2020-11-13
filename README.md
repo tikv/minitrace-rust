@@ -19,7 +19,7 @@ A high-performance, ergonomic timeline tracing library for Rust.
   A `LocalSpanGuard` is used to record a `Span`. Its creation means a `Span`'s begin and its destruction means a `Span`'s
   end.
   
-  A `LocalSpanGuard` is thread-local and can be created by function `new_span()`.
+  A `LocalSpanGuard` is thread-local and can be created via function `start_span()`.
 
   *Note: The relation between `Span`s is constructed implicitly. Even within a deeply nested function calls, the inner
   `LocalSpanGuard` can automatically figure out its parent without explicitly passing any tracing context as a parameter.*
@@ -32,16 +32,16 @@ A high-performance, ergonomic timeline tracing library for Rust.
   which will trace the same task. After dropping all `Scope`s related to a task, a `Span`, representing the whole execution
   of the task, will be recorded.
 
-  A new `Scope` can be created by function `root_scope()` and `child_scope()`, as mentioned [here](#Asynchronous Example).
+  A new `Scope` can be created via functions `Scope::root()`, `Scope::child()` and `Scope::empty()`.
 
 ### Local Scope Guard
 
   A `LocalScopeGuard` can gather spans on a thread during its own lifetime. Generally, the `LocalScopeGuard` should be held
   until the thread will not run for the task.
   
-  A `LocalScopeGuard` is thread-local and can be created by `Scope`'s method `start_scope()`.
+  A `LocalScopeGuard` is thread-local and can be created via functions `start_scope()` and `start_scopes()`.
   
-  *Note: Multiple `Scope`s can `start_scope` on the same thread. In which case, recorded spans will be shared for all `Scope`s.*
+  *Note: You can start multiple scopes on the same thread. In which case, recorded spans will be shared for all `Scope`s.*
 
 
 ### Collector
@@ -60,21 +60,21 @@ minitrace = { git = "https://github.com/tikv/minitrace-rust.git" }
 
 To record a common span:
 ```rust
-use minitrace::new_span;
+use minitrace::*;
 
-let _span_guard = new_span("my event");
+let _span_guard = start_span("my event");
 ```
 
 To add properties:
 
 ```rust
-use minitrace::new_span;
+use minitrace::*;
 
 // add a property for a span
-let _span_guard = new_span("my event").with_property(|| ("key", String::from("value")));
+let _span_guard = start_span("my event").with_property(|| ("key", String::from("value")));
 
 // or add multiple properties for a span
-let _span_guard = new_span("my event").with_properties(|| {
+let _span_guard = start_span("my event").with_properties(|| {
     vec![
         ("key1", String::from("value1")),
         ("key2", String::from("value2")),
@@ -86,19 +86,19 @@ let _span_guard = new_span("my event").with_properties(|| {
 
 A common pattern to trace synchronous code:
 
-- Create a root `Scope` and a `Collector` via `root_scope`, then create `LocalScopeGuard` via `start_scope`.
-- Add `new_span`s somewhere, e.g. at the beginning of a code scope, at the beginning of a function, to record spans.
+- Create a root `Scope` and a `Collector` via `Scope::root()`, then create `LocalScopeGuard` via `start_scope`.
+- Add `start_span()`s somewhere, e.g. at the beginning of a code scope, at the beginning of a function, to record spans.
 - Make sure the root `Scope` and all guards are dropped, then call `Collector`'s `collect` to get all `Span`s.
 
 
 ```rust
-use minitrace::{new_span, root_scope, Span};
+use minitrace::*;
 
 let collector = {
-    let (root_scope, collector) = root_scope("root");
-    let _scope_guard = root_scope.start_scope();
+    let (root_scope, collector) = Scope::root("root");
+    let _scope_guard = start_scope(&root_scope);
 
-    let _span_guard = new_span("child");
+    let _span_guard = start_span("child");
 
     // do something ...
 
@@ -115,35 +115,35 @@ To trace asynchronous code, we usually transmit `Scope` from one thread to anoth
 The transmitted `Scope` is of one of the following types:
 
 - Clone from an existing `Scope`, will trace the same task as the origin `Scope`
-- Create via `child_scope`, will trace a new task related to the origin task
+- Create via `Scope::child()`, will trace a new task related to the origin task
 
 You can choose one of the variants to satisfy the semantic of your application.
 
 #### Threads
 
 ```rust
-use minitrace::{child_scope, new_span, root_scope, Span};
+use minitrace::*;
 
 let collector = {
-    let (root_scope, collector) = root_scope("task1");
-    let _scope_guard = root_scope.start_scope();
+    let (root_scope, collector) = Scope::root("task1");
+    let _scope_guard = start_scope(&root_scope);
 
-    let _span_guard = new_span("span of task1");
+    let _span_guard = start_span("span of task1");
     
     // To trace the same task
     let scope = root_scope.clone();
     std::thread::spawn(move || {
-        let _scope_guard = scope.start_scope();
+        let _scope_guard = start_scope(&scope);
 
-        let _span_guard = new_span("span of also task1");
+        let _span_guard = start_span("span of also task1");
     });
     
     // To trace a new task
-    let scope = child_scope("task2");
+    let scope = Scope::child("task2");
     std::thread::spawn(move || {
-        let _scope_guard = scope.start_scope();
+        let _scope_guard = start_scope(&scope);
 
-        let _span_guard = new_span("span of also task2");
+        let _span_guard = start_span("span of also task2");
     });
 
     collector
@@ -154,21 +154,19 @@ let spans: Vec<Span> = collector.collect(true, None, None);
 
 #### Futures
 
-We provide three future adaptors:
+We provide two `Future` adaptors:
 
-- `in_new_span`: will call `new_span` at every poll
-- `in_new_scope`: create a new scope via `child_scope`, will call `start_scope` at every poll
-- `with_scope`: accept a `Scope`, will call `start_scope` at every poll
+- `in_new_span`: call `start_span` at every poll
+- `with_scope`: wrap the `Future` with the `Scope`, then call `start_scope` at every poll
 
-The last two adaptors are mostly used on a `Future` submitting to a runtime.
+The `with_scope` adaptor is commonly used on a `Future` submitting to a runtime.
 
 ```rust
-use minitrace::FutureExt as _;
-use minitrace::{root_scope, Span};
+use minitrace::*;
 
 let collector = {
-    let (root_scope, collector) = root_scope("root");
-    let _scope_guard = root_scope.start_scope();
+    let (root_scope, collector) = Scope::root("root");
+    let _scope_guard = start_scope(&root_scope);
 
     // To trace the same task
     let scope = root_scope.clone();
@@ -187,7 +185,7 @@ let collector = {
             // some works
         }.in_new_span("");
         
-    }.in_new_scope("new task"));
+    }.with_scope(Scope::child("new task")));
 
     collector
 };
@@ -207,7 +205,7 @@ For normal functions, you can change:
 use minitrace::*;
 
 fn amazing_func() {
-    let _span_guard = new_span("wow");
+    let _span_guard = start_span("wow");
 
     // some works
 }

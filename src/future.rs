@@ -2,19 +2,11 @@
 
 use std::task::Poll;
 
-use crate::{child_scope, new_span, Scope};
+use crate::{start_scope, start_span, Scope};
 
 impl<T: Sized> FutureExt for T {}
 
 pub trait FutureExt: Sized {
-    #[inline]
-    fn in_new_scope(self, event: &'static str) -> WithScope<Self> {
-        WithScope {
-            inner: self,
-            scope: child_scope(event),
-        }
-    }
-
     #[inline]
     fn with_scope(self, scope: Scope) -> WithScope<Self> {
         WithScope { inner: self, scope }
@@ -38,7 +30,7 @@ impl<T: std::future::Future> std::future::Future for WithScope<T> {
 
     fn poll(self: std::pin::Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> Poll<Self::Output> {
         let this = self.project();
-        let _guard = this.scope.start_scope();
+        let _guard = start_scope(this.scope);
         match this.inner.poll(cx) {
             r @ Poll::Pending => r,
             other => {
@@ -54,7 +46,7 @@ impl<T: futures_01::Future> futures_01::Future for WithScope<T> {
     type Error = T::Error;
 
     fn poll(&mut self) -> futures_01::Poll<Self::Item, Self::Error> {
-        let _guard = self.scope.start_scope();
+        let _guard = start_scope(&self.scope);
         match self.inner.poll() {
             r @ Ok(futures_01::Async::NotReady) => r,
             other => {
@@ -77,7 +69,7 @@ impl<T: std::future::Future> std::future::Future for WithSpan<T> {
 
     fn poll(self: std::pin::Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> Poll<Self::Output> {
         let this = self.project();
-        let _guard = new_span(this.event);
+        let _guard = start_span(this.event);
         this.inner.poll(cx)
     }
 }
@@ -87,7 +79,7 @@ impl<T: futures_01::Future> futures_01::Future for WithSpan<T> {
     type Error = T::Error;
 
     fn poll(&mut self) -> futures_01::Poll<Self::Item, Self::Error> {
-        let _guard = new_span(self.event);
+        let _guard = start_span(self.event);
         self.inner.poll()
     }
 }
