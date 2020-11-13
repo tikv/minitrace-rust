@@ -26,9 +26,9 @@ fn trace_wide_bench(c: &mut Criterion) {
         |b, len| {
             b.iter(|| {
                 {
-                    let (root_scope, collector) = root_scope("root");
+                    let (root_scope, collector) = Scope::root("root");
 
-                    let _sg = root_scope.start_scope();
+                    let _sg = start_scope(&root_scope);
 
                     if *len > 1 {
                         dummy_iter(*len);
@@ -49,9 +49,9 @@ fn trace_deep_bench(c: &mut Criterion) {
         |b, len| {
             b.iter(|| {
                 {
-                    let (root_scope, collector) = root_scope("root");
+                    let (root_scope, collector) = Scope::root("root");
 
-                    let _sg = root_scope.start_scope();
+                    let _sg = start_scope(&root_scope);
 
                     if *len > 1 {
                         dummy_rec(*len);
@@ -78,7 +78,7 @@ fn trace_future_bench(c: &mut Criterion) {
         |b, len| {
             b.iter(|| {
                 {
-                    let (root_scope, collector) = root_scope("root");
+                    let (root_scope, collector) = Scope::root("root");
 
                     let _ = futures_03::executor::block_on(f(*len).with_scope(root_scope));
 

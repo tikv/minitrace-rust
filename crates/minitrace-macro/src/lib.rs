@@ -53,7 +53,7 @@ pub fn trace(args: TokenStream, item: TokenStream) -> TokenStream {
         #vis #constness #unsafety #asyncness #abi fn #ident<#gen_params>(#params) #return_type
         #where_clause
         {
-            let _guard = new_span(#event);
+            let _guard = start_span(#event);
             #block
         }
     )

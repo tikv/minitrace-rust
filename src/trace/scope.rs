@@ -5,20 +5,34 @@ use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
 
 use crate::local::acquirer_group::merge_registered_local_acquirers;
-use crate::local::scope_guard::LocalScopeGuard;
 use crate::span::cycle::DefaultClock;
 use crate::span::span_id::{DefaultIdGenerator, SpanId};
 use crate::span::ScopeSpan;
 use crate::trace::acquirer::{Acquirer, AcquirerGroup, SpanCollection};
+use crate::Collector;
 
-#[derive(Clone, Default)]
+#[derive(Clone)]
 pub struct Scope {
     pub(crate) acquirer_group: Option<Arc<AcquirerGroup>>,
 }
 
 impl Scope {
-    pub fn start_scope(&self) -> LocalScopeGuard {
-        LocalScopeGuard::new(self.acquirer_group.clone())
+    pub fn root(event: &'static str) -> (Self, Collector) {
+        let (tx, rx) = crossbeam_channel::unbounded();
+        let closed = Arc::new(AtomicBool::new(false));
+        let scope = Scope::new_root_scope(event, tx, Arc::clone(&closed));
+        let collector = Collector::new(rx, closed);
+        (scope, collector)
+    }
+
+    pub fn child(event: &'static str) -> Self {
+        Self::merge_local_scopes(event)
+    }
+
+    pub fn empty() -> Self {
+        Self {
+            acquirer_group: None,
+        }
     }
 }
 

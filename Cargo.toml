@@ -23,7 +23,6 @@ package = "futures"
 
 [dev-dependencies]
 criterion = "0.3"
-crossbeam-utils = "0.8"
 minitrace-jaeger = { path = "crates/minitrace-jaeger" }
 minitrace-macro = { path = "crates/minitrace-macro" }
 tokio = { version = "0.2", features = ["full"] }
