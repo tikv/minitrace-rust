@@ -34,6 +34,7 @@ impl Collector {
         };
         self.closed.store(true, Ordering::SeqCst);
 
+        let parent_id_of_root = parent_id_of_root.unwrap_or_default();
         if let Some(duration) = duration_threshold {
             // find the root span and check its duration
             if let Some(scope_span) = span_collections.iter().find_map(|s| match s {
@@ -45,7 +46,9 @@ impl Collector {
                     .epoch_time_ns
                     - DefaultClock::cycle_to_realtime(scope_span.begin_cycle, anchor).epoch_time_ns;
                 if duration_ns < duration.as_nanos() as _ {
-                    return vec![scope_span.into_span()];
+                    let mut span = scope_span.into_span();
+                    span.parent_id = parent_id_of_root;
+                    return vec![span];
                 }
             }
         }
@@ -58,7 +61,7 @@ impl Collector {
     #[inline]
     fn remove_unfinished_and_spawn_spans(
         span_collections: Vec<SpanCollection>,
-        parent_id_of_root: Option<SpanId>,
+        parent_id_of_root: SpanId,
     ) -> Vec<Span> {
         let capacity = span_collections
             .iter()
@@ -106,7 +109,7 @@ impl Collector {
                 }
                 SpanCollection::ScopeSpan(mut scope_span) => {
                     if scope_span.parent_id == SpanId::new(0) {
-                        scope_span.parent_id = parent_id_of_root.unwrap_or_default();
+                        scope_span.parent_id = parent_id_of_root;
                         spans.push(scope_span.into_span());
                     } else {
                         pending_scope_spans.push(scope_span.into_span());
