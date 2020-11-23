@@ -6,7 +6,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 
-use crate::span::cycle::DefaultClock;
+use crate::span::cycle::{Anchor, DefaultClock};
 use crate::span::span_id::SpanId;
 use crate::span::Span;
 use crate::trace::acquirer::SpanCollection;
@@ -25,7 +25,7 @@ impl Collector {
         self,
         need_sync: bool,
         duration_threshold: Option<Duration>,
-        parent_id_of_root: Option<SpanId>,
+        parent_id_of_root: Option<u64>,
     ) -> Vec<Span> {
         let span_collections: Vec<_> = if need_sync {
             self.receiver.iter().collect()
@@ -35,25 +35,22 @@ impl Collector {
         self.closed.store(true, Ordering::SeqCst);
 
         let parent_id_of_root = parent_id_of_root.unwrap_or_default();
+        let anchor = DefaultClock::anchor();
         if let Some(duration) = duration_threshold {
             // find the root span and check its duration
-            if let Some(scope_span) = span_collections.iter().find_map(|s| match s {
+            if let Some(mut scope_span) = span_collections.iter().find_map(|s| match s {
                 SpanCollection::ScopeSpan(s) if s.is_root() => Some(*s),
                 _ => None,
             }) {
-                let anchor = DefaultClock::anchor();
-                let duration_ns = DefaultClock::cycle_to_realtime(scope_span.end_cycle, anchor)
-                    .epoch_time_ns
-                    - DefaultClock::cycle_to_realtime(scope_span.begin_cycle, anchor).epoch_time_ns;
-                if duration_ns < duration.as_nanos() as _ {
-                    let mut span = scope_span.into_span();
-                    span.parent_id = parent_id_of_root;
-                    return vec![span];
+                scope_span.parent_id = SpanId::new(parent_id_of_root);
+                let root_span = scope_span.build_span(anchor);
+                if root_span.duration_ns < duration.as_nanos() as _ {
+                    return vec![root_span];
                 }
             }
         }
 
-        Self::remove_unfinished_and_spawn_spans(span_collections, parent_id_of_root)
+        Self::remove_unfinished_and_spawn_spans(span_collections, parent_id_of_root, anchor)
     }
 }
 
@@ -61,7 +58,8 @@ impl Collector {
     #[inline]
     fn remove_unfinished_and_spawn_spans(
         span_collections: Vec<SpanCollection>,
-        parent_id_of_root: SpanId,
+        parent_id_of_root: u64,
+        anchor: Anchor,
     ) -> Vec<Span> {
         let capacity = span_collections
             .iter()
@@ -90,7 +88,7 @@ impl Collector {
                                 continue;
                             }
 
-                            spans.push(span.clone());
+                            spans.push(span.build_span(anchor));
                         } else if span.end_cycle.is_zero() {
                             // remove unfinished span
                             continue;
@@ -103,16 +101,16 @@ impl Collector {
                             let mut span = span.clone();
                             span.parent_id = parent_span_id;
                             remaining_descendant_count = span._descendant_count;
-                            spans.push(span);
+                            spans.push(span.build_span(anchor));
                         }
                     }
                 }
                 SpanCollection::ScopeSpan(mut scope_span) => {
-                    if scope_span.parent_id == SpanId::new(0) {
-                        scope_span.parent_id = parent_id_of_root;
-                        spans.push(scope_span.into_span());
+                    if scope_span.is_root() {
+                        scope_span.parent_id = SpanId::new(parent_id_of_root);
+                        spans.push(scope_span.build_span(anchor));
                     } else {
-                        pending_scope_spans.push(scope_span.into_span());
+                        pending_scope_spans.push(scope_span);
                     }
                 }
             }
@@ -122,7 +120,7 @@ impl Collector {
             if let Some(parent_id) = parent_ids_of_spawn_spans.get(&span.parent_id) {
                 span.parent_id = *parent_id;
             }
-            spans.push(span);
+            spans.push(span.build_span(anchor));
         }
 
         spans
