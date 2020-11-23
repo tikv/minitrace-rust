@@ -33,12 +33,12 @@ impl DefaultClock {
     #[inline]
     pub fn cycle_to_unix_time_ns(cycle: Cycle, anchor: Anchor) -> u64 {
         if cycle > anchor.cycle {
-            let forward_ns = ((cycle.0 - anchor.cycle.0) as u128 * 1_000_000_000
-                / anchor.cycles_per_second as u128) as u64;
+            let forward_ns = ((cycle.0 - anchor.cycle.0) as f64 * 1_000_000_000.0
+                / anchor.cycles_per_second as f64) as u64;
             anchor.unix_time_ns + forward_ns
         } else {
-            let backward_ns = ((anchor.cycle.0 - cycle.0) as u128 * 1_000_000_000
-                / anchor.cycles_per_second as u128) as u64;
+            let backward_ns = ((anchor.cycle.0 - cycle.0) as f64 * 1_000_000_000.0
+                / anchor.cycles_per_second as f64) as u64;
             anchor.unix_time_ns - backward_ns
         }
     }
