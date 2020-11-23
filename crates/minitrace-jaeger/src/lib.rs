@@ -1,6 +1,6 @@
 // Copyright 2020 TiKV Project Authors. Licensed under Apache-2.0.
 
-use minitrace::{DefaultClock, Span};
+use minitrace::Span;
 use rustracing_jaeger::thrift::agent::EmitBatchNotification;
 use rustracing_jaeger::thrift::jaeger::{
     Batch, Process, Span as JaegerSpan, SpanRef, SpanRefKind, Tag,
@@ -26,9 +26,8 @@ impl Reporter {
     pub fn encode(
         service_name: String,
         trace_id: u64,
-        spans: Vec<Span>,
+        spans: &[Span],
     ) -> Result<Vec<u8>, Box<dyn Error + Send + Sync + 'static>> {
-        let anchor = DefaultClock::anchor();
         let bn = EmitBatchNotification {
             batch: Batch {
                 process: Process {
@@ -36,36 +35,31 @@ impl Reporter {
                     tags: vec![],
                 },
                 spans: spans
-                    .into_iter()
-                    .map(|s| {
-                        let begin_cycles = DefaultClock::cycle_to_realtime(s.begin_cycle, anchor);
-                        let end_time = DefaultClock::cycle_to_realtime(s.end_cycle, anchor);
-                        JaegerSpan {
+                    .iter()
+                    .map(|s| JaegerSpan {
+                        trace_id_low: trace_id as i64,
+                        trace_id_high: 0,
+                        span_id: s.id as i64,
+                        parent_span_id: s.parent_id as i64,
+                        operation_name: s.event.to_string(),
+                        references: vec![SpanRef {
+                            kind: SpanRefKind::FollowsFrom,
                             trace_id_low: trace_id as i64,
                             trace_id_high: 0,
-                            span_id: s.id.0 as i64,
-                            parent_span_id: s.parent_id.0 as i64,
-                            operation_name: s.event.to_string(),
-                            references: vec![SpanRef {
-                                kind: SpanRefKind::FollowsFrom,
-                                trace_id_low: trace_id as i64,
-                                trace_id_high: 0,
-                                span_id: s.parent_id.0 as i64,
-                            }],
-                            flags: 1,
-                            start_time: (begin_cycles.epoch_time_ns / 1_000) as i64,
-                            duration: ((end_time.epoch_time_ns - begin_cycles.epoch_time_ns)
-                                / 1_000) as i64,
-                            tags: s
-                                .properties
-                                .into_iter()
-                                .map(|p| Tag::String {
-                                    key: p.0.to_owned(),
-                                    value: p.1,
-                                })
-                                .collect(),
-                            logs: vec![],
-                        }
+                            span_id: s.parent_id as i64,
+                        }],
+                        flags: 1,
+                        start_time: (s.begin_unix_time_us / 1_000) as i64,
+                        duration: (s.duration_ns / 1_000) as i64,
+                        tags: s
+                            .properties
+                            .iter()
+                            .map(|p| Tag::String {
+                                key: p.0.to_owned(),
+                                value: p.1.to_owned(),
+                            })
+                            .collect(),
+                        logs: vec![],
                     })
                     .collect(),
             },
@@ -90,7 +84,7 @@ impl Reporter {
         .parse()?;
 
         let udp = UdpSocket::bind(local_addr)?;
-        let bytes = Self::encode(self.service_name.to_string(), trace_id, spans)?;
+        let bytes = Self::encode(self.service_name.to_string(), trace_id, &spans)?;
         udp.send_to(&bytes, self.agent)?;
 
         Ok(())

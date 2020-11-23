@@ -8,7 +8,7 @@ use std::sync::Arc;
 
 use crate::local::registry::{Listener, Registry};
 use crate::span::span_queue::{SpanHandle, SpanQueue};
-use crate::span::{ScopeSpan, Span};
+use crate::span::{RawSpan, ScopeSpan};
 use crate::trace::acquirer::AcquirerGroup;
 
 thread_local! {
@@ -62,7 +62,7 @@ impl SpanLine {
     pub fn unregister_and_collect(
         &mut self,
         listener: Listener,
-    ) -> (SmallVec<[Arc<AcquirerGroup>; 4]>, VecDeque<Span>) {
+    ) -> (SmallVec<[Arc<AcquirerGroup>; 4]>, VecDeque<RawSpan>) {
         debug_assert_eq!(
             self.local_acquirer_groups.len(),
             self.registry.len(),

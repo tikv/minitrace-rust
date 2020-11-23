@@ -5,10 +5,10 @@ use std::collections::VecDeque;
 use crate::collections::queue::FixedIndexQueue;
 use crate::span::cycle::{Cycle, DefaultClock};
 use crate::span::span_id::{DefaultIdGenerator, SpanId};
-use crate::span::{ScopeSpan, Span};
+use crate::span::{RawSpan, ScopeSpan};
 
 pub struct SpanQueue {
-    span_queue: FixedIndexQueue<Span>,
+    span_queue: FixedIndexQueue<RawSpan>,
     next_parent_id: SpanId,
 }
 
@@ -91,20 +91,20 @@ impl SpanQueue {
     }
 
     #[inline]
-    pub fn clone_queue_from(&self, index: usize) -> VecDeque<Span> {
+    pub fn clone_queue_from(&self, index: usize) -> VecDeque<RawSpan> {
         self.span_queue.clone_queue_from(index)
     }
 
     #[inline]
-    pub fn take_queue_from(&mut self, index: usize) -> VecDeque<Span> {
+    pub fn take_queue_from(&mut self, index: usize) -> VecDeque<RawSpan> {
         self.span_queue.take_queue_from(index)
     }
 }
 
 impl SpanQueue {
     #[inline]
-    fn gen_span(&self, parent_id: SpanId, event: &'static str) -> Span {
-        Span::begin_with(
+    fn gen_span(&self, parent_id: SpanId, event: &'static str) -> RawSpan {
+        RawSpan::begin_with(
             DefaultIdGenerator::next_id(),
             parent_id,
             DefaultClock::now(),
@@ -123,7 +123,7 @@ impl SpanQueue {
     }
 
     #[inline]
-    fn push_span(&mut self, span: Span) -> usize {
+    fn push_span(&mut self, span: RawSpan) -> usize {
         self.span_queue.push_back(span)
     }
 

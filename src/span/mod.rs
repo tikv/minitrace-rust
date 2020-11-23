@@ -4,11 +4,21 @@ pub mod cycle;
 pub mod span_id;
 pub mod span_queue;
 
-use crate::span::cycle::Cycle;
+use crate::span::cycle::{Anchor, Cycle, DefaultClock};
 use crate::span::span_id::SpanId;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct Span {
+    pub id: u64,
+    pub parent_id: u64,
+    pub begin_unix_time_us: u64,
+    pub duration_ns: u64,
+    pub event: &'static str,
+    pub properties: Vec<(&'static str, String)>,
+}
+
+#[derive(Clone, Debug)]
+pub struct RawSpan {
     pub id: SpanId,
     pub parent_id: SpanId,
     pub begin_cycle: Cycle,
@@ -25,7 +35,7 @@ pub struct Span {
     pub(crate) _is_spawn_span: bool,
 }
 
-impl Span {
+impl RawSpan {
     #[inline]
     pub(crate) fn begin_with(
         id: SpanId,
@@ -33,7 +43,7 @@ impl Span {
         begin_cycles: Cycle,
         event: &'static str,
     ) -> Self {
-        Span {
+        RawSpan {
             id,
             parent_id,
             begin_cycle: begin_cycles,
@@ -52,8 +62,17 @@ impl Span {
     }
 
     #[inline]
-    pub fn is_root(&self) -> bool {
-        self.parent_id == SpanId::new(0)
+    pub fn build_span(&self, anchor: Anchor) -> Span {
+        let begin_unix_time_us = DefaultClock::cycle_to_unix_time_ns(self.begin_cycle, anchor);
+        let end_unix_time_us = DefaultClock::cycle_to_unix_time_ns(self.end_cycle, anchor);
+        Span {
+            id: self.id.0,
+            parent_id: self.parent_id.0,
+            begin_unix_time_us,
+            duration_ns: end_unix_time_us - begin_unix_time_us,
+            event: self.event,
+            properties: self.properties.clone(),
+        }
     }
 }
 
@@ -77,16 +96,17 @@ impl ScopeSpan {
         }
     }
 
-    pub fn into_span(self) -> Span {
+    #[inline]
+    pub fn build_span(&self, anchor: Anchor) -> Span {
+        let begin_unix_time_us = DefaultClock::cycle_to_unix_time_ns(self.begin_cycle, anchor);
+        let end_unix_time_us = DefaultClock::cycle_to_unix_time_ns(self.end_cycle, anchor);
         Span {
-            id: self.id,
-            parent_id: self.parent_id,
-            begin_cycle: self.begin_cycle,
+            id: self.id.0,
+            parent_id: self.parent_id.0,
+            begin_unix_time_us,
+            duration_ns: end_unix_time_us - begin_unix_time_us,
             event: self.event,
             properties: vec![],
-            end_cycle: self.end_cycle,
-            _descendant_count: 0,
-            _is_spawn_span: false,
         }
     }
 

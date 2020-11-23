@@ -7,12 +7,12 @@ use std::sync::Arc;
 
 use crate::span::cycle::DefaultClock;
 use crate::span::span_id::SpanId;
-use crate::span::{ScopeSpan, Span};
+use crate::span::{RawSpan, ScopeSpan};
 
 #[derive(Clone, Debug)]
 pub enum SpanCollection {
     LocalSpans {
-        spans: Arc<VecDeque<Span>>,
+        spans: Arc<VecDeque<RawSpan>>,
         parent_span_id: SpanId,
     },
     ScopeSpan(ScopeSpan),
@@ -82,7 +82,7 @@ impl AcquirerGroup {
         }
     }
 
-    pub fn submit(&self, spans: Arc<VecDeque<Span>>) {
+    pub fn submit(&self, spans: Arc<VecDeque<RawSpan>>) {
         self.submit_to_acquirers(SpanCollection::LocalSpans {
             spans,
             parent_span_id: self.scope_span.id,

@@ -6,8 +6,6 @@
 pub use crate::future::FutureExt;
 pub use crate::local::scope_guard::LocalScopeGuard;
 pub use crate::local::span_guard::LocalSpanGuard;
-pub use crate::span::cycle::DefaultClock;
-pub use crate::span::span_id::{DefaultIdGenerator, SpanId};
 pub use crate::span::Span;
 pub use crate::trace::collector::Collector;
 pub use crate::trace::scope::Scope;
@@ -21,7 +19,7 @@ pub(crate) mod trace;
 
 #[inline]
 pub fn set_span_id_prefix(id_prefix: u32) {
-    DefaultIdGenerator::set_prefix(id_prefix)
+    crate::span::span_id::DefaultIdGenerator::set_prefix(id_prefix)
 }
 
 #[inline]
