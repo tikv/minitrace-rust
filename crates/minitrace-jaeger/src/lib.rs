@@ -49,7 +49,7 @@ impl Reporter {
                             span_id: s.parent_id as i64,
                         }],
                         flags: 1,
-                        start_time: (s.begin_unix_time_us / 1_000) as i64,
+                        start_time: (s.begin_unix_time_ns / 1_000) as i64,
                         duration: (s.duration_ns / 1_000) as i64,
                         tags: s
                             .properties

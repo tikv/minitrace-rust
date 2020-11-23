@@ -11,7 +11,7 @@ use crate::span::span_id::SpanId;
 pub struct Span {
     pub id: u64,
     pub parent_id: u64,
-    pub begin_unix_time_us: u64,
+    pub begin_unix_time_ns: u64,
     pub duration_ns: u64,
     pub event: &'static str,
     pub properties: Vec<(&'static str, String)>,
@@ -63,13 +63,13 @@ impl RawSpan {
 
     #[inline]
     pub fn build_span(&self, anchor: Anchor) -> Span {
-        let begin_unix_time_us = DefaultClock::cycle_to_unix_time_ns(self.begin_cycle, anchor);
-        let end_unix_time_us = DefaultClock::cycle_to_unix_time_ns(self.end_cycle, anchor);
+        let begin_unix_time_ns = DefaultClock::cycle_to_unix_time_ns(self.begin_cycle, anchor);
+        let end_unix_time_ns = DefaultClock::cycle_to_unix_time_ns(self.end_cycle, anchor);
         Span {
             id: self.id.0,
             parent_id: self.parent_id.0,
-            begin_unix_time_us,
-            duration_ns: end_unix_time_us - begin_unix_time_us,
+            begin_unix_time_ns,
+            duration_ns: end_unix_time_ns - begin_unix_time_ns,
             event: self.event,
             properties: self.properties.clone(),
         }
@@ -98,13 +98,13 @@ impl ScopeSpan {
 
     #[inline]
     pub fn build_span(&self, anchor: Anchor) -> Span {
-        let begin_unix_time_us = DefaultClock::cycle_to_unix_time_ns(self.begin_cycle, anchor);
-        let end_unix_time_us = DefaultClock::cycle_to_unix_time_ns(self.end_cycle, anchor);
+        let begin_unix_time_ns = DefaultClock::cycle_to_unix_time_ns(self.begin_cycle, anchor);
+        let end_unix_time_ns = DefaultClock::cycle_to_unix_time_ns(self.end_cycle, anchor);
         Span {
             id: self.id.0,
             parent_id: self.parent_id.0,
-            begin_unix_time_us,
-            duration_ns: end_unix_time_us - begin_unix_time_us,
+            begin_unix_time_ns,
+            duration_ns: end_unix_time_ns - begin_unix_time_ns,
             event: self.event,
             properties: vec![],
         }
