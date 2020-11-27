@@ -41,22 +41,6 @@ impl<T: std::future::Future> std::future::Future for WithScope<T> {
     }
 }
 
-impl<T: futures_01::Future> futures_01::Future for WithScope<T> {
-    type Item = T::Item;
-    type Error = T::Error;
-
-    fn poll(&mut self) -> futures_01::Poll<Self::Item, Self::Error> {
-        let _guard = start_scope(&self.scope);
-        match self.inner.poll() {
-            r @ Ok(futures_01::Async::NotReady) => r,
-            other => {
-                self.scope.release();
-                other
-            }
-        }
-    }
-}
-
 #[pin_project::pin_project]
 pub struct WithSpan<T> {
     #[pin]
@@ -71,15 +55,5 @@ impl<T: std::future::Future> std::future::Future for WithSpan<T> {
         let this = self.project();
         let _guard = start_span(this.event);
         this.inner.poll(cx)
-    }
-}
-
-impl<T: futures_01::Future> futures_01::Future for WithSpan<T> {
-    type Item = T::Item;
-    type Error = T::Error;
-
-    fn poll(&mut self) -> futures_01::Poll<Self::Item, Self::Error> {
-        let _guard = start_span(self.event);
-        self.inner.poll()
     }
 }

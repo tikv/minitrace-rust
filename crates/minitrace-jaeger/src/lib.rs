@@ -1,14 +1,16 @@
 // Copyright 2020 TiKV Project Authors. Licensed under Apache-2.0.
 
+mod thrift;
+
 use minitrace::Span;
-use rustracing_jaeger::thrift::agent::EmitBatchNotification;
-use rustracing_jaeger::thrift::jaeger::{
-    Batch, Process, Span as JaegerSpan, SpanRef, SpanRefKind, Tag,
-};
 use std::error::Error;
 use std::net::{SocketAddr, UdpSocket};
 use thrift_codec::message::Message;
 use thrift_codec::CompactEncode;
+
+use crate::thrift::{
+    Batch, EmitBatchNotification, Process, Span as JaegerSpan, SpanRef, SpanRefKind, Tag,
+};
 
 pub struct Reporter {
     agent: SocketAddr,

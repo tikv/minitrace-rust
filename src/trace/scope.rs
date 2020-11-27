@@ -1,6 +1,6 @@
 // Copyright 2020 TiKV Project Authors. Licensed under Apache-2.0.
 
-use crossbeam_channel::Sender;
+use crossbeam::channel::Sender;
 use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
 
@@ -18,7 +18,7 @@ pub struct Scope {
 
 impl Scope {
     pub fn root(event: &'static str) -> (Self, Collector) {
-        let (tx, rx) = crossbeam_channel::unbounded();
+        let (tx, rx) = crossbeam::channel::unbounded();
         let closed = Arc::new(AtomicBool::new(false));
         let scope = Scope::new_root_scope(event, tx, Arc::clone(&closed));
         let collector = Collector::new(rx, closed);

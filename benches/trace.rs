@@ -80,7 +80,7 @@ fn trace_future_bench(c: &mut Criterion) {
                 {
                     let (root_scope, collector) = Scope::root("root");
 
-                    let _ = futures_03::executor::block_on(f(*len).with_scope(root_scope));
+                    let _ = futures::executor::block_on(f(*len).with_scope(root_scope));
 
                     collector
                 }
