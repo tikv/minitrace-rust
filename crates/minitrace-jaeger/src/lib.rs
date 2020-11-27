@@ -43,18 +43,22 @@ impl Reporter {
                     .map(|s| JaegerSpan {
                         trace_id_low: trace_id as i64,
                         trace_id_high: 0,
-                        span_id: span_id_prefix as i64 | s.id as i64,
+                        span_id: (span_id_prefix as i64) << 32 | s.id as i64,
                         parent_span_id: if s.parent_id == 0 {
                             root_parent_span_id as i64
                         } else {
-                            span_id_prefix as i64 | s.parent_id as i64
+                            (span_id_prefix as i64) << 32 | s.parent_id as i64
                         },
                         operation_name: s.event.to_string(),
                         references: vec![SpanRef {
                             kind: SpanRefKind::FollowsFrom,
                             trace_id_low: trace_id as i64,
                             trace_id_high: 0,
-                            span_id: s.parent_id as i64,
+                            span_id: if s.parent_id == 0 {
+                                root_parent_span_id as i64
+                            } else {
+                                (span_id_prefix as i64) << 32 | s.parent_id as i64
+                            },
                         }],
                         flags: 1,
                         start_time: (s.begin_unix_time_ns / 1_000) as i64,
@@ -82,8 +86,8 @@ impl Reporter {
     pub fn report(
         &self,
         trace_id: u64,
-        span_id_prefix: u32,
         root_parent_span_id: u64,
+        span_id_prefix: u32,
         spans: &[Span],
     ) -> Result<(), Box<dyn Error + Send + Sync + 'static>> {
         let local_addr: SocketAddr = if self.agent.is_ipv4() {

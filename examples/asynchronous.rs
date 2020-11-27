@@ -53,6 +53,6 @@ async fn main() {
     let spans = collector.collect(true, None);
     let reporter = Reporter::new("127.0.0.1:6831".parse().unwrap(), "asynchronous");
     reporter
-        .report(rand::random(), rand::random(), 0, &spans)
+        .report(rand::random(), 0, rand::random(), &spans)
         .ok();
 }

@@ -33,6 +33,6 @@ fn main() {
 
     let reporter = Reporter::new("127.0.0.1:6831".parse().unwrap(), "synchronous");
     reporter
-        .report(rand::random(), rand::random(), 0, &spans)
+        .report(rand::random(), 0, rand::random(), &spans)
         .ok();
 }
