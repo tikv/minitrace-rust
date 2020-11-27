@@ -1,13 +1,13 @@
 // Copyright 2020 TiKV Project Authors. Licensed under Apache-2.0.
 
 use std::cell::Cell;
-use std::sync::atomic::{AtomicU16, AtomicU32, Ordering};
+use std::sync::atomic::{AtomicU16, Ordering};
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, Default)]
-pub struct SpanId(pub u64);
+pub struct SpanId(pub u32);
 
 impl SpanId {
-    pub fn new(id: u64) -> Self {
+    pub fn new(id: u32) -> Self {
         SpanId(id)
     }
 }
@@ -23,9 +23,6 @@ thread_local! {
     static SNOWFLACK_ID_GENERATOR: Cell<(u16, u16)> = Cell::new((next_snowflake_id_prefix(), 0))
 }
 
-/// Set by user
-static ID_PREFIX: AtomicU32 = AtomicU32::new(0);
-
 impl DefaultIdGenerator {
     #[inline]
     pub fn next_id() -> SpanId {
@@ -40,19 +37,7 @@ impl DefaultIdGenerator {
 
             g.set((prefix, suffix));
 
-            SpanId::new(
-                ((Self::get_prefix() as u64) << 32) | ((prefix as u64) << 16) | (suffix as u64),
-            )
+            SpanId::new(((prefix as u32) << 16) | (suffix as u32))
         })
-    }
-
-    #[inline]
-    pub fn set_prefix(prefix: u32) {
-        ID_PREFIX.store(prefix, Ordering::Release);
-    }
-
-    #[inline]
-    pub fn get_prefix() -> u32 {
-        ID_PREFIX.load(Ordering::Acquire)
     }
 }

@@ -30,6 +30,10 @@ impl Acquirer {
     }
 
     pub fn submit(&self, span_collection: SpanCollection) {
+        if self.is_shutdown() {
+            return;
+        }
+
         self.sender.send(span_collection).ok();
     }
 

@@ -18,11 +18,6 @@ pub(crate) mod span;
 pub(crate) mod trace;
 
 #[inline]
-pub fn set_span_id_prefix(id_prefix: u32) {
-    crate::span::span_id::DefaultIdGenerator::set_prefix(id_prefix)
-}
-
-#[inline]
 pub fn start_scope(scope: &Scope) -> LocalScopeGuard {
     LocalScopeGuard::new(scope.acquirer_group.clone())
 }
@@ -76,7 +71,7 @@ mod tests {
 
             collector
         }
-        .collect(true, None, None);
+        .collect(true, None);
 
         assert_eq!(spans.len(), 5);
     }
@@ -97,9 +92,9 @@ mod tests {
             };
 
             (
-                c1.collect(true, None, None),
-                c2.collect(true, None, None),
-                c3.collect(true, None, None),
+                c1.collect(true, None),
+                c2.collect(true, None),
+                c3.collect(true, None),
             )
         };
 
@@ -125,7 +120,7 @@ mod tests {
             four_spans();
             collector
         }
-        .collect(true, None, None);
+        .collect(true, None);
 
         assert_eq!(spans.len(), 25);
     }
@@ -151,7 +146,7 @@ mod tests {
                 (collector1, collector2)
             };
 
-            (c1.collect(true, None, None), c2.collect(false, None, None))
+            (c1.collect(true, None), c2.collect(true, None))
         };
 
         assert_eq!(spans1.len(), 25);
@@ -173,9 +168,9 @@ mod tests {
             };
 
             (
-                c1.collect(true, None, None),
-                c2.collect(true, None, None),
-                c3.collect(true, None, None),
+                c1.collect(true, None),
+                c2.collect(true, None),
+                c3.collect(true, None),
             )
         };
 

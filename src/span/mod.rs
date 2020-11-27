@@ -9,8 +9,8 @@ use crate::span::span_id::SpanId;
 
 #[derive(Clone, Debug, Default)]
 pub struct Span {
-    pub id: u64,
-    pub parent_id: u64,
+    pub id: u32,
+    pub parent_id: u32,
     pub begin_unix_time_ns: u64,
     pub duration_ns: u64,
     pub event: &'static str,

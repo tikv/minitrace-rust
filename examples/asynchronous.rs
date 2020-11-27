@@ -3,7 +3,6 @@
 use minitrace::*;
 use minitrace_jaeger::Reporter;
 use minitrace_macro::trace_async;
-use std::net::{Ipv4Addr, SocketAddr};
 
 fn parallel_job() -> Vec<tokio::task::JoinHandle<()>> {
     let mut v = Vec::with_capacity(4);
@@ -51,8 +50,9 @@ async fn main() {
 
     tokio::spawn(f).await.unwrap();
 
-    let spans = collector.collect(true, None, None);
-    let socket = SocketAddr::new(Ipv4Addr::new(127, 0, 0, 1).into(), 6831);
-    let reporter = Reporter::new(socket, "asynchronous");
-    reporter.report(rand::random(), spans).ok();
+    let spans = collector.collect(true, None);
+    let reporter = Reporter::new("127.0.0.1:6831".parse().unwrap(), "asynchronous");
+    reporter
+        .report(rand::random(), rand::random(), 0, &spans)
+        .ok();
 }

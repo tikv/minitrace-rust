@@ -62,7 +62,7 @@ fn minitrace_harness() {
 
         collector
     }
-    .collect(false, None, None);
+    .collect(false, None);
 }
 
 #[derive(Debug)]
