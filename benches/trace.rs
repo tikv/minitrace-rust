@@ -36,7 +36,7 @@ fn trace_wide_bench(c: &mut Criterion) {
 
                     collector
                 }
-                .collect(false, None, None);
+                .collect(false, None);
             });
         },
         vec![1, 10, 100, 1000, 10000],
@@ -59,7 +59,7 @@ fn trace_deep_bench(c: &mut Criterion) {
 
                     collector
                 }
-                .collect(false, None, None);
+                .collect(false, None);
             });
         },
         vec![1, 10, 100, 1000, 10000],
@@ -80,11 +80,11 @@ fn trace_future_bench(c: &mut Criterion) {
                 {
                     let (root_scope, collector) = Scope::root("root");
 
-                    let _ = futures_03::executor::block_on(f(*len).with_scope(root_scope));
+                    let _ = futures::executor::block_on(f(*len).with_scope(root_scope));
 
                     collector
                 }
-                .collect(false, None, None);
+                .collect(false, None);
             });
         },
         vec![1, 10, 100, 1000, 10000],

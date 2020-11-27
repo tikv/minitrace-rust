@@ -3,7 +3,6 @@
 use minitrace::{start_scope, start_span, Scope};
 use minitrace_jaeger::Reporter;
 use minitrace_macro::trace;
-use std::net::{Ipv4Addr, SocketAddr};
 
 fn func1(i: u64) {
     let _guard = start_span("func1");
@@ -30,9 +29,10 @@ fn main() {
 
         collector
     }
-    .collect(true, None, None);
+    .collect(true, None);
 
-    let socket = SocketAddr::new(Ipv4Addr::new(127, 0, 0, 1).into(), 6831);
-    let reporter = Reporter::new(socket, "synchronous");
-    reporter.report(rand::random(), spans).ok();
+    let reporter = Reporter::new("127.0.0.1:6831".parse().unwrap(), "synchronous");
+    reporter
+        .report(rand::random(), 0, rand::random(), &spans)
+        .ok();
 }

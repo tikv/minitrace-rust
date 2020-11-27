@@ -105,7 +105,7 @@ let collector = {
     collector
 };
 
-let spans: Vec<Span> = collector.collect(true, None, None);
+let spans: Vec<Span> = collector.collect(true, None);
 ```
 
 ### Asynchronous Example
@@ -149,7 +149,7 @@ let collector = {
     collector
 };
 
-let spans: Vec<Span> = collector.collect(true, None, None);
+let spans: Vec<Span> = collector.collect(true, None);
 ```
 
 #### Futures
@@ -169,14 +169,13 @@ let collector = {
     let _scope_guard = start_scope(&root_scope);
 
     // To trace the same task
-    let scope = root_scope.clone();
     runtime::spawn(async {
         
         let _ = async {
             // some works
         }.in_new_span("");
         
-    }.with_scope(scope));
+    }.with_scope(root_scope.clone()));
 
     // To trace another task
     runtime::spawn(async {
@@ -190,7 +189,7 @@ let collector = {
     collector
 };
 
-let spans: Vec<Span> = collector.collect(true, None, None);
+let spans: Vec<Span> = collector.collect(true, None);
 ```
 
 ### Macros
@@ -266,15 +265,16 @@ minitrace-jaeger = { git = "https://github.com/tikv/minitrace-rust.git" }
 
 ```rust
 use minitrace_jaeger::Reporter;
-use std::net::{Ipv4Addr, SocketAddr};
 
 let spans = /* collect from a collector */;
 
-let socket = SocketAddr::new(Ipv4Addr::new(127, 0, 0, 1).into(), 6831);
+let socket = SocketAddr::new("127.0.0.1:6831".parse().unwrap());
 let reporter = Reporter::new(socket, "service name");
 
 const TRACE_ID: u64 = 42;
-reporter.report(TRACE_ID, spans).expect("report error");
+const SPAN_ID_PREFIX: u32 = 42;
+const ROOT_PARENT_SPAN_ID: u64 = 0;
+reporter.report(TRACE_ID, SPAN_ID_PREFIX, ROOT_PARENT_SPAN_ID, &spans).expect("report error");
 ```
 
 ### Setup Jaeger

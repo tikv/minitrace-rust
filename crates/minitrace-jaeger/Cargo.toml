@@ -7,5 +7,4 @@ edition = "2018"
 
 [dependencies]
 minitrace = { path = "../.." }
-rustracing_jaeger = "0.5.0"
-thrift_codec = "0.1.1"
+thrift_codec = "0.1"
