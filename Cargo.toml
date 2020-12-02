@@ -16,6 +16,7 @@ smallvec = "1.4"
 [dev-dependencies]
 criterion = "0.3"
 minitrace-jaeger = { path = "crates/minitrace-jaeger" }
+minitrace-datadog = { path = "crates/minitrace-datadog" }
 minitrace-macro = { path = "crates/minitrace-macro" }
 tokio = { version = "0.2", features = ["full"] }
 rustracing = "0.4"
@@ -28,6 +29,7 @@ tracing-subscriber = "0.2"
 rand = "0.7"
 crossbeam = "0.7"
 futures = "0.3"
+hex = "*"
 
 [[bench]]
 name = "trace"
