@@ -98,27 +98,3 @@ struct MPSpan<'a> {
     trace_id: u64,
     parent_id: u64,
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn it_works() {
-        let val = vec![MPSpan {
-            name: "a",
-            service: "b",
-            start: 1,
-            duration: 2,
-            meta: None,
-            span_id: 3,
-            trace_id: 4,
-            parent_id: 5,
-        }];
-        let mut buf = Vec::new();
-        val.serialize(&mut Serializer::new(&mut buf).with_struct_map())
-            .unwrap();
-
-        dbg!(hex::encode(buf));
-    }
-}
