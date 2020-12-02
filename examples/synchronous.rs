@@ -1,7 +1,8 @@
 // Copyright 2020 TiKV Project Authors. Licensed under Apache-2.0.
 
 use minitrace::{start_scope, start_span, Scope};
-use minitrace_jaeger::Reporter;
+use minitrace_datadog::Reporter as DReporter;
+use minitrace_jaeger::Reporter as JReporter;
 use minitrace_macro::trace;
 
 fn func1(i: u64) {
@@ -31,8 +32,11 @@ fn main() {
     }
     .collect(true, None);
 
-    let reporter = Reporter::new("127.0.0.1:6831".parse().unwrap(), "synchronous");
-    reporter
-        .report(rand::random(), 0, rand::random(), &spans)
-        .ok();
+    // Report to Jaeger
+    let bytes = JReporter::encode("synchronous".to_owned(), rand::random(), 0, 0, &spans).unwrap();
+    JReporter::report("127.0.0.1:6831".parse().unwrap(), &bytes).ok();
+
+    // Report to Datadog
+    let bytes = DReporter::encode("synchronous", rand::random(), 0, 0, &spans).unwrap();
+    DReporter::report_blocking("127.0.0.1:8126".parse().unwrap(), bytes).ok();
 }

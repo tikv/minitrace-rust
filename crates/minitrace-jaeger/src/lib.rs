@@ -12,19 +12,9 @@ use crate::thrift::{
     Batch, EmitBatchNotification, Process, Span as JaegerSpan, SpanRef, SpanRefKind, Tag,
 };
 
-pub struct Reporter {
-    agent: SocketAddr,
-    service_name: &'static str,
-}
+pub struct Reporter;
 
 impl Reporter {
-    pub fn new(agent: SocketAddr, service_name: &'static str) -> Self {
-        Reporter {
-            agent,
-            service_name,
-        }
-    }
-
     pub fn encode(
         service_name: String,
         trace_id: u64,
@@ -84,28 +74,19 @@ impl Reporter {
     }
 
     pub fn report(
-        &self,
-        trace_id: u64,
-        root_parent_span_id: u64,
-        span_id_prefix: u32,
-        spans: &[Span],
+        agent: SocketAddr,
+        bytes: &[u8],
     ) -> Result<(), Box<dyn Error + Send + Sync + 'static>> {
-        let local_addr: SocketAddr = if self.agent.is_ipv4() {
+        let local_addr: SocketAddr = if agent.is_ipv4() {
             "0.0.0.0:0"
         } else {
             "[::]:0"
         }
-        .parse()?;
+        .parse()
+        .unwrap();
 
         let udp = UdpSocket::bind(local_addr)?;
-        let bytes = Self::encode(
-            self.service_name.to_string(),
-            trace_id,
-            root_parent_span_id,
-            span_id_prefix,
-            spans,
-        )?;
-        udp.send_to(&bytes, self.agent)?;
+        udp.send_to(bytes, agent)?;
 
         Ok(())
     }
