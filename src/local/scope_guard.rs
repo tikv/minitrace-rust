@@ -1,61 +1,78 @@
-// Copyright 2020 TiKV Project Authors. Licensed under Apache-2.0.
+use std::cell::RefCell;
 
-use smallvec::SmallVec;
+use crate::local::observer::Observer;
+use crate::Scope;
 use std::sync::Arc;
 
-use crate::local::registry::Listener;
-use crate::local::span_line::SPAN_LINE;
-use crate::trace::acquirer::AcquirerGroup;
-use crate::Scope;
-
-pub struct LocalScopeGuard {
-    listener: Option<Listener>,
+thread_local! {
+    static LOCAL_SCOPE: RefCell<Option<LocalScope>> = RefCell::new(None);
 }
 
-impl !Sync for LocalScopeGuard {}
+pub struct LocalScope {
+    scope: Scope,
+    observer: Option<Observer>,
+}
+
+impl LocalScope {
+    pub fn with_local_scope<R>(f: impl FnOnce(Option<&mut Scope>) -> R) -> R {
+        LOCAL_SCOPE.with(|local_scope| {
+            let mut local_scope = local_scope.borrow_mut();
+            f(local_scope.as_mut().map(|ls| &mut ls.scope))
+        })
+    }
+}
+
+pub struct LocalScopeGuard;
 impl !Send for LocalScopeGuard {}
-
-impl LocalScopeGuard {
-    pub(crate) fn new(acquirer_group: Option<Arc<AcquirerGroup>>) -> Self {
-        SPAN_LINE.with(|span_line| {
-            let mut span_line = span_line.borrow_mut();
-            Self {
-                listener: acquirer_group
-                    .map(|acq_group| span_line.register(smallvec::smallvec![acq_group])),
-            }
-        })
-    }
-
-    pub fn new_from_scopes<'a, I: Iterator<Item = &'a Scope>>(iter: I) -> Self {
-        use std::iter::FromIterator;
-
-        SPAN_LINE.with(|span_line| {
-            let mut span_line = span_line.borrow_mut();
-            let sv = SmallVec::from_iter(iter.filter_map(|scope| scope.acquirer_group.clone()));
-            Self {
-                listener: if sv.is_empty() {
-                    None
-                } else {
-                    Some(span_line.register(sv))
-                },
-            }
-        })
-    }
-}
+impl !Sync for LocalScopeGuard {}
 
 impl Drop for LocalScopeGuard {
     fn drop(&mut self) {
-        if let Some(listener) = self.listener {
-            SPAN_LINE.with(|span_line| {
-                let mut span_line = span_line.borrow_mut();
-                let (acgs, spans) = span_line.unregister_and_collect(listener);
-                let spans = Arc::new(spans);
-                if !spans.is_empty() {
-                    for acg in acgs {
-                        acg.submit(spans.clone());
-                    }
-                }
-            })
-        }
+        LOCAL_SCOPE.with(|local_scope| {
+            if let Some(LocalScope {
+                scope,
+                observer: Some(observer),
+            }) = local_scope.borrow_mut().take()
+            {
+                let raw_spans = Arc::new(observer.collect());
+                scope.submit_raw_spans(raw_spans);
+            }
+        })
+    }
+}
+
+impl LocalScopeGuard {
+    #[inline]
+    pub fn new(scope: Scope) -> Self {
+        Self::new_with_observer(scope, None)
+    }
+
+    #[inline]
+    pub fn new_with_observer(scope: Scope, observer: Option<Observer>) -> Self {
+        LOCAL_SCOPE.with(|local_scope| {
+            let mut local_scope = local_scope.borrow_mut();
+
+            if local_scope.is_some() {
+                panic!("Attach too much scopes: > 1")
+            }
+
+            *local_scope = Some(LocalScope { scope, observer })
+        });
+
+        LocalScopeGuard
+    }
+
+    #[inline]
+    pub fn detach(self) -> Scope {
+        LOCAL_SCOPE.with(|local_scope| {
+            let LocalScope { scope, observer } = local_scope.borrow_mut().take().unwrap();
+
+            if let Some(observer) = observer {
+                let raw_spans = Arc::new(observer.collect());
+                scope.submit_raw_spans(raw_spans);
+            }
+
+            scope
+        })
     }
 }

@@ -6,10 +6,12 @@ use crate::span::span_queue::SpanHandle;
 pub struct LocalSpanGuard {
     span_handle: Option<SpanHandle>,
 }
+impl !Send for LocalSpanGuard {}
+impl !Sync for LocalSpanGuard {}
 
 impl LocalSpanGuard {
     #[inline]
-    pub(crate) fn new(event: &'static str) -> Self {
+    pub(crate) fn start(event: &'static str) -> Self {
         SPAN_LINE.with(|span_line| {
             let mut span_line = span_line.borrow_mut();
             let span_handle = span_line.start_span(event);
@@ -60,7 +62,3 @@ impl Drop for LocalSpanGuard {
         }
     }
 }
-
-impl !Send for LocalSpanGuard {}
-
-impl !Sync for LocalSpanGuard {}

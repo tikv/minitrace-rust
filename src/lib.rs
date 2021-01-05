@@ -1,48 +1,34 @@
 // Copyright 2020 TiKV Project Authors. Licensed under Apache-2.0.
 
-#![feature(map_first_last)]
 #![feature(negative_impls)]
 
 pub use crate::future::FutureExt;
+pub use crate::local::observer::Observer;
 pub use crate::local::scope_guard::LocalScopeGuard;
 pub use crate::local::span_guard::LocalSpanGuard;
 pub use crate::span::Span;
-pub use crate::trace::collector::Collector;
+pub use crate::trace::collector::{CollectArgs, Collector};
 pub use crate::trace::scope::Scope;
-
-pub mod collections;
 
 pub(crate) mod future;
 pub(crate) mod local;
 pub(crate) mod span;
 pub(crate) mod trace;
 
-#[inline]
-pub fn start_scope(scope: &Scope) -> LocalScopeGuard {
-    LocalScopeGuard::new(scope.acquirer_group.clone())
-}
-
-#[inline]
-pub fn start_scopes<'a, I: Iterator<Item = &'a Scope>>(iter: I) -> LocalScopeGuard {
-    LocalScopeGuard::new_from_scopes(iter)
-}
-
-#[inline]
-pub fn start_span(event: &'static str) -> LocalSpanGuard {
-    LocalSpanGuard::new(event)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::local::observer::Observer;
+    use crate::trace::collector::CollectArgs;
     use minitrace_macro::trace;
+    use std::sync::Arc;
 
     fn four_spans() {
         {
             // wide
             for _ in 0..2 {
                 let _g =
-                    start_span("iter span").with_property(|| ("tmp_property", "tmp_value".into()));
+                    Span::start("iter span").with_property(|| ("tmp_property", "tmp_value".into()));
             }
         }
 
@@ -65,13 +51,13 @@ mod tests {
     fn single_thread_single_scope() {
         let spans = {
             let (root_scope, collector) = Scope::root("root");
-            let _sg = start_scope(&root_scope);
+            let _g = root_scope.attach_and_observe();
 
             four_spans();
 
             collector
         }
-        .collect(true, None);
+        .collect_with_args(CollectArgs::default().sync(true));
 
         assert_eq!(spans.len(), 5);
     }
@@ -84,17 +70,23 @@ mod tests {
                 let (root_scope2, collector2) = Scope::root("root2");
                 let (root_scope3, collector3) = Scope::root("root3");
 
-                let _sg = start_scopes([root_scope1, root_scope2, root_scope3].iter());
+                let observer = Observer::attach().unwrap();
 
                 four_spans();
+
+                let raw_spans = Arc::new(observer.collect());
+
+                root_scope1.submit_raw_spans(raw_spans.clone());
+                root_scope2.submit_raw_spans(raw_spans.clone());
+                root_scope3.submit_raw_spans(raw_spans);
 
                 (collector1, collector2, collector3)
             };
 
             (
-                c1.collect(true, None),
-                c2.collect(true, None),
-                c3.collect(true, None),
+                c1.collect_with_args(CollectArgs::default().sync(true)),
+                c2.collect_with_args(CollectArgs::default().sync(true)),
+                c3.collect_with_args(CollectArgs::default().sync(true)),
             )
         };
 
@@ -107,20 +99,21 @@ mod tests {
     fn multiple_threads_single_scope() {
         let spans = {
             let (scope, collector) = Scope::root("root");
-            let _sg = start_scope(&scope);
+            let _g = scope.attach_and_observe();
 
             for _ in 0..4 {
-                let child_scope = Scope::child("cross-thread");
+                let child_scope = Scope::child_from_local("cross-thread");
                 std::thread::spawn(move || {
-                    let _sg = start_scope(&child_scope);
+                    let _g = child_scope.attach_and_observe();
                     four_spans();
                 });
             }
 
             four_spans();
+
             collector
         }
-        .collect(true, None);
+        .collect_with_args(CollectArgs::default().sync(true));
 
         assert_eq!(spans.len(), 25);
     }
@@ -131,22 +124,33 @@ mod tests {
             let (c1, c2) = {
                 let (root_scope1, collector1) = Scope::root("root1");
                 let (root_scope2, collector2) = Scope::root("root2");
-
-                let _sg = start_scopes([root_scope1, root_scope2].iter());
+                let observer = Observer::attach().unwrap();
 
                 for _ in 0..4 {
-                    let scope = Scope::child("cross-thread");
+                    let merged =
+                        Scope::merge(vec![&root_scope1, &root_scope2].into_iter(), "merged");
                     std::thread::spawn(move || {
-                        let _sg = start_scope(&scope);
+                        let observer = Observer::attach().unwrap();
+
                         four_spans();
+
+                        let raw_spans = Arc::new(observer.collect());
+                        merged.submit_raw_spans(raw_spans);
                     });
                 }
 
                 four_spans();
+
+                let raw_spans = Arc::new(observer.collect());
+                root_scope1.submit_raw_spans(raw_spans.clone());
+                root_scope2.submit_raw_spans(raw_spans);
                 (collector1, collector2)
             };
 
-            (c1.collect(true, None), c2.collect(true, None))
+            (
+                c1.collect_with_args(CollectArgs::default().sync(true)),
+                c2.collect_with_args(CollectArgs::default().sync(true)),
+            )
         };
 
         assert_eq!(spans1.len(), 25);
@@ -161,16 +165,20 @@ mod tests {
                 let (root_scope2, collector2) = Scope::root("root2");
                 let (root_scope3, collector3) = Scope::root("root3");
 
-                let _sg1 = start_scopes([root_scope1, root_scope2].iter());
-                let _sg2 = start_scope(&root_scope3);
+                let observer = Observer::attach().unwrap();
+
+                let raw_spans = Arc::new(observer.collect());
+                root_scope1.submit_raw_spans(raw_spans.clone());
+                root_scope2.submit_raw_spans(raw_spans.clone());
+                root_scope3.submit_raw_spans(raw_spans);
 
                 (collector1, collector2, collector3)
             };
 
             (
-                c1.collect(true, None),
-                c2.collect(true, None),
-                c3.collect(true, None),
+                c1.collect_with_args(CollectArgs::default().sync(true)),
+                c2.collect_with_args(CollectArgs::default().sync(true)),
+                c3.collect_with_args(CollectArgs::default().sync(true)),
             )
         };
 

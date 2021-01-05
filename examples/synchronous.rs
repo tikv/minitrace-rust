@@ -1,12 +1,13 @@
 // Copyright 2020 TiKV Project Authors. Licensed under Apache-2.0.
 
-use minitrace::{start_scope, start_span, Scope};
+use minitrace::Scope;
+use minitrace::{CollectArgs, Span};
 use minitrace_datadog::Reporter as DReporter;
 use minitrace_jaeger::Reporter as JReporter;
 use minitrace_macro::trace;
 
 fn func1(i: u64) {
-    let _guard = start_span("func1");
+    let _guard = Span::start("func1");
     std::thread::sleep(std::time::Duration::from_millis(i));
     func2(i);
 }
@@ -20,9 +21,9 @@ fn main() {
     let spans = {
         let (scope, collector) = Scope::root("root");
 
-        let _scope_guard = start_scope(&scope);
+        let _scope_guard = scope.attach_and_observe();
         let _span_guard =
-            start_span("a span").with_property(|| ("a property", "a value".to_owned()));
+            Span::start("a span").with_property(|| ("a property", "a value".to_owned()));
 
         for i in 1..=10 {
             func1(i);
@@ -30,7 +31,7 @@ fn main() {
 
         collector
     }
-    .collect(true, None);
+    .collect_with_args(CollectArgs::default().sync(true));
 
     // Report to Jaeger
     let bytes = JReporter::encode("synchronous".to_owned(), rand::random(), 0, 0, &spans).unwrap();

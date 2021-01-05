@@ -1,6 +1,7 @@
 // Copyright 2020 TiKV Project Authors. Licensed under Apache-2.0.
 
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
+use minitrace::Observer;
 use minitrace::*;
 use minitrace_macro::trace;
 
@@ -20,6 +21,20 @@ fn dummy_rec(i: usize) {
     }
 }
 
+fn trace_wide_raw_bench(c: &mut Criterion) {
+    c.bench_function_over_inputs(
+        "trace_wide_raw",
+        |b, len| {
+            b.iter(|| {
+                let observer = Observer::attach().unwrap();
+                dummy_iter(*len);
+                observer.collect()
+            });
+        },
+        vec![1, 10, 100, 1000, 10000],
+    );
+}
+
 fn trace_wide_bench(c: &mut Criterion) {
     c.bench_function_over_inputs(
         "trace_wide",
@@ -28,7 +43,7 @@ fn trace_wide_bench(c: &mut Criterion) {
                 {
                     let (root_scope, collector) = Scope::root("root");
 
-                    let _sg = start_scope(&root_scope);
+                    let _sg = root_scope.attach_and_observe();
 
                     if *len > 1 {
                         dummy_iter(*len);
@@ -36,7 +51,21 @@ fn trace_wide_bench(c: &mut Criterion) {
 
                     collector
                 }
-                .collect(false, None);
+                .collect()
+            });
+        },
+        vec![1, 10, 100, 1000, 10000],
+    );
+}
+
+fn trace_deep_raw_bench(c: &mut Criterion) {
+    c.bench_function_over_inputs(
+        "trace_deep_raw",
+        |b, len| {
+            b.iter(|| {
+                let observer = Observer::attach().unwrap();
+                dummy_rec(*len);
+                observer.collect()
             });
         },
         vec![1, 10, 100, 1000, 10000],
@@ -51,7 +80,7 @@ fn trace_deep_bench(c: &mut Criterion) {
                 {
                     let (root_scope, collector) = Scope::root("root");
 
-                    let _sg = start_scope(&root_scope);
+                    let _sg = root_scope.attach_and_observe();
 
                     if *len > 1 {
                         dummy_rec(*len);
@@ -59,7 +88,7 @@ fn trace_deep_bench(c: &mut Criterion) {
 
                     collector
                 }
-                .collect(false, None);
+                .collect()
             });
         },
         vec![1, 10, 100, 1000, 10000],
@@ -84,7 +113,7 @@ fn trace_future_bench(c: &mut Criterion) {
 
                     collector
                 }
-                .collect(false, None);
+                .collect()
             });
         },
         vec![1, 10, 100, 1000, 10000],
@@ -93,7 +122,9 @@ fn trace_future_bench(c: &mut Criterion) {
 
 criterion_group!(
     benches,
+    trace_wide_raw_bench,
     trace_wide_bench,
+    trace_deep_raw_bench,
     trace_deep_bench,
     trace_future_bench
 );

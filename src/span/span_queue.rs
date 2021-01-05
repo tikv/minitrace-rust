@@ -1,40 +1,47 @@
 // Copyright 2020 TiKV Project Authors. Licensed under Apache-2.0.
 
-use std::collections::VecDeque;
-
-use crate::collections::queue::FixedIndexQueue;
-use crate::span::cycle::{Cycle, DefaultClock};
+use crate::span::cycle::DefaultClock;
 use crate::span::span_id::{DefaultIdGenerator, SpanId};
-use crate::span::{RawSpan, ScopeSpan};
+use crate::span::RawSpan;
 
 pub struct SpanQueue {
-    span_queue: FixedIndexQueue<RawSpan>,
+    span_queue: Vec<RawSpan>,
     next_parent_id: SpanId,
 }
 
 impl SpanQueue {
-    pub fn new() -> Self {
+    pub fn with_capacity(capacity: usize) -> Self {
         Self {
-            span_queue: FixedIndexQueue::with_capacity(1024),
+            span_queue: Vec::with_capacity(capacity),
             next_parent_id: SpanId::new(0),
         }
     }
 
     #[inline]
-    pub fn start_span(&mut self, event: &'static str) -> SpanHandle {
-        let s = self.gen_span(self.next_parent_id, event);
-        self.next_parent_id = s.id;
-        let index = self.push_span(s);
-        SpanHandle { index }
+    pub fn start_span(&mut self, event: &'static str, observer_epoch: usize) -> SpanHandle {
+        let span = RawSpan::begin_with(
+            DefaultIdGenerator::next_id(),
+            self.next_parent_id,
+            DefaultClock::now(),
+            event,
+        );
+        self.next_parent_id = span.id;
+
+        let index = self.span_queue.len();
+        self.span_queue.push(span);
+
+        SpanHandle {
+            index,
+            observer_epoch,
+        }
     }
 
     #[inline]
     pub fn finish_span(&mut self, span_handle: SpanHandle) {
-        debug_assert!(self.span_queue.idx_is_valid(span_handle.index));
+        debug_assert!(span_handle.index < self.span_queue.len());
 
-        let descendant_count = self.count_to_last(span_handle.index);
         let span = &mut self.span_queue[span_handle.index];
-        span.end_with(DefaultClock::now(), descendant_count);
+        span.end_with(DefaultClock::now());
 
         self.next_parent_id = span.parent_id;
     }
@@ -45,7 +52,7 @@ impl SpanQueue {
         span_handle: &SpanHandle,
         properties: F,
     ) {
-        debug_assert!(self.span_queue.idx_is_valid(span_handle.index));
+        debug_assert!(span_handle.index < self.span_queue.len());
 
         let span = &mut self.span_queue[span_handle.index];
         span.properties.extend(properties());
@@ -57,82 +64,20 @@ impl SpanQueue {
         span_handle: &SpanHandle,
         property: F,
     ) {
-        debug_assert!(self.span_queue.idx_is_valid(span_handle.index));
+        debug_assert!(span_handle.index < self.span_queue.len());
 
         let span = &mut self.span_queue[span_handle.index];
         span.properties.push(property());
     }
 
     #[inline]
-    pub fn start_scope_span(
-        &mut self,
-        placeholder_event: &'static str,
-        event: &'static str,
-    ) -> ScopeSpan {
-        // add a spawn span for indirectly linking to the external span
-        let mut s = self.gen_span(self.next_parent_id, placeholder_event);
-        let cycle = s.begin_cycle;
-        s.end_cycle = cycle;
-        s._is_spawn_span = true;
-        let es_parent = s.id;
-        self.push_span(s);
-
-        self.gen_scope_span(es_parent, event, cycle)
-    }
-
-    #[inline]
-    pub fn next_index(&self) -> usize {
-        self.span_queue.next_index()
-    }
-
-    #[inline]
-    pub fn remove_before(&mut self, index: usize) {
-        self.span_queue.remove_before(index);
-    }
-
-    #[inline]
-    pub fn clone_queue_from(&self, index: usize) -> VecDeque<RawSpan> {
-        self.span_queue.clone_queue_from(index)
-    }
-
-    #[inline]
-    pub fn take_queue_from(&mut self, index: usize) -> VecDeque<RawSpan> {
-        self.span_queue.take_queue_from(index)
-    }
-}
-
-impl SpanQueue {
-    #[inline]
-    fn gen_span(&self, parent_id: SpanId, event: &'static str) -> RawSpan {
-        RawSpan::begin_with(
-            DefaultIdGenerator::next_id(),
-            parent_id,
-            DefaultClock::now(),
-            event,
-        )
-    }
-
-    #[inline]
-    fn gen_scope_span(
-        &self,
-        parent_id: SpanId,
-        event: &'static str,
-        begin_cycle: Cycle,
-    ) -> ScopeSpan {
-        ScopeSpan::new(DefaultIdGenerator::next_id(), parent_id, begin_cycle, event)
-    }
-
-    #[inline]
-    fn push_span(&mut self, span: RawSpan) -> usize {
-        self.span_queue.push_back(span)
-    }
-
-    fn count_to_last(&self, index: usize) -> usize {
-        let next_index = self.span_queue.next_index();
-        next_index.wrapping_sub(index) - 1
+    pub fn take_queue(&mut self) -> Vec<RawSpan> {
+        self.next_parent_id = SpanId::new(0);
+        self.span_queue.split_off(0)
     }
 }
 
 pub struct SpanHandle {
-    pub(self) index: usize,
+    pub(crate) index: usize,
+    pub(crate) observer_epoch: usize,
 }
