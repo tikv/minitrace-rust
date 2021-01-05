@@ -19,7 +19,7 @@ A high-performance, ergonomic timeline tracing library for Rust.
   A `LocalSpanGuard` is used to record a `Span`. Its creation means a `Span`'s begin and its destruction means a `Span`'s
   end.
   
-  A `LocalSpanGuard` is thread-local and can be created via function `start_span()`.
+  A `LocalSpanGuard` is thread-local and can be created via method `Span::start()`.
 
   *Note: The relation between `Span`s is constructed implicitly. Even within a deeply nested function calls, the inner
   `LocalSpanGuard` can automatically figure out its parent without explicitly passing any tracing context as a parameter.*
@@ -33,16 +33,6 @@ A high-performance, ergonomic timeline tracing library for Rust.
   of the task, will be recorded.
 
   A new `Scope` can be created via functions `Scope::root()`, `Scope::child()` and `Scope::empty()`.
-
-### Local Scope Guard
-
-  A `LocalScopeGuard` can gather spans on a thread during its own lifetime. Generally, the `LocalScopeGuard` should be held
-  until the thread will not run for the task.
-  
-  A `LocalScopeGuard` is thread-local and can be created via functions `start_scope()` and `start_scopes()`.
-  
-  *Note: You can start multiple scopes on the same thread. In which case, recorded spans will be shared for all `Scope`s.*
-
 
 ### Collector
 
@@ -62,7 +52,7 @@ To record a common span:
 ```rust
 use minitrace::*;
 
-let _span_guard = start_span("my event");
+let _span_guard = Span::start("my event");
 ```
 
 To add properties:
@@ -71,10 +61,10 @@ To add properties:
 use minitrace::*;
 
 // add a property for a span
-let _span_guard = start_span("my event").with_property(|| ("key", String::from("value")));
+let _span_guard = Span::start("my event").with_property(|| ("key", String::from("value")));
 
 // or add multiple properties for a span
-let _span_guard = start_span("my event").with_properties(|| {
+let _span_guard = Span::start("my event").with_properties(|| {
     vec![
         ("key1", String::from("value1")),
         ("key2", String::from("value2")),
@@ -86,8 +76,8 @@ let _span_guard = start_span("my event").with_properties(|| {
 
 A common pattern to trace synchronous code:
 
-- Create a root `Scope` and a `Collector` via `Scope::root()`, then create `LocalScopeGuard` via `start_scope`.
-- Add `start_span()`s somewhere, e.g. at the beginning of a code scope, at the beginning of a function, to record spans.
+- Create a root `Scope` and a `Collector` via `Scope::root()`, then attach the `Scope` to the current thread.
+- Add `Span::start()`s somewhere, e.g. at the beginning of a code scope, at the beginning of a function, to record spans.
 - Make sure the root `Scope` and all guards are dropped, then call `Collector`'s `collect` to get all `Span`s.
 
 
@@ -96,28 +86,21 @@ use minitrace::*;
 
 let collector = {
     let (root_scope, collector) = Scope::root("root");
-    let _scope_guard = start_scope(&root_scope);
+    let _scope_guard = root_scope.attach_and_observe();
 
-    let _span_guard = start_span("child");
+    let _span_guard = Span::start("child");
 
     // do something ...
 
     collector
 };
 
-let spans: Vec<Span> = collector.collect(true, None);
+let spans: Vec<Span> = collector.collect();
 ```
 
 ### Asynchronous Example
 
 To trace asynchronous code, we usually transmit `Scope` from one thread to another thread.
-
-The transmitted `Scope` is of one of the following types:
-
-- Clone from an existing `Scope`, will trace the same task as the origin `Scope`
-- Create via `Scope::child()`, will trace a new task related to the origin task
-
-You can choose one of the variants to satisfy the semantic of your application.
 
 #### Threads
 
@@ -126,38 +109,30 @@ use minitrace::*;
 
 let collector = {
     let (root_scope, collector) = Scope::root("task1");
-    let _scope_guard = start_scope(&root_scope);
+    let _scope_guard = root_scope.attach_and_observe();
 
-    let _span_guard = start_span("span of task1");
+    let _span_guard = Span::start("span of task1");
     
-    // To trace the same task
-    let scope = root_scope.clone();
+    // To trace a child task
+    let scope = Scope::child_from_local("task2");
     std::thread::spawn(move || {
-        let _scope_guard = start_scope(&scope);
+        let _scope_guard = scope.attach_and_observe();
 
-        let _span_guard = start_span("span of also task1");
-    });
-    
-    // To trace a new task
-    let scope = Scope::child("task2");
-    std::thread::spawn(move || {
-        let _scope_guard = start_scope(&scope);
-
-        let _span_guard = start_span("span of also task2");
+        let _span_guard = Span::start("span of also task2");
     });
 
     collector
 };
 
-let spans: Vec<Span> = collector.collect(true, None);
+let spans: Vec<Span> = collector.collect();
 ```
 
 #### Futures
 
 We provide two `Future` adaptors:
 
-- `in_new_span`: call `start_span` at every poll
-- `with_scope`: wrap the `Future` with the `Scope`, then call `start_scope` at every poll
+- `in_new_span`: call `Span::start` at every poll
+- `with_scope`: wrap the `Future` with the `Scope`, then call `Scope::attach_and_observe` at every poll
 
 The `with_scope` adaptor is commonly used on a `Future` submitting to a runtime.
 
@@ -166,30 +141,19 @@ use minitrace::*;
 
 let collector = {
     let (root_scope, collector) = Scope::root("root");
-    let _scope_guard = start_scope(&root_scope);
-
-    // To trace the same task
-    runtime::spawn(async {
-        
-        let _ = async {
-            // some works
-        }.in_new_span("");
-        
-    }.with_scope(root_scope.clone()));
+    let _scope_guard = root_scope.attach_and_observe();
 
     // To trace another task
     runtime::spawn(async {
-        
         let _ = async {
             // some works
         }.in_new_span("");
-        
-    }.with_scope(Scope::child("new task")));
+    }.with_scope(Scope::child_from_local("new task")));
 
     collector
 };
 
-let spans: Vec<Span> = collector.collect(true, None);
+let spans: Vec<Span> = collector.collect();
 ```
 
 ### Macros
@@ -204,7 +168,7 @@ For normal functions, you can change:
 use minitrace::*;
 
 fn amazing_func() {
-    let _span_guard = start_span("wow");
+    let _span_guard = Span::start("wow");
 
     // some works
 }

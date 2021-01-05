@@ -3,7 +3,7 @@
 #![feature(negative_impls)]
 
 pub use crate::future::FutureExt;
-pub use crate::local::observer::Observer;
+pub use crate::local::observer::{Observer, RawSpans};
 pub use crate::local::scope_guard::LocalScopeGuard;
 pub use crate::local::span_guard::LocalSpanGuard;
 pub use crate::span::Span;
