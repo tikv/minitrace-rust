@@ -9,7 +9,7 @@ fn parallel_job() -> Vec<tokio::task::JoinHandle<()>> {
     let mut v = Vec::with_capacity(4);
     for i in 0..4 {
         v.push(tokio::spawn(
-            iter_job(i).with_scope(Scope::child("iter job")),
+            iter_job(i).with_scope(Scope::child_from_local("iter job")),
         ));
     }
     v
@@ -37,7 +37,7 @@ async fn main() {
 
     let f = async {
         let jhs = {
-            let _s = start_span("a span").with_property(|| ("a property", "a value".to_owned()));
+            let _s = Span::start("a span").with_property(|| ("a property", "a value".to_owned()));
             parallel_job()
         };
 
@@ -51,7 +51,7 @@ async fn main() {
 
     tokio::spawn(f).await.unwrap();
 
-    let spans = collector.collect(true, None);
+    let spans = collector.collect_with_args(CollectArgs::default().sync(true));
 
     // Report to Jaeger
     let bytes = JReporter::encode("asynchronous".to_owned(), rand::random(), 0, 0, &spans).unwrap();
