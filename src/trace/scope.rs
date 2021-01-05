@@ -67,6 +67,11 @@ impl Scope {
         Self { inner: None }
     }
 
+    #[inline]
+    pub fn is_empty(&self) -> bool {
+        self.inner.is_none()
+    }
+
     pub fn merge<'a>(scopes: impl Iterator<Item = &'a Scope>, event: &'static str) -> Self {
         let mut collectors = Vec::new();
         for scope in scopes {
