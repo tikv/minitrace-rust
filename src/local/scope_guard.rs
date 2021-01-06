@@ -20,6 +20,14 @@ impl LocalScope {
             f(local_scope.as_mut().map(|ls| &mut ls.scope))
         })
     }
+
+    #[inline]
+    pub fn is_occupied() -> bool {
+        LOCAL_SCOPE.with(|local_scope| {
+            let local_scope = local_scope.borrow();
+            local_scope.is_some()
+        })
+    }
 }
 
 pub struct LocalScopeGuard;
