@@ -1,5 +1,6 @@
 // Copyright 2020 TiKV Project Authors. Licensed under Apache-2.0.
 
+use std::iter;
 use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
 
@@ -42,24 +43,7 @@ impl Scope {
     }
 
     pub fn child(&self, event: &'static str) -> Self {
-        if let Some(inner) = &self.inner {
-            let child_inner = ScopeInner {
-                scope_id: DefaultIdGenerator::next_id(),
-                event,
-                begin_cycle: DefaultClock::now(),
-                collectors: inner
-                    .collectors
-                    .iter()
-                    .map(|(_, acq)| (inner.scope_id, acq.clone()))
-                    .collect(),
-            };
-
-            Self {
-                inner: Some(child_inner),
-            }
-        } else {
-            Self { inner: None }
-        }
+        Self::merge(iter::once(self), event)
     }
 
     #[inline]
@@ -115,8 +99,26 @@ impl Scope {
     }
 
     #[inline]
+    pub fn try_attach(self) -> std::result::Result<LocalScopeGuard, Self> {
+        if LocalScope::is_occupied() {
+            Err(self)
+        } else {
+            Ok(LocalScopeGuard::new(self))
+        }
+    }
+
+    #[inline]
     pub fn attach_and_observe(self) -> LocalScopeGuard {
         LocalScopeGuard::new_with_observer(self, Observer::attach())
+    }
+
+    #[inline]
+    pub fn try_attach_and_observe(self) -> std::result::Result<LocalScopeGuard, Self> {
+        if LocalScope::is_occupied() {
+            Err(self)
+        } else {
+            Ok(LocalScopeGuard::new_with_observer(self, Observer::attach()))
+        }
     }
 
     #[inline]
