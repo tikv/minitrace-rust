@@ -20,6 +20,8 @@ pub struct Scope {
 #[derive(Debug)]
 struct ScopeInner {
     scope_id: SpanId,
+
+    // Report `RawSpan` to `Acquirer` when `ScopeInner` is dropping
     to_report: Vec<(RawSpan, Acquirer)>,
 }
 
@@ -31,12 +33,7 @@ impl Scope {
         let inner = ScopeInner {
             scope_id,
             to_report: vec![(
-                RawSpan::begin_with(
-                    scope_id,
-                    SpanId::new(0),
-                    DefaultClock::now(),
-                    event,
-                ),
+                RawSpan::begin_with(scope_id, SpanId::new(0), DefaultClock::now(), event),
                 Acquirer::new(Arc::new(tx), closed.clone()),
             )],
         };
