@@ -6,7 +6,7 @@ use std::sync::Arc;
 
 use crate::local::observer::{Observer, RawSpans};
 use crate::local::scope_guard::{LocalScope, LocalScopeGuard};
-use crate::span::cycle::{Cycle, DefaultClock};
+use crate::span::cycle::DefaultClock;
 use crate::span::span_id::{DefaultIdGenerator, SpanId};
 use crate::span::RawSpan;
 use crate::trace::acquirer::{Acquirer, SpanCollection};
@@ -20,22 +20,22 @@ pub struct Scope {
 #[derive(Debug)]
 struct ScopeInner {
     scope_id: SpanId,
-    event: &'static str,
-    begin_cycle: Cycle,
 
-    /// [parent scope id -> acquirer]
-    collectors: Vec<(SpanId, Acquirer)>,
+    // Report `RawSpan` to `Acquirer` when `ScopeInner` is dropping
+    to_report: Vec<(RawSpan, Acquirer)>,
 }
 
 impl Scope {
     pub fn root(event: &'static str) -> (Self, Collector) {
         let (tx, rx) = crossbeam::channel::unbounded();
         let closed = Arc::new(AtomicBool::new(false));
+        let scope_id = DefaultIdGenerator::next_id();
         let inner = ScopeInner {
-            scope_id: DefaultIdGenerator::next_id(),
-            event,
-            begin_cycle: DefaultClock::now(),
-            collectors: vec![(SpanId::new(0), Acquirer::new(Arc::new(tx), closed.clone()))],
+            scope_id,
+            to_report: vec![(
+                RawSpan::begin_with(scope_id, SpanId::new(0), DefaultClock::now(), event),
+                Acquirer::new(Arc::new(tx), closed.clone()),
+            )],
         };
         let scope = Self { inner: Some(inner) };
         let collector = Collector::new(rx, closed);
@@ -57,25 +57,28 @@ impl Scope {
     }
 
     pub fn merge<'a>(scopes: impl Iterator<Item = &'a Scope>, event: &'static str) -> Self {
-        let mut collectors = Vec::new();
+        let mut to_report = Vec::new();
+        let now = DefaultClock::now();
+        let scope_id = DefaultIdGenerator::next_id();
         for scope in scopes {
             if let Some(inner) = &scope.inner {
-                let scope_id = inner.scope_id;
-                for (_, acq) in &inner.collectors {
-                    collectors.push((scope_id, acq.clone()))
+                let parent_id = inner.scope_id;
+                for (_, acq) in &inner.to_report {
+                    to_report.push((
+                        RawSpan::begin_with(scope_id, parent_id, now, event),
+                        acq.clone(),
+                    ))
                 }
             }
         }
 
-        if collectors.is_empty() {
+        if to_report.is_empty() {
             Self { inner: None }
         } else {
             Self {
                 inner: Some(ScopeInner {
-                    scope_id: DefaultIdGenerator::next_id(),
-                    event,
-                    begin_cycle: DefaultClock::now(),
-                    collectors,
+                    scope_id,
+                    to_report,
                 }),
             }
         }
@@ -84,7 +87,7 @@ impl Scope {
     #[inline]
     pub fn submit_raw_spans(&self, raw_spans: Arc<RawSpans>) {
         if let Some(inner) = &self.inner {
-            for (_, acq) in &inner.collectors {
+            for (_, acq) in &inner.to_report {
                 acq.submit(SpanCollection::RawSpans {
                     raw_spans: raw_spans.clone(),
                     scope_id: inner.scope_id,
@@ -135,15 +138,10 @@ impl Scope {
 
 impl Drop for ScopeInner {
     fn drop(&mut self) {
-        for (parent_id, collector) in &self.collectors {
-            collector.submit(SpanCollection::ScopeSpan(RawSpan {
-                id: self.scope_id,
-                parent_id: *parent_id,
-                begin_cycle: self.begin_cycle,
-                event: self.event,
-                properties: vec![],
-                end_cycle: DefaultClock::now(),
-            }))
+        let now = DefaultClock::now();
+        for (mut span, collector) in self.to_report.drain(..) {
+            span.end_with(now);
+            collector.submit(SpanCollection::ScopeSpan(span))
         }
     }
 }
