@@ -1,23 +1,38 @@
+// Copyright 2020 TiKV Project Authors. Licensed under Apache-2.0.
+
 use std::cell::RefCell;
+use std::sync::Arc;
 
 use crate::local::observer::Observer;
+use crate::span::span_id::SpanId;
+use crate::trace::acquirer::{Acquirer, SpanCollection};
 use crate::Scope;
-use std::sync::Arc;
 
 thread_local! {
     static LOCAL_SCOPE: RefCell<Option<LocalScope>> = RefCell::new(None);
 }
 
 pub struct LocalScope {
-    scope: Scope,
+    scope_id: SpanId,
+    acquirers: Vec<Acquirer>,
+
     observer: Option<Observer>,
 }
 
 impl LocalScope {
-    pub fn with_local_scope<R>(f: impl FnOnce(Option<&mut Scope>) -> R) -> R {
+    pub fn new_child_scope(event: &'static str) -> Scope {
         LOCAL_SCOPE.with(|local_scope| {
-            let mut local_scope = local_scope.borrow_mut();
-            f(local_scope.as_mut().map(|ls| &mut ls.scope))
+            let local_scope = local_scope.borrow();
+            if let Some(LocalScope {
+                scope_id: parent_scope_id,
+                acquirers,
+                ..
+            }) = local_scope.as_ref()
+            {
+                Scope::new(acquirers.iter().map(|acq| (*parent_scope_id, acq)), event)
+            } else {
+                Scope::empty()
+            }
         })
     }
 
@@ -38,12 +53,18 @@ impl Drop for LocalScopeGuard {
     fn drop(&mut self) {
         LOCAL_SCOPE.with(|local_scope| {
             if let Some(LocalScope {
-                scope,
+                scope_id,
+                acquirers,
                 observer: Some(observer),
             }) = local_scope.borrow_mut().take()
             {
                 let raw_spans = Arc::new(observer.collect());
-                scope.submit_raw_spans(raw_spans);
+                for acq in acquirers {
+                    acq.submit(SpanCollection::RawSpans {
+                        raw_spans: raw_spans.clone(),
+                        scope_id,
+                    })
+                }
             }
         })
     }
@@ -51,12 +72,12 @@ impl Drop for LocalScopeGuard {
 
 impl LocalScopeGuard {
     #[inline]
-    pub fn new(scope: Scope) -> Self {
+    pub fn new(scope: &Scope) -> Self {
         Self::new_with_observer(scope, None)
     }
 
     #[inline]
-    pub fn new_with_observer(scope: Scope, observer: Option<Observer>) -> Self {
+    pub fn new_with_observer(scope: &Scope, observer: Option<Observer>) -> Self {
         LOCAL_SCOPE.with(|local_scope| {
             let mut local_scope = local_scope.borrow_mut();
 
@@ -64,23 +85,15 @@ impl LocalScopeGuard {
                 panic!("Attach too much scopes: > 1")
             }
 
-            *local_scope = Some(LocalScope { scope, observer })
+            if let Some(inner) = &scope.inner {
+                *local_scope = Some(LocalScope {
+                    scope_id: inner.scope_id,
+                    acquirers: inner.to_report.iter().map(|(_, acq)| acq.clone()).collect(),
+                    observer,
+                })
+            }
         });
 
         LocalScopeGuard
-    }
-
-    #[inline]
-    pub fn detach(self) -> Scope {
-        LOCAL_SCOPE.with(|local_scope| {
-            let LocalScope { scope, observer } = local_scope.borrow_mut().take().unwrap();
-
-            if let Some(observer) = observer {
-                let raw_spans = Arc::new(observer.collect());
-                scope.submit_raw_spans(raw_spans);
-            }
-
-            scope
-        })
     }
 }
