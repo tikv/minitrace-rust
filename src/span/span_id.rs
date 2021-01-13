@@ -14,25 +14,27 @@ impl SpanId {
 
 pub struct DefaultIdGenerator;
 
-static NEXT_SNOWFLAKE_ID_PREFIX: AtomicU16 = AtomicU16::new(0);
-fn next_snowflake_id_prefix() -> u16 {
-    NEXT_SNOWFLAKE_ID_PREFIX.fetch_add(1, Ordering::AcqRel)
+static NEXT_ID_PREFIX: AtomicU16 = AtomicU16::new(0);
+fn next_id_prefix() -> u16 {
+    NEXT_ID_PREFIX.fetch_add(1, Ordering::AcqRel)
 }
 
 thread_local! {
-    static SNOWFLACK_ID_GENERATOR: Cell<(u16, u16)> = Cell::new((next_snowflake_id_prefix(), 0))
+    static LOCAL_ID_GENERATOR: Cell<(u16, u16)> = Cell::new((next_id_prefix(), 0))
 }
 
 impl DefaultIdGenerator {
     #[inline]
+    /// Create a non-zero `SpanId`
     pub fn next_id() -> SpanId {
-        SNOWFLACK_ID_GENERATOR.with(|g| {
+        LOCAL_ID_GENERATOR.with(|g| {
             let (mut prefix, mut suffix) = g.get();
 
             if suffix == std::u16::MAX {
                 suffix = 0;
-                prefix = next_snowflake_id_prefix();
+                prefix = next_id_prefix();
             }
+            // `suffix` can not be `0`, so `SpanId` won't be `0`.
             suffix += 1;
 
             g.set((prefix, suffix));
