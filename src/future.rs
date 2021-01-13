@@ -34,9 +34,8 @@ impl<T: std::future::Future> std::future::Future for WithScope<T> {
     fn poll(self: std::pin::Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> Poll<Self::Output> {
         let this = self.project();
 
-        let guard = this.scope.take().map(|s| s.attach_and_observe());
+        let _guard = this.scope.as_ref().map(|s| s.try_attach_and_observe());
         let res = this.inner.poll(cx);
-        *this.scope = guard.map(|g| g.detach());
 
         match res {
             r @ Poll::Pending => r,
