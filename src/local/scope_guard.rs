@@ -3,7 +3,7 @@
 use std::cell::RefCell;
 use std::sync::Arc;
 
-use crate::local::observer::Observer;
+use crate::local::local_collector::LocalCollector;
 use crate::span::span_id::SpanId;
 use crate::trace::acquirer::{Acquirer, SpanCollection};
 use crate::Scope;
@@ -16,7 +16,7 @@ pub struct LocalScope {
     scope_id: SpanId,
     acquirers: Vec<Acquirer>,
 
-    observer: Option<Observer>,
+    local_collector: Option<LocalCollector>,
 }
 
 impl LocalScope {
@@ -55,10 +55,10 @@ impl Drop for LocalScopeGuard {
             if let Some(LocalScope {
                 scope_id,
                 acquirers,
-                observer: Some(observer),
+                local_collector: Some(local_collector),
             }) = local_scope.borrow_mut().take()
             {
-                let raw_spans = Arc::new(observer.collect());
+                let raw_spans = Arc::new(local_collector.collect());
                 for acq in acquirers {
                     acq.submit(SpanCollection::RawSpans {
                         raw_spans: raw_spans.clone(),
@@ -72,12 +72,10 @@ impl Drop for LocalScopeGuard {
 
 impl LocalScopeGuard {
     #[inline]
-    pub fn new(scope: &Scope) -> Self {
-        Self::new_with_observer(scope, None)
-    }
-
-    #[inline]
-    pub fn new_with_observer(scope: &Scope, observer: Option<Observer>) -> Self {
+    pub(crate) fn new_with_local_collector(
+        scope: &Scope,
+        local_collector: Option<LocalCollector>,
+    ) -> Self {
         LOCAL_SCOPE.with(|local_scope| {
             let mut local_scope = local_scope.borrow_mut();
 
@@ -89,11 +87,36 @@ impl LocalScopeGuard {
                 *local_scope = Some(LocalScope {
                     scope_id: inner.scope_id,
                     acquirers: inner.to_report.iter().map(|(_, acq)| acq.clone()).collect(),
-                    observer,
+                    local_collector,
                 })
             }
         });
 
         LocalScopeGuard
+    }
+}
+
+impl Scope {
+    #[inline]
+    pub fn enter(&self) -> LocalScopeGuard {
+        self.try_enter()
+            .expect("Current thread is occupied by another scope")
+    }
+
+    #[inline]
+    pub fn try_enter(&self) -> Option<LocalScopeGuard> {
+        if LocalScope::is_occupied() {
+            None
+        } else {
+            Some(LocalScopeGuard::new_with_local_collector(
+                self,
+                LocalCollector::try_start(),
+            ))
+        }
+    }
+
+    #[inline]
+    pub fn from_local_parent(event: &'static str) -> Self {
+        LocalScope::new_child_scope(event)
     }
 }

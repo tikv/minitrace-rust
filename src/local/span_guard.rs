@@ -1,20 +1,19 @@
 // Copyright 2020 TiKV Project Authors. Licensed under Apache-2.0.
 
-use crate::local::span_line::{SpanLine, SPAN_LINE};
-use crate::span::span_queue::SpanHandle;
+use crate::local::span_line::{LocalSpanHandle, SpanLine, SPAN_LINE};
 
 pub struct LocalSpanGuard {
-    span_handle: Option<SpanHandle>,
+    span_handle: Option<LocalSpanHandle>,
 }
 impl !Send for LocalSpanGuard {}
 impl !Sync for LocalSpanGuard {}
 
 impl LocalSpanGuard {
     #[inline]
-    pub(crate) fn start(event: &'static str) -> Self {
+    pub(crate) fn new(event: &'static str) -> Self {
         SPAN_LINE.with(|span_line| {
             let mut span_line = span_line.borrow_mut();
-            let span_handle = span_line.start_span(event);
+            let span_handle = span_line.enter_span(event);
             Self { span_handle }
         })
     }
@@ -41,11 +40,11 @@ impl LocalSpanGuard {
 
 impl LocalSpanGuard {
     #[inline]
-    fn with_span_line(&self, f: impl FnOnce(&SpanHandle, &mut SpanLine)) {
-        if let Some(span_handle) = &self.span_handle {
+    fn with_span_line(&self, f: impl FnOnce(&LocalSpanHandle, &mut SpanLine)) {
+        if let Some(local_span_handle) = &self.span_handle {
             SPAN_LINE.with(|span_line| {
                 let span_line = &mut *span_line.borrow_mut();
-                f(span_handle, span_line);
+                f(local_span_handle, span_line);
             })
         }
     }
@@ -57,7 +56,7 @@ impl Drop for LocalSpanGuard {
         if let Some(span_handle) = self.span_handle.take() {
             SPAN_LINE.with(|span_line| {
                 let mut span_line = span_line.borrow_mut();
-                span_line.finish_span(span_handle);
+                span_line.exit_span(span_handle);
             });
         }
     }

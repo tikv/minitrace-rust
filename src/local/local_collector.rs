@@ -5,11 +5,11 @@ use crate::span::cycle::{Cycle, DefaultClock};
 use crate::span::RawSpan;
 
 #[derive(Debug, Ord, PartialOrd, Eq, PartialEq)]
-pub struct Observer {
-    pub(crate) observer_epoch: usize,
+pub struct LocalCollector {
+    pub(crate) local_collector_epoch: usize,
 }
-impl !Sync for Observer {}
-impl !Send for Observer {}
+impl !Sync for LocalCollector {}
+impl !Send for LocalCollector {}
 
 #[derive(Debug)]
 pub struct RawSpans {
@@ -17,11 +17,15 @@ pub struct RawSpans {
     pub end_time: Cycle,
 }
 
-impl Observer {
-    pub fn attach() -> Option<Self> {
+impl LocalCollector {
+    pub fn start() -> Self {
+        Self::try_start().expect("Current thread is occupied by another local collector")
+    }
+
+    pub fn try_start() -> Option<Self> {
         SPAN_LINE.with(|span_line| {
             let s = &mut *span_line.borrow_mut();
-            s.register_observer()
+            s.register_local_collector()
         })
     }
 

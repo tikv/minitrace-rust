@@ -3,7 +3,7 @@
 #![feature(negative_impls)]
 
 pub use crate::future::FutureExt;
-pub use crate::local::observer::{Observer, RawSpans};
+pub use crate::local::local_collector::{LocalCollector, RawSpans};
 pub use crate::local::scope_guard::LocalScopeGuard;
 pub use crate::local::span_guard::LocalSpanGuard;
 pub use crate::span::cycle;
@@ -19,7 +19,7 @@ pub(crate) mod trace;
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::local::observer::Observer;
+    use crate::local::local_collector::LocalCollector;
     use crate::trace::collector::CollectArgs;
     use minitrace_macro::trace;
     use std::sync::Arc;
@@ -29,7 +29,7 @@ mod tests {
             // wide
             for _ in 0..2 {
                 let _g =
-                    Span::start("iter span").with_property(|| ("tmp_property", "tmp_value".into()));
+                    Span::enter("iter span").with_property(|| ("tmp_property", "tmp_value".into()));
             }
         }
 
@@ -52,7 +52,7 @@ mod tests {
     fn single_thread_single_scope() {
         let spans = {
             let (root_scope, collector) = Scope::root("root");
-            let _g = root_scope.attach_and_observe();
+            let _g = root_scope.enter();
 
             four_spans();
 
@@ -71,15 +71,15 @@ mod tests {
                 let (root_scope2, collector2) = Scope::root("root2");
                 let (root_scope3, collector3) = Scope::root("root3");
 
-                let observer = Observer::attach().unwrap();
+                let local_collector = LocalCollector::start();
 
                 four_spans();
 
-                let raw_spans = Arc::new(observer.collect());
+                let raw_spans = Arc::new(local_collector.collect());
 
-                root_scope1.submit_raw_spans(raw_spans.clone());
-                root_scope2.submit_raw_spans(raw_spans.clone());
-                root_scope3.submit_raw_spans(raw_spans);
+                root_scope1.extend_raw_spans(raw_spans.clone());
+                root_scope2.extend_raw_spans(raw_spans.clone());
+                root_scope3.extend_raw_spans(raw_spans);
 
                 (collector1, collector2, collector3)
             };
@@ -100,12 +100,12 @@ mod tests {
     fn multiple_threads_single_scope() {
         let spans = {
             let (scope, collector) = Scope::root("root");
-            let _g = scope.attach_and_observe();
+            let _g = scope.enter();
 
             for _ in 0..4 {
-                let child_scope = Scope::child_from_local("cross-thread");
+                let child_scope = Scope::from_local_parent("cross-thread");
                 std::thread::spawn(move || {
-                    let _g = child_scope.attach_and_observe();
+                    let _g = child_scope.enter();
                     four_spans();
                 });
             }
@@ -125,26 +125,26 @@ mod tests {
             let (c1, c2) = {
                 let (root_scope1, collector1) = Scope::root("root1");
                 let (root_scope2, collector2) = Scope::root("root2");
-                let observer = Observer::attach().unwrap();
+                let local_collector = LocalCollector::start();
 
                 for _ in 0..4 {
                     let merged =
-                        Scope::merge(vec![&root_scope1, &root_scope2].into_iter(), "merged");
+                        Scope::from_parents("merged", vec![&root_scope1, &root_scope2].into_iter());
                     std::thread::spawn(move || {
-                        let observer = Observer::attach().unwrap();
+                        let local_collector = LocalCollector::start();
 
                         four_spans();
 
-                        let raw_spans = Arc::new(observer.collect());
-                        merged.submit_raw_spans(raw_spans);
+                        let raw_spans = Arc::new(local_collector.collect());
+                        merged.extend_raw_spans(raw_spans);
                     });
                 }
 
                 four_spans();
 
-                let raw_spans = Arc::new(observer.collect());
-                root_scope1.submit_raw_spans(raw_spans.clone());
-                root_scope2.submit_raw_spans(raw_spans);
+                let raw_spans = Arc::new(local_collector.collect());
+                root_scope1.extend_raw_spans(raw_spans.clone());
+                root_scope2.extend_raw_spans(raw_spans);
                 (collector1, collector2)
             };
 
@@ -166,12 +166,12 @@ mod tests {
                 let (root_scope2, collector2) = Scope::root("root2");
                 let (root_scope3, collector3) = Scope::root("root3");
 
-                let observer = Observer::attach().unwrap();
+                let local_collector = LocalCollector::start();
 
-                let raw_spans = Arc::new(observer.collect());
-                root_scope1.submit_raw_spans(raw_spans.clone());
-                root_scope2.submit_raw_spans(raw_spans.clone());
-                root_scope3.submit_raw_spans(raw_spans);
+                let raw_spans = Arc::new(local_collector.collect());
+                root_scope1.extend_raw_spans(raw_spans.clone());
+                root_scope2.extend_raw_spans(raw_spans.clone());
+                root_scope3.extend_raw_spans(raw_spans);
 
                 (collector1, collector2, collector3)
             };

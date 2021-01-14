@@ -1,7 +1,7 @@
 // Copyright 2020 TiKV Project Authors. Licensed under Apache-2.0.
 
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
-use minitrace::Observer;
+use minitrace::LocalCollector;
 use minitrace::*;
 use minitrace_macro::trace;
 
@@ -26,9 +26,9 @@ fn trace_wide_raw_bench(c: &mut Criterion) {
         "trace_wide_raw",
         |b, len| {
             b.iter(|| {
-                let observer = Observer::attach().unwrap();
+                let local_collector = LocalCollector::start();
                 dummy_iter(*len);
-                observer.collect()
+                local_collector.collect()
             });
         },
         vec![1, 10, 100, 1000, 10000],
@@ -43,7 +43,7 @@ fn trace_wide_bench(c: &mut Criterion) {
                 {
                     let (root_scope, collector) = Scope::root("root");
 
-                    let _sg = root_scope.attach_and_observe();
+                    let _sg = root_scope.enter();
 
                     if *len > 1 {
                         dummy_iter(*len);
@@ -63,9 +63,9 @@ fn trace_deep_raw_bench(c: &mut Criterion) {
         "trace_deep_raw",
         |b, len| {
             b.iter(|| {
-                let observer = Observer::attach().unwrap();
+                let local_collector = LocalCollector::start();
                 dummy_rec(*len);
-                observer.collect()
+                local_collector.collect()
             });
         },
         vec![1, 10, 100, 1000, 10000],
@@ -80,7 +80,7 @@ fn trace_deep_bench(c: &mut Criterion) {
                 {
                     let (root_scope, collector) = Scope::root("root");
 
-                    let _sg = root_scope.attach_and_observe();
+                    let _sg = root_scope.enter();
 
                     if *len > 1 {
                         dummy_rec(*len);

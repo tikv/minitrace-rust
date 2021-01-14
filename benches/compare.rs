@@ -49,13 +49,13 @@ fn opentelemetry_harness() {
 fn minitrace_harness() {
     fn dummy_minitrace() {
         for _ in 0..99 {
-            let _guard = minitrace::Span::start("child");
+            let _guard = minitrace::Span::enter("child");
         }
     }
 
     {
         let (root_scope, collector) = minitrace::Scope::root("parent");
-        let _g = root_scope.attach_and_observe();
+        let _g = root_scope.enter();
 
         dummy_minitrace();
 
