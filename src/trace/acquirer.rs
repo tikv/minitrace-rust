@@ -5,7 +5,7 @@ use crossbeam::channel::Sender;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
-use crate::local::observer::RawSpans;
+use crate::local::local_collector::RawSpans;
 
 use crate::span::span_id::SpanId;
 use crate::span::RawSpan;

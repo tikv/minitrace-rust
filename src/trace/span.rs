@@ -3,7 +3,7 @@
 use crate::{LocalSpanGuard, Span};
 
 impl Span {
-    pub fn start(event: &'static str) -> LocalSpanGuard {
-        LocalSpanGuard::start(event)
+    pub fn enter(event: &'static str) -> LocalSpanGuard {
+        LocalSpanGuard::new(event)
     }
 }

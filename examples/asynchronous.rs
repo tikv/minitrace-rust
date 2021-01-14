@@ -9,7 +9,7 @@ fn parallel_job() -> Vec<tokio::task::JoinHandle<()>> {
     let mut v = Vec::with_capacity(4);
     for i in 0..4 {
         v.push(tokio::spawn(
-            iter_job(i).with_scope(Scope::child_from_local("iter job")),
+            iter_job(i).with_scope(Scope::from_local_parent("iter job")),
         ));
     }
     v
@@ -37,7 +37,7 @@ async fn main() {
 
     let f = async {
         let jhs = {
-            let _s = Span::start("a span").with_property(|| ("a property", "a value".to_owned()));
+            let _s = Span::enter("a span").with_property(|| ("a property", "a value".to_owned()));
             parallel_job()
         };
 

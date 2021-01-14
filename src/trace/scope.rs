@@ -4,8 +4,7 @@ use std::iter;
 use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
 
-use crate::local::observer::{Observer, RawSpans};
-use crate::local::scope_guard::{LocalScope, LocalScopeGuard};
+use crate::local::local_collector::RawSpans;
 use crate::span::cycle::DefaultClock;
 use crate::span::span_id::{DefaultIdGenerator, SpanId};
 use crate::span::RawSpan;
@@ -65,10 +64,6 @@ impl Scope {
         (scope, collector)
     }
 
-    pub fn child(&self, event: &'static str) -> Self {
-        Self::merge(iter::once(self), event)
-    }
-
     #[inline]
     pub fn empty() -> Self {
         Self { inner: None }
@@ -79,9 +74,19 @@ impl Scope {
         self.inner.is_none()
     }
 
-    pub fn merge<'a>(scopes: impl Iterator<Item = &'a Scope>, event: &'static str) -> Self {
+    #[inline]
+    pub fn from_parent(event: &'static str, scope: &Scope) -> Self {
+        Self::from_parents(event, iter::once(scope))
+    }
+
+    #[inline]
+    pub fn from_parents<'a>(
+        event: &'static str,
+        scopes: impl IntoIterator<Item = &'a Scope>,
+    ) -> Self {
         Self::new(
             scopes
+                .into_iter()
                 .filter_map(|scope| scope.inner.as_ref())
                 .flat_map(|inner| {
                     inner
@@ -94,7 +99,7 @@ impl Scope {
     }
 
     #[inline]
-    pub fn submit_raw_spans(&self, raw_spans: Arc<RawSpans>) {
+    pub fn extend_raw_spans(&self, raw_spans: Arc<RawSpans>) {
         if let Some(inner) = &self.inner {
             for (_, acq) in &inner.to_report {
                 acq.submit(SpanCollection::RawSpans {
@@ -103,39 +108,6 @@ impl Scope {
                 })
             }
         }
-    }
-
-    #[inline]
-    pub fn attach(&self) -> LocalScopeGuard {
-        LocalScopeGuard::new(self)
-    }
-
-    #[inline]
-    pub fn try_attach(&self) -> Option<LocalScopeGuard> {
-        if LocalScope::is_occupied() {
-            None
-        } else {
-            Some(LocalScopeGuard::new(self))
-        }
-    }
-
-    #[inline]
-    pub fn attach_and_observe(&self) -> LocalScopeGuard {
-        LocalScopeGuard::new_with_observer(self, Observer::attach())
-    }
-
-    #[inline]
-    pub fn try_attach_and_observe(&self) -> Option<LocalScopeGuard> {
-        if LocalScope::is_occupied() {
-            None
-        } else {
-            Some(LocalScopeGuard::new_with_observer(self, Observer::attach()))
-        }
-    }
-
-    #[inline]
-    pub fn child_from_local(event: &'static str) -> Self {
-        LocalScope::new_child_scope(event)
     }
 }
 

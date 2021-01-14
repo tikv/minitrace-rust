@@ -53,7 +53,7 @@ pub fn trace(args: TokenStream, item: TokenStream) -> TokenStream {
         #vis #constness #unsafety #asyncness #abi fn #ident<#gen_params>(#params) #return_type
         #where_clause
         {
-            let _guard = Span::start(#event);
+            let _guard = Span::enter(#event);
             #block
         }
     )
