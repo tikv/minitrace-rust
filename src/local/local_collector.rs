@@ -6,6 +6,7 @@ use crate::span::RawSpan;
 
 #[derive(Debug, Ord, PartialOrd, Eq, PartialEq)]
 pub struct LocalCollector {
+    pub(crate) collected: bool,
     pub(crate) local_collector_epoch: usize,
 }
 impl !Sync for LocalCollector {}
@@ -29,13 +30,26 @@ impl LocalCollector {
         })
     }
 
-    pub fn collect(self) -> RawSpans {
+    pub fn collect(mut self) -> RawSpans {
         SPAN_LINE.with(|span_line| {
             let s = &mut *span_line.borrow_mut();
+            self.collected = true;
             RawSpans {
                 spans: s.unregister_and_collect(self),
                 end_time: DefaultClock::now(),
             }
         })
+    }
+}
+
+impl Drop for LocalCollector {
+    fn drop(&mut self) {
+        if !self.collected {
+            self.collected = true;
+            SPAN_LINE.with(|span_line| {
+                let s = &mut *span_line.borrow_mut();
+                s.clear();
+            })
+        }
     }
 }

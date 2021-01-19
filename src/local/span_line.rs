@@ -62,6 +62,7 @@ impl SpanLine {
         self.current_local_collector_epoch = self.current_local_collector_epoch.wrapping_add(1);
 
         Some(LocalCollector {
+            collected: false,
             local_collector_epoch: self.current_local_collector_epoch,
         })
     }
@@ -75,6 +76,11 @@ impl SpanLine {
 
         self.local_collector_existing = false;
         self.span_queue.take_queue()
+    }
+
+    pub fn clear(&mut self) {
+        self.local_collector_existing = false;
+        self.span_queue.clear();
     }
 
     #[inline]
