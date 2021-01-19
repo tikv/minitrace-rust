@@ -77,4 +77,10 @@ impl SpanQueue {
         self.next_parent_id = SpanId::new(0);
         self.span_queue.split_off(0)
     }
+
+    #[inline]
+    pub fn clear(&mut self) {
+        self.next_parent_id = SpanId::new(0);
+        self.span_queue.clear();
+    }
 }
