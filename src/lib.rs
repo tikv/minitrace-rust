@@ -75,11 +75,11 @@ mod tests {
 
                 four_spans();
 
-                let raw_spans = Arc::new(local_collector.collect());
+                let local_spans = Arc::new(local_collector.collect());
 
-                root_span1.mount_local_spans(raw_spans.clone());
-                root_span2.mount_local_spans(raw_spans.clone());
-                root_span3.mount_local_spans(raw_spans);
+                root_span1.mount_local_spans(local_spans.clone());
+                root_span2.mount_local_spans(local_spans.clone());
+                root_span3.mount_local_spans(local_spans);
 
                 (collector1, collector2, collector3)
             };
@@ -135,16 +135,16 @@ mod tests {
 
                         four_spans();
 
-                        let raw_spans = Arc::new(local_collector.collect());
-                        merged.mount_local_spans(raw_spans);
+                        let local_spans = Arc::new(local_collector.collect());
+                        merged.mount_local_spans(local_spans);
                     });
                 }
 
                 four_spans();
 
-                let raw_spans = Arc::new(local_collector.collect());
-                root_span1.mount_local_spans(raw_spans.clone());
-                root_span2.mount_local_spans(raw_spans);
+                let local_spans = Arc::new(local_collector.collect());
+                root_span1.mount_local_spans(local_spans.clone());
+                root_span2.mount_local_spans(local_spans);
                 (collector1, collector2)
             };
 
@@ -159,7 +159,7 @@ mod tests {
     }
 
     #[test]
-    fn multiple_spans_without_spans() {
+    fn multiple_spans_without_local_spans() {
         let (spans1, spans2, spans3) = {
             let (c1, c2, c3) = {
                 let (root_span1, collector1) = Span::root("root1");
@@ -168,10 +168,10 @@ mod tests {
 
                 let local_collector = LocalCollector::start();
 
-                let raw_spans = Arc::new(local_collector.collect());
-                root_span1.mount_local_spans(raw_spans.clone());
-                root_span2.mount_local_spans(raw_spans.clone());
-                root_span3.mount_local_spans(raw_spans);
+                let local_spans = Arc::new(local_collector.collect());
+                root_span1.mount_local_spans(local_spans.clone());
+                root_span2.mount_local_spans(local_spans.clone());
+                root_span3.mount_local_spans(local_spans);
 
                 (collector1, collector2, collector3)
             };
