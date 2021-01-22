@@ -3,17 +3,17 @@
 #![feature(negative_impls)]
 
 pub use crate::future::FutureExt;
-pub use crate::local::local_collector::{LocalCollector, RawSpans};
-pub use crate::local::scope_guard::LocalScopeGuard;
-pub use crate::local::span_guard::LocalSpanGuard;
-pub use crate::span::cycle;
-pub use crate::span::Span;
+pub use crate::local::local_collector::{LocalCollector, LocalSpans};
+pub use crate::local::local_span_guard::LocalSpanGuard;
+pub use crate::local::span_guard::SpanGuard;
 pub use crate::trace::collector::{CollectArgs, Collector};
-pub use crate::trace::scope::Scope;
+pub use crate::trace::local_span::LocalSpan;
+pub use crate::trace::span::Span;
+
+pub mod span;
 
 pub(crate) mod future;
 pub(crate) mod local;
-pub(crate) mod span;
 pub(crate) mod trace;
 
 #[cfg(test)]
@@ -28,8 +28,8 @@ mod tests {
         {
             // wide
             for _ in 0..2 {
-                let _g =
-                    Span::enter("iter span").with_property(|| ("tmp_property", "tmp_value".into()));
+                let _g = LocalSpan::enter("iter span")
+                    .with_property(|| ("tmp_property", "tmp_value".into()));
             }
         }
 
@@ -49,10 +49,10 @@ mod tests {
     }
 
     #[test]
-    fn single_thread_single_scope() {
+    fn single_thread_single_span() {
         let spans = {
-            let (root_scope, collector) = Scope::root("root");
-            let _g = root_scope.enter();
+            let (root_span, collector) = Span::root("root");
+            let _g = root_span.enter();
 
             four_spans();
 
@@ -64,12 +64,12 @@ mod tests {
     }
 
     #[test]
-    fn single_thread_multiple_scopes() {
+    fn single_thread_multiple_spans() {
         let (spans1, spans2, spans3) = {
             let (c1, c2, c3) = {
-                let (root_scope1, collector1) = Scope::root("root1");
-                let (root_scope2, collector2) = Scope::root("root2");
-                let (root_scope3, collector3) = Scope::root("root3");
+                let (root_span1, collector1) = Span::root("root1");
+                let (root_span2, collector2) = Span::root("root2");
+                let (root_span3, collector3) = Span::root("root3");
 
                 let local_collector = LocalCollector::start();
 
@@ -77,9 +77,9 @@ mod tests {
 
                 let raw_spans = Arc::new(local_collector.collect());
 
-                root_scope1.extend_raw_spans(raw_spans.clone());
-                root_scope2.extend_raw_spans(raw_spans.clone());
-                root_scope3.extend_raw_spans(raw_spans);
+                root_span1.mount_local_spans(raw_spans.clone());
+                root_span2.mount_local_spans(raw_spans.clone());
+                root_span3.mount_local_spans(raw_spans);
 
                 (collector1, collector2, collector3)
             };
@@ -97,15 +97,15 @@ mod tests {
     }
 
     #[test]
-    fn multiple_threads_single_scope() {
+    fn multiple_threads_single_span() {
         let spans = {
-            let (scope, collector) = Scope::root("root");
-            let _g = scope.enter();
+            let (span, collector) = Span::root("root");
+            let _g = span.enter();
 
             for _ in 0..4 {
-                let child_scope = Scope::from_local_parent("cross-thread");
+                let child_span = Span::from_local_parent("cross-thread");
                 std::thread::spawn(move || {
-                    let _g = child_scope.enter();
+                    let _g = child_span.enter();
                     four_spans();
                 });
             }
@@ -120,31 +120,31 @@ mod tests {
     }
 
     #[test]
-    fn multiple_threads_multiple_scopes() {
+    fn multiple_threads_multiple_spans() {
         let (spans1, spans2) = {
             let (c1, c2) = {
-                let (root_scope1, collector1) = Scope::root("root1");
-                let (root_scope2, collector2) = Scope::root("root2");
+                let (root_span1, collector1) = Span::root("root1");
+                let (root_span2, collector2) = Span::root("root2");
                 let local_collector = LocalCollector::start();
 
                 for _ in 0..4 {
                     let merged =
-                        Scope::from_parents("merged", vec![&root_scope1, &root_scope2].into_iter());
+                        Span::from_parents("merged", vec![&root_span1, &root_span2].into_iter());
                     std::thread::spawn(move || {
                         let local_collector = LocalCollector::start();
 
                         four_spans();
 
                         let raw_spans = Arc::new(local_collector.collect());
-                        merged.extend_raw_spans(raw_spans);
+                        merged.mount_local_spans(raw_spans);
                     });
                 }
 
                 four_spans();
 
                 let raw_spans = Arc::new(local_collector.collect());
-                root_scope1.extend_raw_spans(raw_spans.clone());
-                root_scope2.extend_raw_spans(raw_spans);
+                root_span1.mount_local_spans(raw_spans.clone());
+                root_span2.mount_local_spans(raw_spans);
                 (collector1, collector2)
             };
 
@@ -159,19 +159,19 @@ mod tests {
     }
 
     #[test]
-    fn multiple_scopes_without_spans() {
+    fn multiple_spans_without_spans() {
         let (spans1, spans2, spans3) = {
             let (c1, c2, c3) = {
-                let (root_scope1, collector1) = Scope::root("root1");
-                let (root_scope2, collector2) = Scope::root("root2");
-                let (root_scope3, collector3) = Scope::root("root3");
+                let (root_span1, collector1) = Span::root("root1");
+                let (root_span2, collector2) = Span::root("root2");
+                let (root_span3, collector3) = Span::root("root3");
 
                 let local_collector = LocalCollector::start();
 
                 let raw_spans = Arc::new(local_collector.collect());
-                root_scope1.extend_raw_spans(raw_spans.clone());
-                root_scope2.extend_raw_spans(raw_spans.clone());
-                root_scope3.extend_raw_spans(raw_spans);
+                root_span1.mount_local_spans(raw_spans.clone());
+                root_span2.mount_local_spans(raw_spans.clone());
+                root_span3.mount_local_spans(raw_spans);
 
                 (collector1, collector2, collector3)
             };

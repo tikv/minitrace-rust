@@ -1,22 +1,20 @@
 // Copyright 2020 TiKV Project Authors. Licensed under Apache-2.0.
 
-use crossbeam::channel::Sender;
-
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
-use crate::local::local_collector::RawSpans;
+use crossbeam::channel::Sender;
 
-use crate::span::span_id::SpanId;
-use crate::span::RawSpan;
+use crate::local::local_collector::LocalSpans;
+use crate::span::{RawSpan, SpanId};
 
 #[derive(Clone, Debug)]
 pub enum SpanCollection {
-    RawSpans {
-        raw_spans: Arc<RawSpans>,
-        scope_id: SpanId,
+    LocalSpans {
+        local_spans: Arc<LocalSpans>,
+        parent_id_of_root: SpanId,
     },
-    ScopeSpan(RawSpan),
+    Span(RawSpan),
 }
 
 #[derive(Clone, Debug)]

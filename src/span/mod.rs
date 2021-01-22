@@ -1,12 +1,13 @@
 // Copyright 2020 TiKV Project Authors. Licensed under Apache-2.0.
 
-pub mod cycle;
-pub mod span_id;
+mod cycle;
+mod span_id;
 
 pub(crate) mod span_queue;
+pub(crate) use self::span_id::DefaultIdGenerator;
 
-use crate::span::cycle::{Anchor, Cycle, DefaultClock};
-use crate::span::span_id::SpanId;
+pub use self::cycle::{Anchor, Cycle, DefaultClock};
+pub use self::span_id::SpanId;
 
 #[derive(Clone, Debug, Default)]
 pub struct Span {

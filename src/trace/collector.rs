@@ -6,8 +6,8 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 
-use crate::span::cycle::{Anchor, DefaultClock};
 use crate::span::Span;
+use crate::span::{Anchor, DefaultClock};
 use crate::trace::acquirer::SpanCollection;
 
 pub struct Collector {
@@ -49,7 +49,7 @@ impl Collector {
         if let Some(duration) = duration_threshold {
             // find the root span and check its duration
             if let Some(root_span) = span_collections.iter().find_map(|s| match s {
-                SpanCollection::ScopeSpan(s) if s.parent_id.0 == 0 => Some(s),
+                SpanCollection::Span(s) if s.parent_id.0 == 0 => Some(s),
                 _ => None,
             }) {
                 let root_span = root_span.build_span(anchor);
@@ -69,8 +69,11 @@ impl Collector {
         let capacity = span_collections
             .iter()
             .map(|sc| match sc {
-                SpanCollection::RawSpans { raw_spans, .. } => raw_spans.spans.len(),
-                SpanCollection::ScopeSpan(_) => 1,
+                SpanCollection::LocalSpans {
+                    local_spans: raw_spans,
+                    ..
+                } => raw_spans.spans.len(),
+                SpanCollection::Span(_) => 1,
             })
             .sum();
 
@@ -78,9 +81,9 @@ impl Collector {
 
         for span_collection in span_collections {
             match span_collection {
-                SpanCollection::RawSpans {
-                    raw_spans,
-                    scope_id,
+                SpanCollection::LocalSpans {
+                    local_spans: raw_spans,
+                    parent_id_of_root: span_id,
                 } => {
                     for span in &raw_spans.spans {
                         let begin_unix_time_ns =
@@ -91,7 +94,7 @@ impl Collector {
                             DefaultClock::cycle_to_unix_time_ns(span.end_cycle, anchor)
                         };
                         let parent_id = if span.parent_id.0 == 0 {
-                            scope_id.0
+                            span_id.0
                         } else {
                             span.parent_id.0
                         };
@@ -105,7 +108,7 @@ impl Collector {
                         });
                     }
                 }
-                SpanCollection::ScopeSpan(scope_span) => spans.push(scope_span.build_span(anchor)),
+                SpanCollection::Span(span) => spans.push(span.build_span(anchor)),
             }
         }
 

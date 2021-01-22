@@ -13,30 +13,44 @@ A high-performance, ergonomic timeline tracing library for Rust.
   - An operation name
   - A start timestamp and finish timestamp
   - A set of key-value properties
+  - A reference to a causally-related `Span`
 
-### Local Span Guard
+  To record such a span, a struct of the same name, `Span`, is provided. Its lifetime indicates the begin and the end
+  of the span.
 
-  A `LocalSpanGuard` is used to record a `Span`. Its creation means a `Span`'s begin and its destruction means a `Span`'s
-  end.
-  
-  A `LocalSpanGuard` is thread-local and can be created via method `Span::enter()`.
+  A new `Span` can be created via `Span::root()`, `Span::from_parent()` and `Span::from_parents()`, and the last two
+  methods refer existing related `Span`s to the new `Span`.
 
-  *Note: The relation between `Span`s is constructed implicitly. Even within a deeply nested function calls, the inner
-  `LocalSpanGuard` can automatically figure out its parent without explicitly passing any tracing context as a parameter.*
+  `Span`s are thread-safe and can be sent and accessed across threads.
 
-### Scope
-
-  A `Scope` is used to trace the execution of a task.
-  
-  `Scope` is thread-safe so it's okay to send or access across threads. Cloning a `Scope` will produce another `Scope` 
-  which will trace the same task. After dropping all `Scope`s related to a task, a `Span`, representing the whole execution
-  of the task, will be recorded.
-
-  A new `Scope` can be created via functions `Scope::root()`, `Scope::from_parent()` and `Scope::from_parents()`.
 
 ### Collector
 
-  A `Collector` associated to a root `Scope` is used to collect all spans related to a request.
+  A `Collector` associated to a root `Span` is used to collect all spans related to a request.
+
+
+### Local Span & Local Span Guard
+
+  Cooperate with `LocalCollector`, `LocalSpan` provides an extremely low-cost tracing mechanism for performance-sensitive
+  apps.
+  
+  A `LocalSpan` is recorded by a `LocalSpanGuard` which is thread-local and created via method `LocalSpan::enter()`.
+  A `LocalSpanGuard`'s creation means a `LocalSpan`'s begin and its destruction means a `LocalSpan`'s end. Finally, a
+  completed `LocalSpan` will be stored in thread local.
+
+  The causally-relation between `LocalSpan`s is built implicitly. We don't need to explicitly pass any contexts to connect
+  two `LocalSpan`s. Even within a deeply nested function calls, the inner `LocalSpanGuard` can automatically figure out
+  its parent.
+
+
+### Local Collector
+
+  `LocalCollector` is provided to retrieve `LocalSpan`s from thread local. Such collected `LocalSpan`s can be mounted to a
+  normal `Span`.
+  
+  At most time, we should use the thread-local tracing mechanism via `LocalSpan` and `LocalCollector` to achieve the high
+  performance goal. In other situations where execution is crossing thread bound and a normal `Span` has to be passed from
+  one thread to another thread, we just need to simply mount collected `LocalSpan`s to such a `Span`.
 
 
 ## Usage
@@ -52,7 +66,7 @@ To record a common span:
 ```rust
 use minitrace::*;
 
-let _span_guard = Span::enter("my event");
+let _span_guard = LocalSpan::enter("my event");
 ```
 
 To add properties:
@@ -61,10 +75,10 @@ To add properties:
 use minitrace::*;
 
 // add a property for a span
-let _span_guard = Span::enter("my event").with_property(|| ("key", String::from("value")));
+let _span_guard = LocalSpan::enter("my event").with_property(|| ("key", String::from("value")));
 
 // or add multiple properties for a span
-let _span_guard = Span::enter("my event").with_properties(|| {
+let _span_guard = LocalSpan::enter("my event").with_properties(|| {
     vec![
         ("key1", String::from("value1")),
         ("key2", String::from("value2")),
@@ -76,31 +90,31 @@ let _span_guard = Span::enter("my event").with_properties(|| {
 
 A common pattern to trace synchronous code:
 
-- Create a root `Scope` and a `Collector` via `Scope::root()`, then attach the `Scope` to the current thread.
-- Add `Span::enter()`s somewhere, e.g. at the beginning of a code scope, at the beginning of a function, to record spans.
-- Make sure the root `Scope` and all guards are dropped, then call `Collector`'s `collect` to get all `Span`s.
+- Create a root `Span` and a `Collector` via `Span::root()`, then attach the `Span` to the current thread.
+- Add `LocalSpan::enter()`s somewhere, e.g. at the beginning of a code scope, at the beginning of a function, to record spans.
+- Make sure the root `Span` and all guards are dropped, then call `Collector`'s `collect` to get all `Span`s.
 
 
 ```rust
 use minitrace::*;
 
 let collector = {
-    let (root_scope, collector) = Scope::root("root");
-    let _scope_guard = root_scope.enter();
+    let (root_span, collector) = Span::root("root");
+    let _span_guard = root_span.enter();
 
-    let _span_guard = Span::enter("child");
+    let _local_span_guard = LocalSpan::enter("child");
 
     // do something ...
 
     collector
 };
 
-let spans: Vec<Span> = collector.collect();
+let spans: Vec<span::Span> = collector.collect();
 ```
 
 ### Asynchronous Example
 
-To trace asynchronous code, we usually transmit `Scope` from one thread to another thread.
+To trace asynchronous code, we usually transmit `Span` from one thread to another thread.
 
 #### Threads
 
@@ -108,52 +122,52 @@ To trace asynchronous code, we usually transmit `Scope` from one thread to anoth
 use minitrace::*;
 
 let collector = {
-    let (root_scope, collector) = Scope::root("task1");
-    let _scope_guard = root_scope.enter();
+    let (root_span, collector) = Span::root("task1");
+    let _span_guard = root_span.enter();
 
-    let _span_guard = Span::enter("span of task1");
+    let _local_span_guard = LocalSpan::enter("span of task1");
     
     // To trace a child task
-    let scope = Scope::from_local_parent("task2");
+    let span = Span::from_local_parent("task2");
     std::thread::spawn(move || {
-        let _scope_guard = scope.enter();
+        let _span_guard = span.enter();
 
-        let _span_guard = Span::enter("span of also task2");
+        let _loal_span_guard = Span::enter("span of also task2");
     });
 
     collector
 };
 
-let spans: Vec<Span> = collector.collect();
+let spans: Vec<span::Span> = collector.collect();
 ```
 
 #### Futures
 
 We provide two `Future` adaptors:
 
-- `in_new_span`: call `Span::enter` at every poll
-- `with_scope`: wrap the `Future` with the `Scope`, then call `Scope::try_enter` at every poll
+- `in_local_span`: call `LocalSpan::enter` at every poll
+- `in_span`: wrap the `Future` with a `Span`, then call `Span::try_enter` at every poll
 
-The `with_scope` adaptor is commonly used on a `Future` submitting to a runtime.
+The `in_span` adaptor is commonly used on a `Future` submitting to a runtime.
 
 ```rust
 use minitrace::*;
 
 let collector = {
-    let (root_scope, collector) = Scope::root("root");
-    let _scope_guard = root_scope.enter();
+    let (root_span, collector) = Span::root("root");
+    let _span_guard = root_span.enter();
 
     // To trace another task
     runtime::spawn(async {
         let _ = async {
             // some works
-        }.in_new_span("");
-    }.with_scope(Scope::from_local_parent("new task")));
+        }.in_local_span("");
+    }.in_span(Span::from_local_parent("new task")));
 
     collector
 };
 
-let spans: Vec<Span> = collector.collect();
+let spans: Vec<span::Span> = collector.collect();
 ```
 
 ### Macros
@@ -168,7 +182,7 @@ For normal functions, you can change:
 use minitrace::*;
 
 fn amazing_func() {
-    let _span_guard = Span::enter("wow");
+    let _span_guard = LocalSpan::enter("wow");
 
     // some works
 }
@@ -192,7 +206,7 @@ async fn amazing_async_func() {
     async {
         // some works
     }
-    .in_new_span("wow")
+    .in_local_span("wow")
     .await
 }
 ```
