@@ -2,5 +2,5 @@
 
 pub mod acquirer;
 pub mod collector;
-pub mod scope;
+pub mod local_span;
 pub mod span;

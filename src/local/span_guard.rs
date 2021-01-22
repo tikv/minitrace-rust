@@ -1,63 +1,123 @@
 // Copyright 2020 TiKV Project Authors. Licensed under Apache-2.0.
 
-use crate::local::span_line::{LocalSpanHandle, SpanLine, SPAN_LINE};
+use std::cell::RefCell;
+use std::sync::Arc;
 
-pub struct LocalSpanGuard {
-    span_handle: Option<LocalSpanHandle>,
+use crate::local::local_collector::LocalCollector;
+use crate::span::SpanId;
+use crate::trace::acquirer::{Acquirer, SpanCollection};
+use crate::Span;
+
+thread_local! {
+    static ATTACHED_SPAN: RefCell<Option<AttachedSpan >> = RefCell::new(None);
 }
-impl !Send for LocalSpanGuard {}
-impl !Sync for LocalSpanGuard {}
 
-impl LocalSpanGuard {
-    #[inline]
-    pub(crate) fn new(event: &'static str) -> Self {
-        SPAN_LINE.with(|span_line| {
-            let mut span_line = span_line.borrow_mut();
-            let span_handle = span_line.enter_span(event);
-            Self { span_handle }
+pub struct AttachedSpan {
+    span_id: SpanId,
+    acquirers: Vec<Acquirer>,
+
+    local_collector: Option<LocalCollector>,
+}
+
+impl AttachedSpan {
+    pub fn new_child_span(event: &'static str) -> Span {
+        ATTACHED_SPAN.with(|attached_span| {
+            let attached_span = attached_span.borrow();
+            if let Some(AttachedSpan {
+                span_id: parent_span_id,
+                acquirers,
+                ..
+            }) = attached_span.as_ref()
+            {
+                Span::new(acquirers.iter().map(|acq| (*parent_span_id, acq)), event)
+            } else {
+                Span::empty()
+            }
         })
     }
 
     #[inline]
-    pub fn with_properties<I: IntoIterator<Item = (&'static str, String)>, F: FnOnce() -> I>(
-        self,
-        properties: F,
-    ) -> Self {
-        self.with_span_line(move |span_handle, span_line| {
-            span_line.add_properties(span_handle, properties)
-        });
-        self
-    }
-
-    #[inline]
-    pub fn with_property<F: FnOnce() -> (&'static str, String)>(self, property: F) -> Self {
-        self.with_span_line(move |span_handle, span_line| {
-            span_line.add_property(span_handle, property);
-        });
-        self
+    pub fn is_occupied() -> bool {
+        ATTACHED_SPAN.with(|attached_span| {
+            let attached_span = attached_span.borrow();
+            attached_span.is_some()
+        })
     }
 }
 
-impl LocalSpanGuard {
-    #[inline]
-    fn with_span_line(&self, f: impl FnOnce(&LocalSpanHandle, &mut SpanLine)) {
-        if let Some(local_span_handle) = &self.span_handle {
-            SPAN_LINE.with(|span_line| {
-                let span_line = &mut *span_line.borrow_mut();
-                f(local_span_handle, span_line);
-            })
-        }
-    }
-}
+#[must_use]
+pub struct SpanGuard;
+impl !Send for SpanGuard {}
+impl !Sync for SpanGuard {}
 
-impl Drop for LocalSpanGuard {
-    #[inline]
+impl Drop for SpanGuard {
     fn drop(&mut self) {
-        if let Some(span_handle) = self.span_handle.take() {
-            SPAN_LINE.with(|span_line| {
-                let mut span_line = span_line.borrow_mut();
-                span_line.exit_span(span_handle);
-            });
+        ATTACHED_SPAN.with(|attached_span| {
+            if let Some(AttachedSpan {
+                span_id,
+                acquirers,
+                local_collector: Some(local_collector),
+            }) = attached_span.borrow_mut().take()
+            {
+                let raw_spans = Arc::new(local_collector.collect());
+                for acq in acquirers {
+                    acq.submit(SpanCollection::LocalSpans {
+                        local_spans: raw_spans.clone(),
+                        parent_id_of_root: span_id,
+                    })
+                }
+            }
+        })
+    }
+}
+
+impl SpanGuard {
+    #[inline]
+    pub(crate) fn new_with_local_collector(
+        span: &Span,
+        local_collector: Option<LocalCollector>,
+    ) -> Self {
+        ATTACHED_SPAN.with(|attached_span| {
+            let mut attached_span = attached_span.borrow_mut();
+
+            if attached_span.is_some() {
+                panic!("Attach too much spans: > 1")
+            }
+
+            if let Some(inner) = &span.inner {
+                *attached_span = Some(AttachedSpan {
+                    span_id: inner.span_id,
+                    acquirers: inner.to_report.iter().map(|(_, acq)| acq.clone()).collect(),
+                    local_collector,
+                })
+            }
+        });
+
+        SpanGuard
+    }
+}
+
+impl Span {
+    #[inline]
+    pub fn enter(&self) -> SpanGuard {
+        self.try_enter()
+            .expect("Current thread is occupied by another span")
+    }
+
+    #[inline]
+    pub fn try_enter(&self) -> Option<SpanGuard> {
+        if AttachedSpan::is_occupied() {
+            None
+        } else {
+            Some(SpanGuard::new_with_local_collector(
+                self,
+                LocalCollector::try_start(),
+            ))
         }
+    }
+
+    #[inline]
+    pub fn from_local_parent(event: &'static str) -> Self {
+        AttachedSpan::new_child_span(event)
     }
 }

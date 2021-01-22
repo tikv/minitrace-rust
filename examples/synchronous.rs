@@ -1,13 +1,13 @@
 // Copyright 2020 TiKV Project Authors. Licensed under Apache-2.0.
 
-use minitrace::Scope;
-use minitrace::{CollectArgs, Span};
+use minitrace::CollectArgs;
+use minitrace::{LocalSpan, Span};
 use minitrace_datadog::Reporter as DReporter;
 use minitrace_jaeger::Reporter as JReporter;
 use minitrace_macro::trace;
 
 fn func1(i: u64) {
-    let _guard = Span::enter("func1");
+    let _guard = LocalSpan::enter("func1");
     std::thread::sleep(std::time::Duration::from_millis(i));
     func2(i);
 }
@@ -19,11 +19,11 @@ fn func2(i: u64) {
 
 fn main() {
     let spans = {
-        let (scope, collector) = Scope::root("root");
+        let (span, collector) = Span::root("root");
 
-        let _scope_guard = scope.enter();
-        let _span_guard =
-            Span::enter("a span").with_property(|| ("a property", "a value".to_owned()));
+        let _sg1 = span.enter();
+        let _sg2 =
+            LocalSpan::enter("a span").with_property(|| ("a property", "a value".to_owned()));
 
         for i in 1..=10 {
             func1(i);

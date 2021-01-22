@@ -2,7 +2,7 @@
 
 mod thrift;
 
-use minitrace::Span;
+use minitrace::span::Span;
 use std::error::Error;
 use std::net::{SocketAddr, UdpSocket};
 use thrift_codec::message::Message;
