@@ -35,10 +35,10 @@ A high-performance, ergonomic timeline tracing library for Rust.
   apps.
   
   A `LocalSpan` is recorded by a `LocalSpanGuard` which is thread-local and created via method `LocalSpan::enter()`.
-  A `LocalSpanGuard`'s creation means a `LocalSpan`'s begin and its destruction means a `LocalSpan`'s end. Finally, a
-  completed `LocalSpan` will be stored in thread local.
+  A `LocalSpanGuard`'s creation means a `LocalSpan`'s begin and its destruction means a `LocalSpan`'s end. A completed
+  `LocalSpan` will be finally stored in thread local.
 
-  The causally-relation between `LocalSpan`s is built implicitly. We don't need to explicitly pass any contexts to connect
+  The causally-relation between `LocalSpan`s is built implicitly. It doesn't need to explicitly pass any contexts to connect
   two `LocalSpan`s. Even within a deeply nested function calls, the inner `LocalSpanGuard` can automatically figure out
   its parent.
 
@@ -48,9 +48,10 @@ A high-performance, ergonomic timeline tracing library for Rust.
   `LocalCollector` is provided to retrieve `LocalSpan`s from thread local. Such collected `LocalSpan`s can be mounted to a
   normal `Span`.
   
-  At most time, we should use the thread-local tracing mechanism via `LocalSpan` and `LocalCollector` to achieve the high
-  performance goal. In other situations where execution is crossing thread bound and a normal `Span` has to be passed from
-  one thread to another thread, we just need to simply mount collected `LocalSpan`s to such a `Span`.
+  At most time, we should use the thread-local tracing mechanism (i.e `LocalSpan` and `LocalCollector`) to achieve the high
+  performance goal. In other situations where execution is crossing thread bound, and a `Span` has to be passed from one
+  thread to another thread, we just need to simply mount `LocalSpan`s, which is collected by different `LocalCollector`s,
+  to the `Span`.
 
 
 ## Usage
