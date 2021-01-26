@@ -1,5 +1,7 @@
 // Copyright 2021 TiKV Project Authors. Licensed under Apache-2.0.
 
+use std::marker::PhantomData;
+
 use crate::local::span_line::SPAN_LINE;
 use crate::span::RawSpan;
 use crate::span::{Cycle, DefaultClock};
@@ -9,9 +11,16 @@ use crate::span::{Cycle, DefaultClock};
 pub struct LocalCollector {
     pub(crate) collected: bool,
     pub(crate) local_collector_epoch: usize,
+
+    // Identical to
+    // ```
+    // impl !Sync for LocalCollector {}
+    // impl !Send for LocalCollector {}
+    // ```
+    //
+    // TODO: replace it until feature `negative_impls` is stable.
+    _p: PhantomData<*const ()>,
 }
-impl !Sync for LocalCollector {}
-impl !Send for LocalCollector {}
 
 #[derive(Debug)]
 pub struct LocalSpans {
@@ -20,6 +29,14 @@ pub struct LocalSpans {
 }
 
 impl LocalCollector {
+    pub(crate) fn new(local_collector_epoch: usize) -> Self {
+        Self {
+            collected: false,
+            local_collector_epoch,
+            _p: Default::default(),
+        }
+    }
+
     pub fn start() -> Self {
         Self::try_start().expect("Current thread is occupied by another local collector")
     }
