@@ -61,10 +61,7 @@ impl SpanLine {
         self.local_collector_existing = true;
         self.current_local_collector_epoch = self.current_local_collector_epoch.wrapping_add(1);
 
-        Some(LocalCollector {
-            collected: false,
-            local_collector_epoch: self.current_local_collector_epoch,
-        })
+        Some(LocalCollector::new(self.current_local_collector_epoch))
     }
 
     pub fn unregister_and_collect(&mut self, local_collector: LocalCollector) -> Vec<RawSpan> {

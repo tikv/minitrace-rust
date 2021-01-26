@@ -1,13 +1,22 @@
 // Copyright 2020 TiKV Project Authors. Licensed under Apache-2.0.
 
+use std::marker::PhantomData;
+
 use crate::local::span_line::{LocalSpanHandle, SpanLine, SPAN_LINE};
 
 #[must_use]
 pub struct LocalSpanGuard {
     span_handle: Option<LocalSpanHandle>,
+
+    // Identical to
+    // ```
+    // impl !Sync for LocalSpanGuard {}
+    // impl !Send for LocalSpanGuard {}
+    // ```
+    //
+    // TODO: replace it until feature `negative_impls` is stable.
+    _p: PhantomData<*const ()>,
 }
-impl !Send for LocalSpanGuard {}
-impl !Sync for LocalSpanGuard {}
 
 impl LocalSpanGuard {
     #[inline]
@@ -15,7 +24,10 @@ impl LocalSpanGuard {
         SPAN_LINE.with(|span_line| {
             let mut span_line = span_line.borrow_mut();
             let span_handle = span_line.enter_span(event);
-            Self { span_handle }
+            Self {
+                span_handle,
+                _p: Default::default(),
+            }
         })
     }
 

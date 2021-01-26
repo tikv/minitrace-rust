@@ -1,7 +1,5 @@
 // Copyright 2020 TiKV Project Authors. Licensed under Apache-2.0.
 
-#![feature(negative_impls)]
-
 pub use crate::future::FutureExt;
 pub use crate::local::local_collector::{LocalCollector, LocalSpans};
 pub use crate::local::local_span_guard::LocalSpanGuard;

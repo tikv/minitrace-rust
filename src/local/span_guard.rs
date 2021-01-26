@@ -1,6 +1,7 @@
 // Copyright 2020 TiKV Project Authors. Licensed under Apache-2.0.
 
 use std::cell::RefCell;
+use std::marker::PhantomData;
 use std::sync::Arc;
 
 use crate::local::local_collector::LocalCollector;
@@ -9,7 +10,7 @@ use crate::trace::acquirer::{Acquirer, SpanCollection};
 use crate::Span;
 
 thread_local! {
-    static ATTACHED_SPAN: RefCell<Option<AttachedSpan >> = RefCell::new(None);
+    static ATTACHED_SPAN: RefCell<Option<AttachedSpan>> = RefCell::new(None);
 }
 
 pub struct AttachedSpan {
@@ -46,9 +47,16 @@ impl AttachedSpan {
 }
 
 #[must_use]
-pub struct SpanGuard;
-impl !Send for SpanGuard {}
-impl !Sync for SpanGuard {}
+pub struct SpanGuard {
+    // Identical to
+    // ```
+    // impl !Sync for SpanGuard {}
+    // impl !Send for SpanGuard {}
+    // ```
+    //
+    // TODO: replace it until feature `negative_impls` is stable.
+    _p: PhantomData<*const ()>,
+}
 
 impl Drop for SpanGuard {
     fn drop(&mut self) {
@@ -93,7 +101,9 @@ impl SpanGuard {
             }
         });
 
-        SpanGuard
+        SpanGuard {
+            _p: Default::default(),
+        }
     }
 }
 
