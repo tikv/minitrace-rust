@@ -2,7 +2,7 @@
 
 use std::marker::PhantomData;
 
-use crate::local::span_line::SPAN_LINE;
+use crate::local::span_line::LOCAL_SPAN_LINE;
 use crate::span::RawSpan;
 use crate::span::{Cycle, DefaultClock};
 
@@ -18,7 +18,7 @@ pub struct LocalCollector {
     // impl !Send for LocalCollector {}
     // ```
     //
-    // TODO: replace it until feature `negative_impls` is stable.
+    // TODO: Replace it once feature `negative_impls` is stable.
     _p: PhantomData<*const ()>,
 }
 
@@ -42,14 +42,14 @@ impl LocalCollector {
     }
 
     pub fn try_start() -> Option<Self> {
-        SPAN_LINE.with(|span_line| {
+        LOCAL_SPAN_LINE.with(|span_line| {
             let s = &mut *span_line.borrow_mut();
             s.register_local_collector()
         })
     }
 
     pub fn collect(mut self) -> LocalSpans {
-        SPAN_LINE.with(|span_line| {
+        LOCAL_SPAN_LINE.with(|span_line| {
             let s = &mut *span_line.borrow_mut();
             self.collected = true;
             LocalSpans {
@@ -64,7 +64,7 @@ impl Drop for LocalCollector {
     fn drop(&mut self) {
         if !self.collected {
             self.collected = true;
-            SPAN_LINE.with(|span_line| {
+            LOCAL_SPAN_LINE.with(|span_line| {
                 let s = &mut *span_line.borrow_mut();
                 s.clear();
             })

@@ -7,10 +7,10 @@ use crate::span::span_queue::{SpanHandle, SpanQueue};
 use crate::span::RawSpan;
 
 thread_local! {
-    pub(super) static SPAN_LINE: RefCell<SpanLine> = RefCell::new(SpanLine::with_capacity(1024));
+    pub(super) static LOCAL_SPAN_LINE: RefCell<LocalSpanLine> = RefCell::new(LocalSpanLine::with_capacity(1024));
 }
 
-pub struct SpanLine {
+pub struct LocalSpanLine {
     span_queue: SpanQueue,
 
     local_collector_existing: bool,
@@ -22,7 +22,7 @@ pub struct LocalSpanHandle {
     local_collector_epoch: usize,
 }
 
-impl SpanLine {
+impl LocalSpanLine {
     #[inline]
     pub fn with_capacity(capacity: usize) -> Self {
         Self {
@@ -88,7 +88,7 @@ impl SpanLine {
     ) {
         if self.is_valid(local_span_handle) {
             self.span_queue
-                .add_properties(&local_span_handle.span_handle, properties);
+                .add_properties(&local_span_handle.span_handle, properties());
         }
     }
 
@@ -100,12 +100,12 @@ impl SpanLine {
     ) {
         if self.is_valid(local_span_handle) {
             self.span_queue
-                .add_property(&local_span_handle.span_handle, property);
+                .add_property(&local_span_handle.span_handle, property());
         }
     }
 }
 
-impl SpanLine {
+impl LocalSpanLine {
     #[inline]
     fn is_valid(&self, local_span_handle: &LocalSpanHandle) -> bool {
         self.local_collector_existing

@@ -49,27 +49,23 @@ impl SpanQueue {
     }
 
     #[inline]
-    pub fn add_properties<I: IntoIterator<Item = (&'static str, String)>, F: FnOnce() -> I>(
+    pub fn add_properties<I: IntoIterator<Item = (&'static str, String)>>(
         &mut self,
         span_handle: &SpanHandle,
-        properties: F,
+        properties: I,
     ) {
         debug_assert!(span_handle.index < self.span_queue.len());
 
         let span = &mut self.span_queue[span_handle.index];
-        span.properties.extend(properties());
+        span.properties.extend(properties);
     }
 
     #[inline]
-    pub fn add_property<F: FnOnce() -> (&'static str, String)>(
-        &mut self,
-        span_handle: &SpanHandle,
-        property: F,
-    ) {
+    pub fn add_property(&mut self, span_handle: &SpanHandle, property: (&'static str, String)) {
         debug_assert!(span_handle.index < self.span_queue.len());
 
         let span = &mut self.span_queue[span_handle.index];
-        span.properties.push(property());
+        span.properties.push(property);
     }
 
     #[inline]

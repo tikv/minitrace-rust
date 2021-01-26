@@ -43,3 +43,30 @@ impl DefaultIdGenerator {
         })
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::collections::HashSet;
+
+    #[test]
+    #[allow(clippy::needless_collect)]
+    fn unique_id() {
+        let handles = std::iter::repeat_with(|| {
+            std::thread::spawn(|| {
+                std::iter::repeat_with(DefaultIdGenerator::next_id)
+                    .take(1000)
+                    .collect::<Vec<_>>()
+            })
+        })
+        .take(32)
+        .collect::<Vec<_>>();
+
+        let k = handles
+            .into_iter()
+            .flat_map(|h| h.join().unwrap())
+            .collect::<HashSet<_>>();
+
+        assert_eq!(k.len(), 32 * 1000);
+    }
+}
