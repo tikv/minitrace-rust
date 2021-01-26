@@ -64,31 +64,16 @@ fn minitrace_harness() {
     .collect();
 }
 
-#[derive(Debug)]
-enum TracingType {
-    TokioTracing,
-    Rustracing,
-    Minitrace,
-}
-
 fn tracing_comparison(c: &mut Criterion) {
     init_opentelemetry();
 
-    c.bench_function_over_inputs(
-        "tracing_comparison",
-        |b, tp| {
-            b.iter(|| match tp {
-                TracingType::TokioTracing => opentelemetry_harness(),
-                TracingType::Rustracing => rustracing_harness(),
-                TracingType::Minitrace => minitrace_harness(),
-            });
-        },
-        &[
-            TracingType::TokioTracing,
-            TracingType::Rustracing,
-            TracingType::Minitrace,
-        ],
-    );
+    let mut bgroup = c.benchmark_group("tracing_comparison");
+
+    bgroup.bench_function("Tokio Tracing", |b| b.iter(opentelemetry_harness));
+    bgroup.bench_function("Rustracing", |b| b.iter(rustracing_harness));
+    bgroup.bench_function("Minitrace", |b| b.iter(minitrace_harness));
+
+    bgroup.finish();
 }
 
 criterion_group!(benches, tracing_comparison);

@@ -7,11 +7,9 @@ license = "Apache-2.0"
 edition = "2018"
 
 [dependencies]
-slab = "0.4"
 minstant = { git = "https://github.com/zhongzc/minstant.git" }
 crossbeam = "0.7"
 pin-project = "0.4"
-smallvec = "1.4"
 
 [dev-dependencies]
 criterion = "0.3"
@@ -27,7 +25,6 @@ tracing = "0.1"
 tracing-core = "0.1"
 tracing-subscriber = "0.2"
 rand = "0.7"
-crossbeam = "0.7"
 futures = "0.3"
 
 [[bench]]
