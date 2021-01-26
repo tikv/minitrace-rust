@@ -22,77 +22,79 @@ fn dummy_rec(i: usize) {
 }
 
 fn trace_wide_raw_bench(c: &mut Criterion) {
-    c.bench_function_over_inputs(
-        "trace_wide_raw",
-        |b, len| {
+    let mut group = c.benchmark_group("trace_wide_raw");
+
+    for len in &[1, 10, 100, 1000, 10000] {
+        group.bench_function(len.to_string(), |b| {
             b.iter(|| {
                 let local_collector = LocalCollector::start();
                 dummy_iter(*len);
                 local_collector.collect()
-            });
-        },
-        vec![1, 10, 100, 1000, 10000],
-    );
+            })
+        });
+    }
+
+    group.finish();
 }
 
 fn trace_wide_bench(c: &mut Criterion) {
-    c.bench_function_over_inputs(
-        "trace_wide",
-        |b, len| {
+    let mut group = c.benchmark_group("trace_wide");
+
+    for len in &[1, 10, 100, 1000, 10000] {
+        group.bench_function(len.to_string(), |b| {
             b.iter(|| {
                 {
                     let (root_span, collector) = Span::root("root");
-
                     let _sg = root_span.enter();
-
                     if *len > 1 {
                         dummy_iter(*len);
                     }
-
                     collector
                 }
                 .collect()
-            });
-        },
-        vec![1, 10, 100, 1000, 10000],
-    );
+            })
+        });
+    }
+
+    group.finish();
 }
 
 fn trace_deep_raw_bench(c: &mut Criterion) {
-    c.bench_function_over_inputs(
-        "trace_deep_raw",
-        |b, len| {
+    let mut group = c.benchmark_group("trace_deep_raw");
+
+    for len in &[1, 10, 100, 1000, 10000] {
+        group.bench_function(len.to_string(), |b| {
             b.iter(|| {
                 let local_collector = LocalCollector::start();
                 dummy_rec(*len);
                 local_collector.collect()
-            });
-        },
-        vec![1, 10, 100, 1000, 10000],
-    );
+            })
+        });
+    }
+
+    group.finish();
 }
 
 fn trace_deep_bench(c: &mut Criterion) {
-    c.bench_function_over_inputs(
-        "trace_deep",
-        |b, len| {
+    let mut group = c.benchmark_group("trace_deep");
+
+    for len in &[1, 10, 100, 1000, 10000] {
+        group.bench_function(len.to_string(), |b| {
             b.iter(|| {
                 {
                     let (root_span, collector) = Span::root("root");
-
                     let _sg = root_span.enter();
-
                     if *len > 1 {
                         dummy_rec(*len);
                     }
-
                     collector
                 }
                 .collect()
-            });
-        },
-        vec![1, 10, 100, 1000, 10000],
-    );
+            })
+        });
+    }
+
+    group.finish();
 }
 
 fn trace_future_bench(c: &mut Criterion) {
@@ -102,22 +104,22 @@ fn trace_future_bench(c: &mut Criterion) {
         }
     }
 
-    c.bench_function_over_inputs(
-        "trace_future",
-        |b, len| {
+    let mut group = c.benchmark_group("trace_future");
+
+    for len in &[1, 10, 100, 1000, 10000] {
+        group.bench_function(len.to_string(), |b| {
             b.iter(|| {
                 {
                     let (root_span, collector) = Span::root("root");
-
                     let _ = futures::executor::block_on(f(*len).in_span(root_span));
-
                     collector
                 }
                 .collect()
-            });
-        },
-        vec![1, 10, 100, 1000, 10000],
-    );
+            })
+        });
+    }
+
+    group.finish();
 }
 
 criterion_group!(
