@@ -55,7 +55,7 @@ impl RawSpan {
     }
 
     #[inline]
-    pub fn to_span(&self, anchor: Anchor) -> Span {
+    pub fn into_span(self, anchor: Anchor) -> Span {
         let begin_unix_time_ns = DefaultClock::cycle_to_unix_time_ns(self.begin_cycle, anchor);
         let end_unix_time_ns = DefaultClock::cycle_to_unix_time_ns(self.end_cycle, anchor);
         Span {
@@ -64,7 +64,7 @@ impl RawSpan {
             begin_unix_time_ns,
             duration_ns: end_unix_time_ns - begin_unix_time_ns,
             event: self.event,
-            properties: self.properties.clone(),
+            properties: self.properties,
         }
     }
 }
