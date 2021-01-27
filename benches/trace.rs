@@ -9,7 +9,7 @@ fn dummy_iter(i: usize) {
     #[trace("")]
     fn dummy() {}
 
-    for _ in 0..i - 1 {
+    for _ in 0..i {
         dummy();
     }
 }
@@ -46,9 +46,7 @@ fn trace_wide_bench(c: &mut Criterion) {
                 {
                     let (root_span, collector) = Span::root("root");
                     let _sg = root_span.enter();
-                    if *len > 1 {
-                        dummy_iter(*len);
-                    }
+                    dummy_iter(*len - 1);
                     collector
                 }
                 .collect()
@@ -84,9 +82,7 @@ fn trace_deep_bench(c: &mut Criterion) {
                 {
                     let (root_span, collector) = Span::root("root");
                     let _sg = root_span.enter();
-                    if *len > 1 {
-                        dummy_rec(*len);
-                    }
+                    dummy_rec(*len - 1);
                     collector
                 }
                 .collect()

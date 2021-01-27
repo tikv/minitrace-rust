@@ -2,7 +2,7 @@
 
 use std::marker::PhantomData;
 
-use crate::local::span_line::LOCAL_SPAN_LINE;
+use crate::local::local_span_line::LOCAL_SPAN_LINE;
 use crate::span::RawSpan;
 use crate::span::{Cycle, DefaultClock};
 

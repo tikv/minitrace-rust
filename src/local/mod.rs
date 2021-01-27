@@ -2,5 +2,5 @@
 
 pub mod local_collector;
 pub mod local_span_guard;
+pub mod local_span_line;
 pub mod span_guard;
-pub mod span_line;

@@ -2,7 +2,7 @@
 
 use std::marker::PhantomData;
 
-use crate::local::span_line::{LocalSpanHandle, LocalSpanLine, LOCAL_SPAN_LINE};
+use crate::local::local_span_line::{LocalSpanHandle, LocalSpanLine, LOCAL_SPAN_LINE};
 
 #[must_use]
 pub struct LocalSpanGuard {
