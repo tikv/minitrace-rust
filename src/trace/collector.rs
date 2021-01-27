@@ -52,7 +52,7 @@ impl Collector {
                 SpanCollection::Span(s) if s.parent_id.0 == 0 => Some(s),
                 _ => None,
             }) {
-                let root_span = root_span.build_span(anchor);
+                let root_span = root_span.clone().into_span(anchor);
                 if root_span.duration_ns < duration.as_nanos() as _ {
                     return vec![root_span];
                 }
@@ -108,7 +108,7 @@ impl Collector {
                         });
                     }
                 }
-                SpanCollection::Span(span) => spans.push(span.build_span(anchor)),
+                SpanCollection::Span(span) => spans.push(span.into_span(anchor)),
             }
         }
 

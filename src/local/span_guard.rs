@@ -54,7 +54,7 @@ pub struct SpanGuard {
     // impl !Send for SpanGuard {}
     // ```
     //
-    // TODO: replace it until feature `negative_impls` is stable.
+    // TODO: Replace it once feature `negative_impls` is stable.
     _p: PhantomData<*const ()>,
 }
 

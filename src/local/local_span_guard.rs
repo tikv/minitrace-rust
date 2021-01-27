@@ -2,7 +2,7 @@
 
 use std::marker::PhantomData;
 
-use crate::local::span_line::{LocalSpanHandle, SpanLine, SPAN_LINE};
+use crate::local::local_span_line::{LocalSpanHandle, LocalSpanLine, LOCAL_SPAN_LINE};
 
 #[must_use]
 pub struct LocalSpanGuard {
@@ -14,14 +14,14 @@ pub struct LocalSpanGuard {
     // impl !Send for LocalSpanGuard {}
     // ```
     //
-    // TODO: replace it until feature `negative_impls` is stable.
+    // TODO: Replace it once feature `negative_impls` is stable.
     _p: PhantomData<*const ()>,
 }
 
 impl LocalSpanGuard {
     #[inline]
     pub(crate) fn new(event: &'static str) -> Self {
-        SPAN_LINE.with(|span_line| {
+        LOCAL_SPAN_LINE.with(|span_line| {
             let mut span_line = span_line.borrow_mut();
             let span_handle = span_line.enter_span(event);
             Self {
@@ -53,9 +53,9 @@ impl LocalSpanGuard {
 
 impl LocalSpanGuard {
     #[inline]
-    fn with_span_line(&self, f: impl FnOnce(&LocalSpanHandle, &mut SpanLine)) {
+    fn with_span_line(&self, f: impl FnOnce(&LocalSpanHandle, &mut LocalSpanLine)) {
         if let Some(local_span_handle) = &self.span_handle {
-            SPAN_LINE.with(|span_line| {
+            LOCAL_SPAN_LINE.with(|span_line| {
                 let span_line = &mut *span_line.borrow_mut();
                 f(local_span_handle, span_line);
             })
@@ -67,7 +67,7 @@ impl Drop for LocalSpanGuard {
     #[inline]
     fn drop(&mut self) {
         if let Some(span_handle) = self.span_handle.take() {
-            SPAN_LINE.with(|span_line| {
+            LOCAL_SPAN_LINE.with(|span_line| {
                 let mut span_line = span_line.borrow_mut();
                 span_line.exit_span(span_handle);
             });
