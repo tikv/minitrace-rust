@@ -11,11 +11,11 @@ env:
 
 jobs:
   build:
-
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [macos-latest, ubuntu-latest]
+        os: [windows-latest, macos-latest, ubuntu-latest]
+        rust: [stable, nightly]
     env:
       RUST_BACKTRACE: 1
     steps:
