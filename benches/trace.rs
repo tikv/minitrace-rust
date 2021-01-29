@@ -60,7 +60,7 @@ fn trace_wide_bench(c: &mut Criterion) {
 fn trace_deep_raw_bench(c: &mut Criterion) {
     let mut group = c.benchmark_group("trace_deep_raw");
 
-    for len in &[1, 10, 100, 1000, 10000] {
+    for len in &[1, 10, 100, 1000] {
         group.bench_function(len.to_string(), |b| {
             b.iter(|| {
                 let local_collector = LocalCollector::start();
@@ -76,7 +76,7 @@ fn trace_deep_raw_bench(c: &mut Criterion) {
 fn trace_deep_bench(c: &mut Criterion) {
     let mut group = c.benchmark_group("trace_deep");
 
-    for len in &[1, 10, 100, 1000, 10000] {
+    for len in &[1, 10, 100, 1000] {
         group.bench_function(len.to_string(), |b| {
             b.iter(|| {
                 {

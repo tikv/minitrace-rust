@@ -7,7 +7,7 @@ license = "Apache-2.0"
 edition = "2018"
 
 [dependencies]
-minstant = { git = "https://github.com/zhongzc/minstant.git", rev = "f5ff59b64a1060ab01734d7e61c69b214dde8382" }
+minstant = { git = "https://github.com/zhongzc/minstant.git", rev = "dc7dd5c17c564601afff7c0b640fd430728bfcd5" }
 crossbeam = "0.7"
 pin-project = "0.4"
 

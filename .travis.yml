@@ -1,0 +1,25 @@
+language: rust
+env:
+  global:
+    - RUST_BACKTRACE=1
+
+arch:
+  - arm64
+
+os:
+  - linux
+
+rust:
+  - nightly
+  - stable
+
+script:
+  - rustup component add rustfmt
+  - rustup component add clippy
+  - cargo fmt --all -- --check
+  - cargo clippy --all-targets --all-features -- --deny warnings
+  - cargo build --workspace --all-targets
+  - cargo test --workspace --all-targets -- --nocapture
+  - cargo bench --workspace --all-targets
+  - cargo run --example asynchronous
+  - cargo run --example synchronous
