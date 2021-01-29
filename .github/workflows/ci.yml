@@ -21,9 +21,11 @@ jobs:
     steps:
     - uses: actions/checkout@v2
     - name: Set up toolchains
-      run: |
-        rustup component add rustfmt	
-        rustup component add clippy
+      uses: actions-rs/toolchain@v1
+      with:
+        toolchain: ${{ matrix.rust }}
+        override: true
+        components: rustfmt, clippy
     - name: Check format
       run: cargo fmt --all -- --check
     - name: Lints
