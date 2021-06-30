@@ -1,6 +1,6 @@
-use std::net::SocketAddr;
 use minitrace::*;
 use minitrace_jaeger::Reporter;
+use std::net::SocketAddr;
 
 fn main() {
     let collector = {
@@ -20,6 +20,13 @@ fn main() {
     const TRACE_ID: u64 = 42;
     const SPAN_ID_PREFIX: u32 = 42;
     const ROOT_PARENT_SPAN_ID: u64 = 0;
-    let bytes = Reporter::encode(String::from("service name"), TRACE_ID, ROOT_PARENT_SPAN_ID, SPAN_ID_PREFIX, &spans).expect("report error");
-    Reporter::report(socket, &bytes);
+    let bytes = Reporter::encode(
+        String::from("service name"),
+        TRACE_ID,
+        ROOT_PARENT_SPAN_ID,
+        SPAN_ID_PREFIX,
+        &spans,
+    )
+    .expect("encode error");
+    Reporter::report(socket, &bytes).expect("report error");
 }
