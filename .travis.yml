@@ -22,4 +22,5 @@ script:
   - cargo test --workspace --all-targets -- --nocapture
   - cargo bench --workspace --all-targets
   - cargo run --example asynchronous
+  - cargo run --example get_started
   - cargo run --example synchronous
