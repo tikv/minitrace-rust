@@ -248,13 +248,20 @@ use minitrace_jaeger::Reporter;
 
 let spans = /* collect from a collector */;
 
-let socket = SocketAddr::new("127.0.0.1:6831".parse().unwrap());
-let reporter = Reporter::new(socket, "service name");
+let socket = SocketAddr::new("127.0.0.1".parse().unwrap(), 6831);
 
 const TRACE_ID: u64 = 42;
 const SPAN_ID_PREFIX: u32 = 42;
 const ROOT_PARENT_SPAN_ID: u64 = 0;
-reporter.report(TRACE_ID, SPAN_ID_PREFIX, ROOT_PARENT_SPAN_ID, &spans).expect("report error");
+let bytes = Reporter::encode(
+    String::from("service name"),
+    TRACE_ID,
+    ROOT_PARENT_SPAN_ID,
+    SPAN_ID_PREFIX,
+    &spans,
+)
+.expect("encode error");
+Reporter::report(socket, &bytes).expect("report error");
 ```
 
 ### Setup Jaeger
