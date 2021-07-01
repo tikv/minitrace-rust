@@ -1,6 +1,5 @@
 # Minitrace
 [![Actions Status](https://github.com/tikv/minitrace-rust/workflows/CI/badge.svg)](https://github.com/tikv/minitrace-rust/actions)
-[![Build Status](https://travis-ci.org/tikv/minitrace-rust.svg?branch=master)](https://travis-ci.org/tikv/minitrace-rust)
 [![LICENSE](https://img.shields.io/github/license/tikv/minitrace-rust.svg)](https://github.com/tikv/minitrace-rust/blob/master/LICENSE)
 
 A high-performance, ergonomic timeline tracing library for Rust.
