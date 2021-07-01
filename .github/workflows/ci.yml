@@ -36,10 +36,13 @@ jobs:
       run: cargo test --workspace --all-targets -- --nocapture
     - name: Run benches
       run: cargo bench --workspace --all-targets
+    - name: Setup Jaeger
+      if: ${{ runner.os == 'Linux' }}
+      run: docker run --rm -d -p6831:6831/udp -p16686:16686 --name jaeger jaegertracing/all-in-one:latest
     - name: Run examples
       run: |
-        docker run --rm -d -p6831:6831/udp -p16686:16686 --name jaeger jaegertracing/all-in-one:latest
         cargo run --example asynchronous
         cargo run --example synchronous
         cargo run --example get_started
-        docker kill $(docker ps -q)
+    - name: Stop Jaeger
+      run: docker kill $(docker ps -q)
