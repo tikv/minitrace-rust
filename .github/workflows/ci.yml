@@ -40,3 +40,4 @@ jobs:
       run: |
         cargo run --example asynchronous
         cargo run --example synchronous
+        cargo run --example get_started
