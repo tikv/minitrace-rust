@@ -101,7 +101,7 @@ pub fn trace_async(args: TokenStream, item: TokenStream) -> TokenStream {
         // hack for `async_trait`
         // See https://docs.rs/async-trait/0.1.31/async_trait/
         quote::quote_spanned! {block.span() =>
-            std::boxed::Box::pin(#block.in_span(#event))
+            std::boxed::Box::pin(#block.in_local_span(#event))
         }
     };
 
