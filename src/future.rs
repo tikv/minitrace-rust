@@ -18,7 +18,7 @@ pub trait FutureExt: Sized {
     /// # async fn main() {
     /// use minitrace::{Span, FutureExt};
     ///
-    /// let (span, _collector) = Span::root("Task");
+    /// let (span, _collector) = Span::root("Task".to_owned());
     /// let task = async {
     ///     42
     /// };
@@ -46,11 +46,11 @@ pub trait FutureExt: Sized {
     /// # async fn main() {
     /// use minitrace::{Span, FutureExt};
     ///
-    /// let (span, _collector) = Span::root("Task");
+    /// let (span, _collector) = Span::root("Task".to_owned());
     ///
     /// let fut = async {
     ///     9527
-    /// }.in_local_span("Future");
+    /// }.in_local_span("Future".to_owned());
     ///
     /// let task = async {
     ///     fut.await
@@ -60,7 +60,7 @@ pub trait FutureExt: Sized {
     /// # }
     /// ```
     #[inline]
-    fn in_local_span(self, event: &'static str) -> InLocalSpan<Self> {
+    fn in_local_span(self, event: String) -> InLocalSpan<Self> {
         InLocalSpan { inner: self, event }
     }
 }
@@ -95,7 +95,7 @@ impl<T: std::future::Future> std::future::Future for InSpan<T> {
 pub struct InLocalSpan<T> {
     #[pin]
     inner: T,
-    event: &'static str,
+    event: String,
 }
 
 impl<T: std::future::Future> std::future::Future for InLocalSpan<T> {
@@ -103,7 +103,7 @@ impl<T: std::future::Future> std::future::Future for InLocalSpan<T> {
 
     fn poll(self: std::pin::Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> Poll<Self::Output> {
         let this = self.project();
-        let _guard = LocalSpan::enter(this.event);
+        let _guard = LocalSpan::enter(this.event.to_string());
         this.inner.poll(cx)
     }
 }

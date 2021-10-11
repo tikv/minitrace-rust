@@ -22,7 +22,7 @@ impl SpanQueue {
     }
 
     #[inline]
-    pub fn start_span(&mut self, event: &'static str) -> SpanHandle {
+    pub fn start_span(&mut self, event: String) -> SpanHandle {
         let span = RawSpan::begin_with(
             DefaultIdGenerator::next_id(),
             self.next_parent_id,
@@ -49,7 +49,7 @@ impl SpanQueue {
     }
 
     #[inline]
-    pub fn add_properties<I: IntoIterator<Item = (&'static str, String)>>(
+    pub fn add_properties<I: IntoIterator<Item = (String, String)>>(
         &mut self,
         span_handle: &SpanHandle,
         properties: I,
@@ -61,7 +61,7 @@ impl SpanQueue {
     }
 
     #[inline]
-    pub fn add_property(&mut self, span_handle: &SpanHandle, property: (&'static str, String)) {
+    pub fn add_property(&mut self, span_handle: &SpanHandle, property: (String, String)) {
         debug_assert!(span_handle.index < self.span_queue.len());
 
         let span = &mut self.span_queue[span_handle.index];

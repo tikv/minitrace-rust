@@ -33,7 +33,7 @@ impl LocalSpanLine {
     }
 
     #[inline]
-    pub fn enter_span(&mut self, event: &'static str) -> Option<LocalSpanHandle> {
+    pub fn enter_span(&mut self, event: String) -> Option<LocalSpanHandle> {
         if !self.local_collector_existing {
             return None;
         }
@@ -81,7 +81,7 @@ impl LocalSpanLine {
     }
 
     #[inline]
-    pub fn add_properties<I: IntoIterator<Item = (&'static str, String)>, F: FnOnce() -> I>(
+    pub fn add_properties<I: IntoIterator<Item = (String, String)>, F: FnOnce() -> I>(
         &mut self,
         local_span_handle: &LocalSpanHandle,
         properties: F,
@@ -93,7 +93,7 @@ impl LocalSpanLine {
     }
 
     #[inline]
-    pub fn add_property<F: FnOnce() -> (&'static str, String)>(
+    pub fn add_property<F: FnOnce() -> (String, String)>(
         &mut self,
         local_span_handle: &LocalSpanHandle,
         property: F,

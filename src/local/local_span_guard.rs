@@ -20,7 +20,7 @@ pub struct LocalSpanGuard {
 
 impl LocalSpanGuard {
     #[inline]
-    pub(crate) fn new(event: &'static str) -> Self {
+    pub(crate) fn new(event: String) -> Self {
         LOCAL_SPAN_LINE.with(|span_line| {
             let mut span_line = span_line.borrow_mut();
             let span_handle = span_line.enter_span(event);
@@ -32,7 +32,7 @@ impl LocalSpanGuard {
     }
 
     #[inline]
-    pub fn with_properties<I: IntoIterator<Item = (&'static str, String)>, F: FnOnce() -> I>(
+    pub fn with_properties<I: IntoIterator<Item = (String, String)>, F: FnOnce() -> I>(
         self,
         properties: F,
     ) -> Self {
@@ -43,7 +43,7 @@ impl LocalSpanGuard {
     }
 
     #[inline]
-    pub fn with_property<F: FnOnce() -> (&'static str, String)>(self, property: F) -> Self {
+    pub fn with_property<F: FnOnce() -> (String, String)>(self, property: F) -> Self {
         self.with_span_line(move |span_handle, span_line| {
             span_line.add_property(span_handle, property);
         });
