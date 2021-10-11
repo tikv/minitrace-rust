@@ -18,14 +18,14 @@ impl Reporter {
         spans: &[Span],
     ) -> Result<Vec<u8>, Box<dyn Error + Send + Sync + 'static>> {
         let spans = spans.iter().map(|s| MPSpan {
-            name: s.event,
+            name: &s.event,
             service: service_name,
             start: s.begin_unix_time_ns as i64,
             duration: s.duration_ns as i64,
             meta: if s.properties.is_empty() {
                 None
             } else {
-                Some(s.properties.iter().map(|(k, v)| (*k, v.as_ref())).collect())
+                Some(s.properties.iter().map(|(k, v)| (k.as_ref(), v.as_ref())).collect())
             },
             span_id: (span_id_prefix as u64) << 32 | s.id as u64,
             trace_id,

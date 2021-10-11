@@ -7,23 +7,23 @@ use minitrace_jaeger::Reporter as JReporter;
 use minitrace_macro::trace;
 
 fn func1(i: u64) {
-    let _guard = LocalSpan::enter("func1");
+    let _guard = LocalSpan::enter("func1".to_owned());
     std::thread::sleep(std::time::Duration::from_millis(i));
     func2(i);
 }
 
-#[trace("func2")]
+#[trace("func2".to_owned())]
 fn func2(i: u64) {
     std::thread::sleep(std::time::Duration::from_millis(i));
 }
 
 fn main() {
     let spans = {
-        let (span, collector) = Span::root("root");
+        let (span, collector) = Span::root("root".to_owned());
 
         let _sg1 = span.enter();
         let _sg2 =
-            LocalSpan::enter("a span").with_property(|| ("a property", "a value".to_owned()));
+            LocalSpan::enter("a span".to_owned()).with_property(|| ("a property".to_owned(), "a value".to_owned()));
 
         for i in 1..=10 {
             func1(i);

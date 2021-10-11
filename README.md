@@ -76,13 +76,13 @@ To add properties:
 use minitrace::*;
 
 // add a property for a span
-let _span_guard = LocalSpan::enter("my event").with_property(|| ("key", String::from("value")));
+let _span_guard = LocalSpan::enter("my event").with_property(|| (String::from("key"), String::from("value")));
 
 // or add multiple properties for a span
 let _span_guard = LocalSpan::enter("my event").with_properties(|| {
     vec![
-        ("key1", String::from("value1")),
-        ("key2", String::from("value2")),
+        (String::from("key1"), String::from("value1")),
+        (String::from("key2"), String::from("value2")),
     ]
 });
 ```
