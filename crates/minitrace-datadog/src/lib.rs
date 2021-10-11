@@ -12,6 +12,8 @@ pub struct Reporter;
 impl Reporter {
     pub fn encode(
         service_name: &str,
+        r#type: &str,
+        resource: &str,
         trace_id: u64,
         root_parent_span_id: u64,
         span_id_prefix: u32,
@@ -20,6 +22,8 @@ impl Reporter {
         let spans = spans.iter().map(|s| MPSpan {
             name: &s.event,
             service: service_name,
+            r#type: &r#type,
+            resource: &resource,
             start: s.begin_unix_time_ns as i64,
             duration: s.duration_ns as i64,
             meta: if s.properties.is_empty() {
@@ -90,6 +94,8 @@ impl Reporter {
 struct MPSpan<'a> {
     name: &'a str,
     service: &'a str,
+    r#type: &'a str,
+    resource: &'a str,
     start: i64,
     duration: i64,
     #[serde(skip_serializing_if = "Option::is_none")]
