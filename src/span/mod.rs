@@ -15,7 +15,7 @@ pub struct Span {
     pub parent_id: u32,
     pub begin_unix_time_ns: u64,
     pub duration_ns: u64,
-    pub event: String,
+    pub event: &'static str,
     pub properties: Vec<(String, String)>,
 }
 
@@ -24,7 +24,7 @@ pub struct RawSpan {
     pub id: SpanId,
     pub parent_id: SpanId,
     pub begin_cycle: Cycle,
-    pub event: String,
+    pub event: &'static str,
     pub properties: Vec<(String, String)>,
 
     // Will write this field at post processing
@@ -37,7 +37,7 @@ impl RawSpan {
         id: SpanId,
         parent_id: SpanId,
         begin_cycles: Cycle,
-        event: String,
+        event: &'static str,
     ) -> Self {
         RawSpan {
             id,

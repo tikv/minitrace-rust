@@ -4,10 +4,10 @@ use std::net::SocketAddr;
 
 fn main() {
     let collector = {
-        let (root_span, collector) = Span::root("root".to_owned());
+        let (root_span, collector) = Span::root("root");
         let _span_guard = root_span.enter();
 
-        let _local_span_guard = LocalSpan::enter("child".to_owned());
+        let _local_span_guard = LocalSpan::enter("child");
 
         // do something ...
         collector

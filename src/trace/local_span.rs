@@ -5,7 +5,7 @@ use crate::LocalSpanGuard;
 pub struct LocalSpan;
 
 impl LocalSpan {
-    pub fn enter(event: String) -> LocalSpanGuard {
+    pub fn enter(event: &'static str) -> LocalSpanGuard {
         LocalSpanGuard::new(event)
     }
 }

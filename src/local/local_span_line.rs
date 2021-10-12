@@ -33,7 +33,7 @@ impl LocalSpanLine {
     }
 
     #[inline]
-    pub fn enter_span(&mut self, event: String) -> Option<LocalSpanHandle> {
+    pub fn enter_span(&mut self, event: &'static str) -> Option<LocalSpanHandle> {
         if !self.local_collector_existing {
             return None;
         }

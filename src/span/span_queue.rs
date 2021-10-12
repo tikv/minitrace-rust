@@ -22,7 +22,7 @@ impl SpanQueue {
     }
 
     #[inline]
-    pub fn start_span(&mut self, event: String) -> SpanHandle {
+    pub fn start_span(&mut self, event: &'static str) -> SpanHandle {
         let span = RawSpan::begin_with(
             DefaultIdGenerator::next_id(),
             self.next_parent_id,

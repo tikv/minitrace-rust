@@ -20,7 +20,7 @@ pub struct LocalSpanGuard {
 
 impl LocalSpanGuard {
     #[inline]
-    pub(crate) fn new(event: String) -> Self {
+    pub(crate) fn new(event: &'static str) -> Self {
         LOCAL_SPAN_LINE.with(|span_line| {
             let mut span_line = span_line.borrow_mut();
             let span_handle = span_line.enter_span(event);

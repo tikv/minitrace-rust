@@ -21,7 +21,7 @@ pub struct AttachedSpan {
 }
 
 impl AttachedSpan {
-    pub fn new_child_span(event: String) -> Span {
+    pub fn new_child_span(event: &'static str) -> Span {
         ATTACHED_SPAN.with(|attached_span| {
             let attached_span = attached_span.borrow();
             if let Some(AttachedSpan {
@@ -127,7 +127,7 @@ impl Span {
     }
 
     #[inline]
-    pub fn from_local_parent(event: String) -> Self {
+    pub fn from_local_parent(event: &'static str) -> Self {
         AttachedSpan::new_child_span(event)
     }
 }

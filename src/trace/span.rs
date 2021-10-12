@@ -28,7 +28,7 @@ impl Span {
     #[inline]
     pub(crate) fn new<'a>(
         acquirers: impl Iterator<Item = (SpanId, &'a Acquirer)>,
-        event: String,
+        event: &'static str,
     ) -> Self {
         let span_id = DefaultIdGenerator::next_id();
         let now = DefaultClock::now();
@@ -52,7 +52,7 @@ impl Span {
         }
     }
 
-    pub fn root(event: String) -> (Self, Collector) {
+    pub fn root(event: &'static str) -> (Self, Collector) {
         let (tx, rx) = crossbeam::channel::unbounded();
         let closed = Arc::new(AtomicBool::new(false));
         let acquirer = Acquirer::new(Arc::new(tx), closed.clone());
@@ -72,13 +72,13 @@ impl Span {
     }
 
     #[inline]
-    pub fn from_parent(event: String, span: &Span) -> Self {
+    pub fn from_parent(event: &'static str, span: &Span) -> Self {
         Self::from_parents(event, iter::once(span))
     }
 
     #[inline]
     pub fn from_parents<'a>(
-        event: String,
+        event: &'static str,
         spans: impl IntoIterator<Item = &'a Span>,
     ) -> Self {
         Self::new(
