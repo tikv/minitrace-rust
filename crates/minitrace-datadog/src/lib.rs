@@ -14,6 +14,7 @@ impl Reporter {
         service_name: &str,
         r#type: &str,
         resource: &str,
+        error_code: i32,
         trace_id: u64,
         root_parent_span_id: u64,
         span_id_prefix: u32,
@@ -31,6 +32,7 @@ impl Reporter {
             } else {
                 Some(s.properties.iter().map(|(k, v)| (k.as_ref(), v.as_ref())).collect())
             },
+            error: error_code,
             span_id: (span_id_prefix as u64) << 32 | s.id as u64,
             trace_id,
             parent_id: if s.parent_id == 0 {
@@ -100,6 +102,7 @@ struct MPSpan<'a> {
     duration: i64,
     #[serde(skip_serializing_if = "Option::is_none")]
     meta: Option<HashMap<&'a str, &'a str>>,
+    error: i32,
     span_id: u64,
     trace_id: u64,
     parent_id: u64,

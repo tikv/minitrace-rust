@@ -59,7 +59,7 @@ async fn main() {
     JReporter::report("127.0.0.1:6831".parse().unwrap(), &bytes).ok();
 
     // Report to Datadog
-    let bytes = DReporter::encode("asynchronous", "db", "select", rand::random(), 0, 0, &spans).unwrap();
+    let bytes = DReporter::encode("asynchronous", "db", "select", 0, rand::random(), 0, 0, &spans).unwrap();
     DReporter::report("127.0.0.1:8126".parse().unwrap(), bytes)
         .await
         .ok();
