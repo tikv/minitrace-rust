@@ -27,7 +27,7 @@ mod tests {
             // wide
             for _ in 0..2 {
                 let _g = LocalSpan::enter("iter span")
-                    .with_property(|| ("tmp_property".into(), "tmp_value".into()));
+                    .with_property(|| ("tmp_property", "tmp_value"));
             }
         }
 

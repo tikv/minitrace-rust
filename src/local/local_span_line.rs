@@ -81,7 +81,7 @@ impl LocalSpanLine {
     }
 
     #[inline]
-    pub fn add_properties<I: IntoIterator<Item = (String, String)>, F: FnOnce() -> I>(
+    pub fn add_properties<I: IntoIterator<Item = (S, S)>, F: FnOnce() -> I, S: Into<String>>(
         &mut self,
         local_span_handle: &LocalSpanHandle,
         properties: F,
@@ -93,7 +93,7 @@ impl LocalSpanLine {
     }
 
     #[inline]
-    pub fn add_property<F: FnOnce() -> (String, String)>(
+    pub fn add_property<F: FnOnce() -> (S, S), S: Into<String>>(
         &mut self,
         local_span_handle: &LocalSpanHandle,
         property: F,

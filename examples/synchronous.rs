@@ -23,7 +23,7 @@ fn main() {
 
         let _sg1 = span.enter();
         let _sg2 =
-            LocalSpan::enter("a span").with_property(|| ("a property".to_owned(), "a value".to_owned()));
+            LocalSpan::enter("a span").with_property(|| ("a property", "a value"));
 
         for i in 1..=10 {
             func1(i);

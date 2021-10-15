@@ -49,7 +49,7 @@ impl SpanQueue {
     }
 
     #[inline]
-    pub fn add_properties<I: IntoIterator<Item = (String, String)>>(
+    pub fn add_properties<I: IntoIterator<Item = (S, S)>, S: Into<String>>(
         &mut self,
         span_handle: &SpanHandle,
         properties: I,
@@ -57,15 +57,17 @@ impl SpanQueue {
         debug_assert!(span_handle.index < self.span_queue.len());
 
         let span = &mut self.span_queue[span_handle.index];
+        let properties = properties.into_iter().map(|(k, v)| (k.into(), v.into()));
         span.properties.extend(properties);
     }
 
     #[inline]
-    pub fn add_property(&mut self, span_handle: &SpanHandle, property: (String, String)) {
+    pub fn add_property<S: Into<String>>(&mut self, span_handle: &SpanHandle, property: (S, S)) {
         debug_assert!(span_handle.index < self.span_queue.len());
 
         let span = &mut self.span_queue[span_handle.index];
-        span.properties.push(property);
+        let (k, v) = property;
+        span.properties.push((k.into(), v.into()));
     }
 
     #[inline]
