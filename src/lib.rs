@@ -27,7 +27,7 @@
 //!   }
 //!
 //!   drop(root);
-//!   let records: Vec<SpanRecord> = collector.colelct();
+//!   let records: Vec<SpanRecord> = collector.collect();
 //!   ```
 //!
 //!
