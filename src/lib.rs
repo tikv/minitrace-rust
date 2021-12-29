@@ -104,7 +104,7 @@
 //!   let collector = {
 //!       let (root, collector) = Span::root("root");
 //!
-//!       // To trace another task
+//!       // To trace a task
 //!       let task = async {
 //!           async {
 //!               // some work
@@ -212,8 +212,6 @@
 //! [`LocalSpan::enter_with_local_parent`]: crate::prelude::LocalSpan::enter_with_local_parent
 //! [`in_span`]: crate::prelude::FutureExt::in_span
 //! [`enter_on_poll`]: crate::prelude::FutureExt::enter_on_poll
-
-#![allow(clippy::return_self_not_must_use)]
 
 pub mod collector;
 pub mod future;
