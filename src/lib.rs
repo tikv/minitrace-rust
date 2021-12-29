@@ -33,7 +33,7 @@
 //!
 //! ## Collector
 //!
-//!   A [`Collector`](crate::prelude::Collector) will be provided when statring a root [`Span`]. Use it to collect all spans related to a request.
+//!   A [`Collector`] will be provided when statring a root [`Span`]. Use it to collect all spans related to a request.
 //!
 //!   ```rust
 //!   use minitrace::prelude::*;
@@ -86,7 +86,7 @@
 //!
 //! ## Futures
 //!
-//!   minitrace provides [`FutureExt`](crate::prelude::FutureExt) which extends [`Future`] with two methods:
+//!   minitrace provides [`FutureExt`] which extends [`Future`] with two methods:
 //!
 //!   - [`in_span`](crate::prelude::FutureExt::in_span): Bind a [`Span`] that stop clocking when the [`Future`] drops. Besides, it'll call `Span::set_local_parent` at every poll.
 //!   - [`enter_on_poll`](crate::prelude::FutureExt::enter_on_poll): Start on local span at every poll.
@@ -174,7 +174,7 @@
 //!   [`LocalCollector`] allows manully collect [`LocalSpan`] without a local parent, and the collected [`LocalSpan`] can be
 //!   linked to a parent later.
 //!
-//!   At most time, [`Span`](crate::prelude::Span) and [`LocalSpan`] are sufficient. Use [`LocalCollector`] when the span may start before the parent
+//!   At most time, [`Span`] and [`LocalSpan`] are sufficient. Use [`LocalCollector`] when the span may start before the parent
 //!   span. Sometimes it is useful to trace the preceding task that is blocking the current request.
 //!
 //!   ```rust
@@ -205,6 +205,8 @@
 //! [`trace_async`]: crate::prelude::trace_async
 //! [`LocalCollector`]: crate::local::LocalCollector
 //! [`Future`]: std::future::Future
+
+#![allow(clippy::return_self_not_must_use)]
 
 pub mod collector;
 pub mod future;

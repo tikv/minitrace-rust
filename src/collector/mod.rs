@@ -144,6 +144,7 @@ impl Collector {
     }
 }
 
+#[must_use]
 #[derive(Default, Debug)]
 pub struct CollectArgs {
     sync: bool,
