@@ -52,7 +52,7 @@ pub fn trace(args: TokenStream, item: TokenStream) -> TokenStream {
         #vis #constness #unsafety #asyncness #abi fn #ident<#gen_params>(#params) #return_type
         #where_clause
         {
-            let _guard = LocalSpan::enter(#event);
+            let _guard = LocalSpan::enter_with_local_parent(#event);
             #block
         }
     )
@@ -94,14 +94,14 @@ pub fn trace_async(args: TokenStream, item: TokenStream) -> TokenStream {
         let await_kwd = syn::Ident::new("await", block.span());
         quote::quote_spanned! {block.span() =>
             #async_kwd move { #block }
-                .in_local_span(#event)
+                .enter_on_poll(#event)
                 .#await_kwd
         }
     } else {
         // hack for `async_trait`
         // See https://docs.rs/async-trait/0.1.31/async_trait/
         quote::quote_spanned! {block.span() =>
-            std::boxed::Box::pin(#block.in_local_span(#event))
+            std::boxed::Box::pin(#block.enter_on_poll(#event))
         }
     };
 

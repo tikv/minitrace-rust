@@ -2,9 +2,10 @@
 
 use std::marker::PhantomData;
 
+use minstant::Cycle;
+
 use crate::local::local_span_line::LOCAL_SPAN_LINE;
-use crate::span::RawSpan;
-use crate::span::{Cycle, DefaultClock};
+use crate::local::raw_span::RawSpan;
 
 #[must_use]
 #[derive(Debug, Ord, PartialOrd, Eq, PartialEq)]
@@ -24,8 +25,8 @@ pub struct LocalCollector {
 
 #[derive(Debug)]
 pub struct LocalSpans {
-    pub spans: Vec<RawSpan>,
-    pub end_time: Cycle,
+    pub(crate) spans: Vec<RawSpan>,
+    pub(crate) end_time: Cycle,
 }
 
 impl LocalCollector {
@@ -37,15 +38,16 @@ impl LocalCollector {
         }
     }
 
-    pub fn start() -> Self {
-        Self::try_start().expect("Current thread is occupied by another local collector")
-    }
-
-    pub fn try_start() -> Option<Self> {
-        LOCAL_SPAN_LINE.with(|span_line| {
+    pub fn start() -> Option<Self> {
+        let collector = LOCAL_SPAN_LINE.with(|span_line| {
             let s = &mut *span_line.borrow_mut();
             s.register_local_collector()
-        })
+        });
+        debug_assert!(
+            collector.is_some(),
+            "Current thread is occupied by another local collector"
+        );
+        collector
     }
 
     pub fn collect(mut self) -> LocalSpans {
@@ -54,7 +56,7 @@ impl LocalCollector {
             self.collected = true;
             LocalSpans {
                 spans: s.unregister_and_collect(self),
-                end_time: DefaultClock::now(),
+                end_time: Cycle::now(),
             }
         })
     }

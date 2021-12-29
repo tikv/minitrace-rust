@@ -32,20 +32,21 @@ impl LocalSpanGuard {
     }
 
     #[inline]
-    pub fn with_properties<I: IntoIterator<Item = (&'static str, String)>, F: FnOnce() -> I>(
-        self,
-        properties: F,
-    ) -> Self {
-        self.with_span_line(move |span_handle, span_line| {
-            span_line.add_properties(span_handle, properties)
-        });
-        self
+    pub fn with_property<F>(self, property: F) -> Self
+    where
+        F: FnOnce() -> (&'static str, String),
+    {
+        self.with_properties(|| [property()])
     }
 
     #[inline]
-    pub fn with_property<F: FnOnce() -> (&'static str, String)>(self, property: F) -> Self {
+    pub fn with_properties<I, F>(self, properties: F) -> Self
+    where
+        I: IntoIterator<Item = (&'static str, String)>,
+        F: FnOnce() -> I,
+    {
         self.with_span_line(move |span_handle, span_line| {
-            span_line.add_property(span_handle, property);
+            span_line.add_properties(span_handle, properties)
         });
         self
     }

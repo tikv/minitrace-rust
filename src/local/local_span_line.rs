@@ -3,21 +3,21 @@
 use std::cell::RefCell;
 
 use crate::local::local_collector::LocalCollector;
-use crate::span::span_queue::{SpanHandle, SpanQueue};
-use crate::span::RawSpan;
+use crate::local::raw_span::RawSpan;
+use crate::local::span_queue::{SpanHandle, SpanQueue};
 
 thread_local! {
     pub(super) static LOCAL_SPAN_LINE: RefCell<LocalSpanLine> = RefCell::new(LocalSpanLine::with_capacity(1024));
 }
 
-pub struct LocalSpanLine {
+pub(crate) struct LocalSpanLine {
     span_queue: SpanQueue,
 
     local_collector_existing: bool,
     current_local_collector_epoch: usize,
 }
 
-pub struct LocalSpanHandle {
+pub(crate) struct LocalSpanHandle {
     span_handle: SpanHandle,
     local_collector_epoch: usize,
 }
@@ -81,26 +81,14 @@ impl LocalSpanLine {
     }
 
     #[inline]
-    pub fn add_properties<I: IntoIterator<Item = (&'static str, String)>, F: FnOnce() -> I>(
-        &mut self,
-        local_span_handle: &LocalSpanHandle,
-        properties: F,
-    ) {
+    pub fn add_properties<I, F>(&mut self, local_span_handle: &LocalSpanHandle, properties: F)
+    where
+        I: IntoIterator<Item = (&'static str, String)>,
+        F: FnOnce() -> I,
+    {
         if self.is_valid(local_span_handle) {
             self.span_queue
                 .add_properties(&local_span_handle.span_handle, properties());
-        }
-    }
-
-    #[inline]
-    pub fn add_property<F: FnOnce() -> (&'static str, String)>(
-        &mut self,
-        local_span_handle: &LocalSpanHandle,
-        property: F,
-    ) {
-        if self.is_valid(local_span_handle) {
-            self.span_queue
-                .add_property(&local_span_handle.span_handle, property());
         }
     }
 }

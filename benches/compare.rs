@@ -47,15 +47,17 @@ fn opentelemetry_harness() {
 }
 
 fn minitrace_harness() {
+    use minitrace::prelude::*;
+
     fn dummy_minitrace() {
         for _ in 0..99 {
-            let _guard = minitrace::LocalSpan::enter("child");
+            let _guard = LocalSpan::enter_with_local_parent("child");
         }
     }
 
     {
-        let (root_span, collector) = minitrace::Span::root("parent");
-        let _g = root_span.enter();
+        let (root_span, collector) = Span::root("parent");
+        let _g = root_span.set_local_parent();
 
         dummy_minitrace();
 

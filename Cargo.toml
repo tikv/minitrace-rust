@@ -8,6 +8,7 @@ edition = "2018"
 
 [dependencies]
 minstant = { git = "https://github.com/zhongzc/minstant.git", rev = "dc7dd5c17c564601afff7c0b640fd430728bfcd5" }
+minitrace-macro = { path = "crates/minitrace-macro" }
 crossbeam = "0.7"
 pin-project = "0.4"
 
@@ -15,7 +16,6 @@ pin-project = "0.4"
 criterion = "0.3"
 minitrace-jaeger = { path = "crates/minitrace-jaeger" }
 minitrace-datadog = { path = "crates/minitrace-datadog" }
-minitrace-macro = { path = "crates/minitrace-macro" }
 tokio = { version = "0.2", features = ["full"] }
 rustracing = "0.4"
 opentelemetry = "0.5"

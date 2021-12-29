@@ -1,32 +1,233 @@
 // Copyright 2020 TiKV Project Authors. Licensed under Apache-2.0.
 
-pub use crate::future::FutureExt;
-pub use crate::local::local_collector::{LocalCollector, LocalSpans};
-pub use crate::local::local_span_guard::LocalSpanGuard;
-pub use crate::local::span_guard::SpanGuard;
-pub use crate::trace::collector::{CollectArgs, Collector};
-pub use crate::trace::local_span::LocalSpan;
-pub use crate::trace::span::Span;
+//! A high-performance, ergonomic timeline tracing library for Rust.
+//!
+//! ## Span
+//!
+//!   A [`SpanRecord`] represents an individual unit of work done. It contains:
+//!   - An operation name
+//!   - A start timestamp and duration
+//!   - A set of key-value properties
+//!   - A reference to a parent `Span`
+//!
+//!   To record such a span record, we create a [`Span`] and drop it to stop clocking.
+//!
+//!   A new [`Span`] can be started via [`Span::root(event)`](crate::prelude::Span::root), [`Span::enter_with_parent(event, parent)`](crate::prelude::Span::enter_with_parent). The span started by the latter method will be the child span of parent.
+//!
+//!   [`Span`] is thread-safe and can be sent across threads.
+//!
+//!   ```rust
+//!   use minitrace::prelude::*;
+//!
+//!   let (root, collector) = Span::root("root");
+//!
+//!   let _span_guard = Span::enter_with_parent("a child span", &root);
+//!   // some works
+//!   drop(_span_guard);
+//!   ```
+//!
+//!
+//! ## Collector
+//!
+//!   A [`Collector`](crate::prelude::Collector) will be provided when statring a root [`Span`]. Use it to collect all spans related to a request.
+//!
+//!   ```rust
+//!   use minitrace::prelude::*;
+//!
+//!   let (root, collector) = Span::root("root");
+//!   drop(root);
+//!
+//!   let records: Vec<SpanRecord> = collector.collect();
+//!   ```
+//!
+//!
+//! ## Local Span & Local Parent Guard
+//!
+//!   A [`Span`] can be optimized into [`LocalSpan`], if the span is not supposed to sent to other thread, to greatly reduces the overhead.
+//!
+//!   Before starting a [`LocalSpan`], a scope where the parent span can be inferred from thread-local should be set using [`Span::set_local_parent()`](crate::prelude::Span::set_local_parent). And then a [`LocalSpan`] can start by [`LocalSpan::enter_with_local_parent()`](crate::prelude::LocalSpan::enter_with_local_parent).
+//!
+//!   If the local parent is not set, the [`LocalSpan`] will panic on debug profile or do nothing on release profile.
+//!
+//!   ```rust
+//!   use minitrace::prelude::*;
+//!
+//!   let (root, collector) = Span::root("root");
+//!
+//!   let _local_parent_guard = root.set_local_parent();
+//!
+//!   // The parent of this span is `root`.
+//!   let _span_guard = LocalSpan::enter_with_local_parent("a child span");
+//!   drop(_span_guard);
+//!
+//!   drop(_local_parent_guard);
+//!   ```
+//!
+//!
+//! ## Property
+//!
+//!   Property is an arbitrary custom kev-value pair associated to a span.
+//!
+//!   ```rust
+//!   use minitrace::prelude::*;
+//!
+//!   let (mut root, collector) = Span::root("root");
+//!   root.with_property(|| ("key", "value".to_owned()));
+//!
+//!   let _local_parent_guard = root.set_local_parent();
+//!
+//!   let _span_guard = LocalSpan::enter_with_local_parent("a child span")
+//!       .with_property(|| ("key", "value".to_owned()));
+//!   ```
+//!
+//!
+//! ## Futures
+//!
+//!   minitrace provides [`FutureExt`](crate::prelude::FutureExt) which extends [`Future`] with two methods:
+//!
+//!   - [`in_span`](crate::prelude::FutureExt::in_span): Bind a [`Span`] that stop clocking when the [`Future`] drops. Besides, it'll call `Span::set_local_parent` at every poll.
+//!   - [`enter_on_poll`](crate::prelude::FutureExt::enter_on_poll): Start on local span at every poll.
+//!
+//!   The [`in_span`](crate::prelude::FutureExt::in_span) adaptor is commonly used on the outmost [`Future`] which is about to submit to a runtime.
+//!
+//!   ```rust
+//!   use minitrace::prelude::*;
+//!
+//!   let collector = {
+//!       let (root, collector) = Span::root("root");
+//!
+//!       // To trace another task
+//!       let task = async {
+//!           async {
+//!               // some works
+//!           }.enter_on_poll("future is polled").await;
+//!       }
+//!       .in_span(Span::enter_with_parent("task", &root));
+//!
+//!       # let runtime = tokio::runtime::Runtime::new().unwrap();
+//!       runtime.spawn(task);
+//!   };
+//!   ```
+//!
+//!
+//! ## Macro
+//!
+//!   The two attribute macros [`trace`] and [`trace_async`] for `fn` is provided to help get rid of boilerplate.
+//!
+//!   - [`trace`]
+//!
+//!     For example, the code list below has been annotated with a event name:
+//!
+//!     ```rust
+//!     use minitrace::prelude::*;
+//!
+//!     #[trace("wow")]
+//!     fn amazing_func() {
+//!         // some works
+//!     }
+//!     ```
+//!
+//!     which will be translated into
+//!
+//!     ```rust
+//!     use minitrace::prelude::*;
+//!
+//!     fn amazing_func() {
+//!         let _span_guard = LocalSpan::enter_with_local_parent("wow");
+//!         // some works
+//!     }
+//!     ```
+//!
+//!   - [`trace_async`]
+//!
+//!     Similarly, `async fn` uses [`trace_async`]:
+//!
+//!     ```rust
+//!     use minitrace::prelude::*;
+//!
+//!     #[trace_async("wow")]
+//!     async fn amazing_func() {
+//!         // some works
+//!     }
+//!     ```
+//!
+//!     which will be translated into
+//!
+//!     ```rust
+//!     use minitrace::prelude::*;
+//!
+//!     async fn amazing_func() {
+//!         async {
+//!             // some works
+//!         }
+//!         .enter_on_poll("wow")
+//!         .await
+//!     }
+//!     ```
+//!
+//!
+//! ## Local Collector (Advanced)
+//!
+//!   [`LocalCollector`] allows manully collect [`LocalSpan`] without a local parent, and the collected [`LocalSpan`] can be
+//!   linked to a parent later.
+//!
+//!   At most time, [`Span`](crate::prelude::Span) and [`LocalSpan`] are sufficient. Use [`LocalCollector`] when the span may start before the parent
+//!   span. Sometimes it is useful to trace the preceding task that is blocking the current request.
+//!
+//!   ```rust
+//!   use minitrace::prelude::*;
+//!   use minitrace::local::LocalCollector;
+//!   use std::sync::Arc;
+//!
+//!   // Collect local spans in advance with no parent
+//!   let collector = LocalCollector::start().unwrap();
+//!   let _span_guard = LocalSpan::enter_with_local_parent("a child span");
+//!   drop(_span_guard);
+//!   let local_spans = Arc::new(collector.collect());
+//!
+//!   // Link the local spans to a parent
+//!   let (root, collector) = Span::root("root");
+//!   root.push_child_spans(local_spans);
+//!   drop(root);
+//!
+//!   let records: Vec<SpanRecord> = collector.collect();
+//!   ```
+//!
+//! [`Span`]: crate::prelude::Span
+//! [`LocalSpan`]: crate::prelude::LocalSpan
+//! [`Collector`]: crate::prelude::Collector
+//! [`SpanRecord`]: crate::prelude::SpanRecord
+//! [`FutureExt`]: crate::prelude::FutureExt
+//! [`trace`]: crate::prelude::trace
+//! [`trace_async`]: crate::prelude::trace_async
+//! [`LocalCollector`]: crate::local::LocalCollector
+//! [`Future`]: std::future::Future
 
+pub mod collector;
+pub mod future;
+pub mod local;
 pub mod span;
 
-pub(crate) mod future;
-pub(crate) mod local;
-pub(crate) mod trace;
+pub mod prelude {
+    pub use crate::collector::{CollectArgs, Collector, SpanRecord};
+    pub use crate::future::FutureExt;
+    pub use crate::local::LocalSpan;
+    pub use crate::span::Span;
+    pub use minitrace_macro::{trace, trace_async};
+}
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use super::prelude::*;
+    use crate::collector::CollectArgs;
     use crate::local::local_collector::LocalCollector;
-    use crate::trace::collector::CollectArgs;
-    use minitrace_macro::trace;
     use std::sync::Arc;
 
     fn four_spans() {
         {
             // wide
             for _ in 0..2 {
-                let _g = LocalSpan::enter("iter span")
+                let _g = LocalSpan::enter_with_local_parent("iter span")
                     .with_property(|| ("tmp_property", "tmp_value".into()));
             }
         }
@@ -50,7 +251,7 @@ mod tests {
     fn single_thread_single_span() {
         let spans = {
             let (root_span, collector) = Span::root("root");
-            let _g = root_span.enter();
+            let _g = root_span.set_local_parent();
 
             four_spans();
 
@@ -69,15 +270,15 @@ mod tests {
                 let (root_span2, collector2) = Span::root("root2");
                 let (root_span3, collector3) = Span::root("root3");
 
-                let local_collector = LocalCollector::start();
+                let local_collector = LocalCollector::start().unwrap();
 
                 four_spans();
 
                 let local_spans = Arc::new(local_collector.collect());
 
-                root_span1.mount_local_spans(local_spans.clone());
-                root_span2.mount_local_spans(local_spans.clone());
-                root_span3.mount_local_spans(local_spans);
+                root_span1.push_child_spans(local_spans.clone());
+                root_span2.push_child_spans(local_spans.clone());
+                root_span3.push_child_spans(local_spans);
 
                 (collector1, collector2, collector3)
             };
@@ -98,12 +299,12 @@ mod tests {
     fn multiple_threads_single_span() {
         let spans = {
             let (span, collector) = Span::root("root");
-            let _g = span.enter();
+            let _g = span.set_local_parent();
 
             for _ in 0..4 {
-                let child_span = Span::from_local_parent("cross-thread");
+                let child_span = Span::enter_with_local_parent("cross-thread");
                 std::thread::spawn(move || {
-                    let _g = child_span.enter();
+                    let _g = child_span.set_local_parent();
                     four_spans();
                 });
             }
@@ -123,26 +324,28 @@ mod tests {
             let (c1, c2) = {
                 let (root_span1, collector1) = Span::root("root1");
                 let (root_span2, collector2) = Span::root("root2");
-                let local_collector = LocalCollector::start();
+                let local_collector = LocalCollector::start().unwrap();
 
                 for _ in 0..4 {
-                    let merged =
-                        Span::from_parents("merged", vec![&root_span1, &root_span2].into_iter());
+                    let merged = Span::enter_with_parents(
+                        "merged",
+                        vec![&root_span1, &root_span2].into_iter(),
+                    );
                     std::thread::spawn(move || {
-                        let local_collector = LocalCollector::start();
+                        let local_collector = LocalCollector::start().unwrap();
 
                         four_spans();
 
                         let local_spans = Arc::new(local_collector.collect());
-                        merged.mount_local_spans(local_spans);
+                        merged.push_child_spans(local_spans);
                     });
                 }
 
                 four_spans();
 
                 let local_spans = Arc::new(local_collector.collect());
-                root_span1.mount_local_spans(local_spans.clone());
-                root_span2.mount_local_spans(local_spans);
+                root_span1.push_child_spans(local_spans.clone());
+                root_span2.push_child_spans(local_spans);
                 (collector1, collector2)
             };
 
@@ -164,12 +367,12 @@ mod tests {
                 let (root_span2, collector2) = Span::root("root2");
                 let (root_span3, collector3) = Span::root("root3");
 
-                let local_collector = LocalCollector::start();
+                let local_collector = LocalCollector::start().unwrap();
 
                 let local_spans = Arc::new(local_collector.collect());
-                root_span1.mount_local_spans(local_spans.clone());
-                root_span2.mount_local_spans(local_spans.clone());
-                root_span3.mount_local_spans(local_spans);
+                root_span1.push_child_spans(local_spans.clone());
+                root_span2.push_child_spans(local_spans.clone());
+                root_span3.push_child_spans(local_spans);
 
                 (collector1, collector2, collector3)
             };

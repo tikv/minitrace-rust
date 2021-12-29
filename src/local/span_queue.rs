@@ -1,15 +1,16 @@
 // Copyright 2020 TiKV Project Authors. Licensed under Apache-2.0.
 
-use crate::span::cycle::DefaultClock;
-use crate::span::span_id::{DefaultIdGenerator, SpanId};
-use crate::span::RawSpan;
+use minstant::Cycle;
 
-pub struct SpanQueue {
+use crate::local::raw_span::RawSpan;
+use crate::local::span_id::{DefaultIdGenerator, SpanId};
+
+pub(crate) struct SpanQueue {
     span_queue: Vec<RawSpan>,
     next_parent_id: SpanId,
 }
 
-pub struct SpanHandle {
+pub(crate) struct SpanHandle {
     pub(crate) index: usize,
 }
 
@@ -26,7 +27,7 @@ impl SpanQueue {
         let span = RawSpan::begin_with(
             DefaultIdGenerator::next_id(),
             self.next_parent_id,
-            DefaultClock::now(),
+            Cycle::now(),
             event,
         );
         self.next_parent_id = span.id;
@@ -43,7 +44,7 @@ impl SpanQueue {
         debug_assert_eq!(self.next_parent_id, self.span_queue[span_handle.index].id);
 
         let span = &mut self.span_queue[span_handle.index];
-        span.end_with(DefaultClock::now());
+        span.end_with(Cycle::now());
 
         self.next_parent_id = span.parent_id;
     }
@@ -58,14 +59,6 @@ impl SpanQueue {
 
         let span = &mut self.span_queue[span_handle.index];
         span.properties.extend(properties);
-    }
-
-    #[inline]
-    pub fn add_property(&mut self, span_handle: &SpanHandle, property: (&'static str, String)) {
-        debug_assert!(span_handle.index < self.span_queue.len());
-
-        let span = &mut self.span_queue[span_handle.index];
-        span.properties.push(property);
     }
 
     #[inline]
