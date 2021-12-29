@@ -29,7 +29,7 @@ jobs:
     - name: Check format
       run: cargo fmt --all -- --check
     - name: Lints
-      run: cargo clippy --all-targets --all-features -- --deny warnings --allow clippy::return-self-not-must-use
+      run: cargo clippy --all-targets --all-features -- --deny warnings --allow clippy::return_self_not_must_use
     - name: Build
       run: cargo build --workspace --all-targets
     - name: Run tests
