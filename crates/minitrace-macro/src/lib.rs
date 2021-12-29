@@ -162,7 +162,7 @@ impl Args {
                     lit: Lit::Bool(b),
                     ..
                 })) if path.is_ident("enter_on_poll") => b.value(),
-                _ => abort!(arg1.span(), "expected `enter_on_poll=true|false`"),
+                _ => abort!(arg1.span(), "expected `enter_on_poll = <bool>`"),
             },
             None => false,
         };

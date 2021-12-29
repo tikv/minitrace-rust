@@ -141,7 +141,7 @@
 //!       // some work
 //!   }
 //!
-//!   #[trace("qux", enter_on_poll=true)]
+//!   #[trace("qux", enter_on_poll = true)]
 //!   async fn qux() {
 //!       // some work
 //!   }
