@@ -29,10 +29,10 @@ pub trait FutureExt: Sized {
     /// # }
     /// ```
     #[inline]
-    fn in_span(self, parent: Span) -> InSpan<Self> {
+    fn in_span(self, span: Span) -> InSpan<Self> {
         InSpan {
             inner: self,
-            span: Some(parent),
+            span: Some(span),
         }
     }
 

@@ -49,7 +49,7 @@
 //!
 //!   A [`Span`] can be optimized into [`LocalSpan`], if the span is not supposed to sent to other thread, to greatly reduces the overhead.
 //!
-//!   Before starting a [`LocalSpan`], a scope where the parent span can be inferred from thread-local should be set using [`Span::set_local_parent`]. And then a [`LocalSpan`] can start by [`LocalSpan::enter_with_local_parent`].
+//!   Before starting a [`LocalSpan`], a scope where the parent span can be inferred from thread-local should be set using [`Span::set_local_parent`]. And then [`LocalSpan::enter_with_local_parent`] will start a [`LocalSpan`] and set it as the new local parent.
 //!
 //!   If the local parent is not set, [`LocalSpan`] will do nothing.
 //!
@@ -65,9 +65,13 @@
 //!       let _span1 = LocalSpan::enter_with_local_parent("a child span");
 //!
 //!       {
-//!           // The parent of this span is `span1`.
-//!           let _span2 = LocalSpan::enter_with_local_parent("a child span of child span");
+//!           foo();
 //!       }
+//!   }
+//!
+//!   fn foo() {
+//!       // The parent of this span is `span1`.
+//!       let _span2 = LocalSpan::enter_with_local_parent("a child span of child span");
 //!   }
 //!   ```
 //!
@@ -120,7 +124,7 @@
 //!
 //! ## Macro
 //!
-//!   A attribute-macro [`trace`] is provided to help get rid of boilerplate.
+//!   A attribute-macro [\#\[trace\]] is provided to help get rid of boilerplate.
 //!
 //!   For example:
 //!
@@ -169,6 +173,8 @@
 //!   }
 //!   ```
 //!
+//!   Note that [\#\[trace\]] always require an local parent in the context. For synchronous functions, make sure that the caller is within the scope of [`Span::set_local_parent`]; and for asynchronous fuctions, make sure that the caller is within a future instrumented by [`in_span`].
+//!
 //!
 //! ## Local Collector (Advanced)
 //!
@@ -202,7 +208,7 @@
 //! [`Collector`]: crate::prelude::Collector
 //! [`SpanRecord`]: crate::prelude::SpanRecord
 //! [`FutureExt`]: crate::prelude::FutureExt
-//! [`trace`]: crate::prelude::trace
+//! [\#\[trace\]]: crate::prelude::trace
 //! [`LocalCollector`]: crate::local::LocalCollector
 //! [`Future`]: std::future::Future
 //! [`Future::poll`]: std::future::Future::poll
@@ -397,5 +403,33 @@ mod tests {
         assert_eq!(spans1.len(), 1);
         assert_eq!(spans2.len(), 1);
         assert_eq!(spans3.len(), 1);
+    }
+
+    #[test]
+    fn macro_with_async_trait() {
+        use async_trait::async_trait;
+
+        #[async_trait]
+        trait Foo {
+            async fn run(&self);
+        }
+
+        struct Bar;
+
+        #[async_trait]
+        impl Foo for Bar {
+            #[trace("run")]
+            async fn run(&self) {
+                let _g = LocalSpan::enter_with_local_parent("child");
+            }
+        }
+
+        let (root, collector) = Span::root("root");
+
+        tokio::runtime::Runtime::new()
+            .unwrap()
+            .block_on(async { Bar.run().await }.in_span(Span::enter_with_parent("Task", &root)));
+
+        assert_eq!(collector.collect().len(), 3);
     }
 }
