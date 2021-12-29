@@ -45,7 +45,7 @@
 //!   ```
 //!
 //!
-//! ## Local Span & Local Parent Guard
+//! ## Local Span
 //!
 //!   A [`Span`] can be optimized into [`LocalSpan`], if the span is not supposed to sent to other thread, to greatly reduces the overhead.
 //!
@@ -183,7 +183,7 @@
 //!   use minitrace::local::LocalCollector;
 //!   use std::sync::Arc;
 //!
-//!   // Collect local spans in advance with no parent
+//!   // Collect local spans in advance without parent
 //!   let collector = LocalCollector::start().unwrap();
 //!   let _span1 = LocalSpan::enter_with_local_parent("a child span");
 //!   drop(_span1);
