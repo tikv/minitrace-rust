@@ -18,7 +18,7 @@ async fn iter_job(iter: u64) {
     other_job().await;
 }
 
-#[trace("other job", enter_on_poll=true)]
+#[trace("other job", enter_on_poll = true)]
 async fn other_job() {
     for i in 0..20 {
         if i == 10 {
