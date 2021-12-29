@@ -12,6 +12,25 @@ minitrace = { git = "https://github.com/tikv/minitrace-rust.git" }
 minitrace-jaeger = { git = "https://github.com/tikv/minitrace-rust.git" }
 ```
 
+```rust
+use minitrace::prelude::*;
+
+let (root, collector) = Span::root("root");
+
+{
+    let _child_span_1 = Span::enter_with_parent("child span 1", &root);
+    // some works
+}
+
+{
+    let _child_span_2 = Span::enter_with_parent("child span 2", &root);
+    // some works
+}
+
+drop(root);
+let records: Vec<SpanRecord> = collector.colelct();
+```
+
 ## Examples
 
 ### Setup Jaeger

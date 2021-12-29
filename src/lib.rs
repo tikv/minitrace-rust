@@ -21,9 +21,13 @@
 //!
 //!   let (root, collector) = Span::root("root");
 //!
-//!   let _span_guard = Span::enter_with_parent("a child span", &root);
-//!   // some works
-//!   drop(_span_guard);
+//!   {
+//!       let _child_span = Span::enter_with_parent("a child span", &root);
+//!       // some works
+//!   }
+//!
+//!   drop(root);
+//!   let records: Vec<SpanRecord> = collector.colelct();
 //!   ```
 //!
 //!
@@ -54,13 +58,12 @@
 //!
 //!   let (root, collector) = Span::root("root");
 //!
-//!   let _local_parent_guard = root.set_local_parent();
+//!   {
+//!       let _local_parent_guard = root.set_local_parent();
 //!
-//!   // The parent of this span is `root`.
-//!   let _span_guard = LocalSpan::enter_with_local_parent("a child span");
-//!   drop(_span_guard);
-//!
-//!   drop(_local_parent_guard);
+//!       // The parent of this span is `root`.
+//!       let _span_guard = LocalSpan::enter_with_local_parent("a child span");
+//!   }
 //!   ```
 //!
 //!
