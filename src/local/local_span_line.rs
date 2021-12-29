@@ -11,7 +11,7 @@ thread_local! {
 }
 
 pub(crate) struct LocalSpanLine {
-    span_queue: SpanQueue,
+    pub(crate) span_queue: SpanQueue,
 
     local_collector_existing: bool,
     current_local_collector_epoch: usize,

@@ -1,7 +1,6 @@
 // Copyright 2020 TiKV Project Authors. Licensed under Apache-2.0.
 
 use minitrace::prelude::*;
-use minitrace_macro::trace_async;
 
 fn parallel_job() -> Vec<tokio::task::JoinHandle<()>> {
     let mut v = Vec::with_capacity(4);
@@ -19,7 +18,7 @@ async fn iter_job(iter: u64) {
     other_job().await;
 }
 
-#[trace_async("other job")]
+#[trace("other job")]
 async fn other_job() {
     for i in 0..20 {
         if i == 10 {

@@ -8,11 +8,9 @@ use crate::span::Span;
 impl<T: std::future::Future> FutureExt for T {}
 
 pub trait FutureExt: Sized {
-    /// Bind a `span` to the future to record the entire lifetime of future. This is usually used
-    /// on the outmost async block.
+    /// Bind a `span` to the future to record the entire lifetime of the future. This is usually used on the outmost async block.
     ///
-    /// It'll call [`Span::set_local_parent`](Span::set_local_parent) when the executor
-    /// [`poll`](std::future::Future::poll) it.
+    /// It'll call [`Span::set_local_parent`](Span::set_local_parent) when the executor [`poll`](std::future::Future::poll) it.
     ///
     /// # Examples
     ///
@@ -38,10 +36,8 @@ pub trait FutureExt: Sized {
         }
     }
 
-    /// It will call [`LocalSpan::enter_with_local_parent`](LocalSpan::enter_with_local_parent) at the
-    /// beginning of [`poll`](std::future::Future::poll)ing. A span will be generated at every
-    /// single poll call. Note that polling on a future may return [`Poll::Pending`](Poll::Pending),
-    /// so it can produce more than 1 span for the future.
+    /// A span will be generated at every single poll call. Internally it will call [`LocalSpan::enter_with_local_parent`](LocalSpan::enter_with_local_parent) at the beginning of [`poll`](std::future::Future::poll).
+    /// Note that polling on a future may return [`Poll::Pending`](Poll::Pending), so it can produce more than 1 span for the future.
     ///
     /// # Examples
     ///

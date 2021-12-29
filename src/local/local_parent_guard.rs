@@ -6,6 +6,7 @@ use std::sync::Arc;
 
 use crate::collector::acquirer::{Acquirer, SpanCollection};
 use crate::local::local_collector::LocalCollector;
+use crate::local::local_span_line::LOCAL_SPAN_LINE;
 use crate::local::span_id::SpanId;
 use crate::span::Span;
 
@@ -17,21 +18,26 @@ pub struct AttachedSpan {
     span_id: SpanId,
     acquirers: Vec<Acquirer>,
 
-    local_collector: Option<LocalCollector>,
+    local_collector: LocalCollector,
 }
 
 impl AttachedSpan {
     pub fn new_child_span(event: &'static str) -> Option<Span> {
+        let local_parent_span_id =
+            LOCAL_SPAN_LINE.with(|span_line| span_line.borrow().span_queue.next_parent_id);
+
         ATTACHED_SPAN.with(|attached_span| {
             let attached_span = attached_span.borrow();
             if let Some(AttachedSpan {
-                span_id: parent_span_id,
+                span_id: attached_span_id,
                 acquirers,
                 ..
             }) = attached_span.as_ref()
             {
                 Some(Span::new(
-                    acquirers.iter().map(|acq| (*parent_span_id, acq)),
+                    acquirers
+                        .iter()
+                        .map(|acq| (local_parent_span_id.unwrap_or(*attached_span_id), acq)),
                     event,
                 ))
             } else {
@@ -67,7 +73,7 @@ impl Drop for LocalParentGuard {
             if let Some(AttachedSpan {
                 span_id,
                 acquirers,
-                local_collector: Some(local_collector),
+                local_collector,
             }) = attached_span.borrow_mut().take()
             {
                 let raw_spans = Arc::new(local_collector.collect());
@@ -84,10 +90,7 @@ impl Drop for LocalParentGuard {
 
 impl LocalParentGuard {
     #[inline]
-    pub(crate) fn new_with_local_collector(
-        span: &Span,
-        local_collector: Option<LocalCollector>,
-    ) -> Self {
+    pub(crate) fn new_with_local_collector(span: &Span, local_collector: LocalCollector) -> Self {
         ATTACHED_SPAN.with(|attached_span| {
             let mut attached_span = attached_span.borrow_mut();
 

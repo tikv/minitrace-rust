@@ -12,7 +12,7 @@
 //!
 //!   To record such a span record, we create a [`Span`] and drop it to stop clocking.
 //!
-//!   A new [`Span`] can be started via [`Span::root(event)`](crate::prelude::Span::root), [`Span::enter_with_parent(event, parent)`](crate::prelude::Span::enter_with_parent). The span started by the latter method will be the child span of parent.
+//!   A new [`Span`] can be started via [`Span::root`], [`Span::enter_with_parent`]. The span started by the latter method will be the child span of parent.
 //!
 //!   [`Span`] is thread-safe and can be sent across threads.
 //!
@@ -23,7 +23,7 @@
 //!
 //!   {
 //!       let _child_span = Span::enter_with_parent("a child span", &root);
-//!       // some works
+//!       // some work
 //!   }
 //!
 //!   drop(root);
@@ -49,9 +49,9 @@
 //!
 //!   A [`Span`] can be optimized into [`LocalSpan`], if the span is not supposed to sent to other thread, to greatly reduces the overhead.
 //!
-//!   Before starting a [`LocalSpan`], a scope where the parent span can be inferred from thread-local should be set using [`Span::set_local_parent()`](crate::prelude::Span::set_local_parent). And then a [`LocalSpan`] can start by [`LocalSpan::enter_with_local_parent()`](crate::prelude::LocalSpan::enter_with_local_parent).
+//!   Before starting a [`LocalSpan`], a scope where the parent span can be inferred from thread-local should be set using [`Span::set_local_parent`]. And then a [`LocalSpan`] can start by [`LocalSpan::enter_with_local_parent`].
 //!
-//!   If the local parent is not set, the [`LocalSpan`] will panic on debug profile or do nothing on release profile.
+//!   If the local parent is not set, [`LocalSpan`] will do nothing.
 //!
 //!   ```rust
 //!   use minitrace::prelude::*;
@@ -59,10 +59,15 @@
 //!   let (root, collector) = Span::root("root");
 //!
 //!   {
-//!       let _local_parent_guard = root.set_local_parent();
+//!       let _guard = root.set_local_parent();
 //!
 //!       // The parent of this span is `root`.
-//!       let _span_guard = LocalSpan::enter_with_local_parent("a child span");
+//!       let _span1 = LocalSpan::enter_with_local_parent("a child span");
+//!
+//!       {
+//!           // The parent of this span is `span1`.
+//!           let _span2 = LocalSpan::enter_with_local_parent("a child span of child span");
+//!       }
 //!   }
 //!   ```
 //!
@@ -77,9 +82,9 @@
 //!   let (mut root, collector) = Span::root("root");
 //!   root.with_property(|| ("key", "value".to_owned()));
 //!
-//!   let _local_parent_guard = root.set_local_parent();
+//!   let _guard = root.set_local_parent();
 //!
-//!   let _span_guard = LocalSpan::enter_with_local_parent("a child span")
+//!   let _span1 = LocalSpan::enter_with_local_parent("a child span")
 //!       .with_property(|| ("key", "value".to_owned()));
 //!   ```
 //!
@@ -88,10 +93,10 @@
 //!
 //!   minitrace provides [`FutureExt`] which extends [`Future`] with two methods:
 //!
-//!   - [`in_span`](crate::prelude::FutureExt::in_span): Bind a [`Span`] that stop clocking when the [`Future`] drops. Besides, it'll call `Span::set_local_parent` at every poll.
-//!   - [`enter_on_poll`](crate::prelude::FutureExt::enter_on_poll): Start on local span at every poll.
+//!   - [`in_span`]: Bind a [`Span`] to the [`Future`] that keeps clocking until the future drops. Besides, it will set the span as the local parent at every poll so that `LocalSpan` becomes available inside the future.
+//!   - [`enter_on_poll`]: Start a [`LocalSpan`] at every [`Future::poll`]. This will create multiple _short_ spans if the future get polled multiple times.
 //!
-//!   The [`in_span`](crate::prelude::FutureExt::in_span) adaptor is commonly used on the outmost [`Future`] which is about to submit to a runtime.
+//!   The outmost future must use [`in_span`] instead of [`enter_on_poll`]. Otherwise, [`enter_on_poll`] won't find a local parent at poll and thus will record nothing.
 //!
 //!   ```rust
 //!   use minitrace::prelude::*;
@@ -102,7 +107,7 @@
 //!       // To trace another task
 //!       let task = async {
 //!           async {
-//!               // some works
+//!               // some work
 //!           }.enter_on_poll("future is polled").await;
 //!       }
 //!       .in_span(Span::enter_with_parent("task", &root));
@@ -115,58 +120,54 @@
 //!
 //! ## Macro
 //!
-//!   The two attribute macros [`trace`] and [`trace_async`] for `fn` is provided to help get rid of boilerplate.
+//!   A attribute-macro [`trace`] is provided to help get rid of boilerplate.
 //!
-//!   - [`trace`]
+//!   For example:
 //!
-//!     For example, the code list below has been annotated with a event name:
+//!   ```rust
+//!   use minitrace::prelude::*;
 //!
-//!     ```rust
-//!     use minitrace::prelude::*;
+//!   #[trace("foo")]
+//!   fn foo() {
+//!       // some work
+//!   }
 //!
-//!     #[trace("wow")]
-//!     fn amazing_func() {
-//!         // some works
-//!     }
-//!     ```
+//!   #[trace("bar")]
+//!   async fn bar() {
+//!       // some work
+//!   }
 //!
-//!     which will be translated into
+//!   #[trace("qux", enter_on_poll=true)]
+//!   async fn qux() {
+//!       // some work
+//!   }
+//!   ```
 //!
-//!     ```rust
-//!     use minitrace::prelude::*;
+//!   will be translated into
 //!
-//!     fn amazing_func() {
-//!         let _span_guard = LocalSpan::enter_with_local_parent("wow");
-//!         // some works
-//!     }
-//!     ```
+//!   ```rust
+//!   # use minitrace::prelude::*;
+//!   fn foo() {
+//!       let _span1 = LocalSpan::enter_with_local_parent("foo");
+//!       // some work
+//!   }
 //!
-//!   - [`trace_async`]
+//!   async fn bar() {
+//!       async {
+//!           // some work
+//!       }
+//!       .in_span(Span::enter_with_local_parent("bar"))
+//!       .await
+//!   }
 //!
-//!     Similarly, `async fn` uses [`trace_async`]:
-//!
-//!     ```rust
-//!     use minitrace::prelude::*;
-//!
-//!     #[trace_async("wow")]
-//!     async fn amazing_func() {
-//!         // some works
-//!     }
-//!     ```
-//!
-//!     which will be translated into
-//!
-//!     ```rust
-//!     use minitrace::prelude::*;
-//!
-//!     async fn amazing_func() {
-//!         async {
-//!             // some works
-//!         }
-//!         .enter_on_poll("wow")
-//!         .await
-//!     }
-//!     ```
+//!   async fn qux() {
+//!       async {
+//!           // some work
+//!       }
+//!       .enter_on_poll("qux")
+//!       .await
+//!   }
+//!   ```
 //!
 //!
 //! ## Local Collector (Advanced)
@@ -184,8 +185,8 @@
 //!
 //!   // Collect local spans in advance with no parent
 //!   let collector = LocalCollector::start().unwrap();
-//!   let _span_guard = LocalSpan::enter_with_local_parent("a child span");
-//!   drop(_span_guard);
+//!   let _span1 = LocalSpan::enter_with_local_parent("a child span");
+//!   drop(_span1);
 //!   let local_spans = Arc::new(collector.collect());
 //!
 //!   // Link the local spans to a parent
@@ -202,9 +203,15 @@
 //! [`SpanRecord`]: crate::prelude::SpanRecord
 //! [`FutureExt`]: crate::prelude::FutureExt
 //! [`trace`]: crate::prelude::trace
-//! [`trace_async`]: crate::prelude::trace_async
 //! [`LocalCollector`]: crate::local::LocalCollector
 //! [`Future`]: std::future::Future
+//! [`Future::poll`]: std::future::Future::poll
+//! [`Span::root`]: crate::prelude::Span::root
+//! [`Span::enter_with_parent`]: crate::prelude::Span::enter_with_parent
+//! [`Span::set_local_parent`]: crate::prelude::Span::set_local_parent
+//! [`LocalSpan::enter_with_local_parent`]: crate::prelude::LocalSpan::enter_with_local_parent
+//! [`in_span`]: crate::prelude::FutureExt::in_span
+//! [`enter_on_poll`]: crate::prelude::FutureExt::enter_on_poll
 
 #![allow(clippy::return_self_not_must_use)]
 
@@ -218,14 +225,14 @@ pub mod prelude {
     pub use crate::future::FutureExt;
     pub use crate::local::LocalSpan;
     pub use crate::span::Span;
-    pub use minitrace_macro::{trace, trace_async};
+    pub use minitrace_macro::trace;
 }
 
 #[cfg(test)]
 mod tests {
-    use super::prelude::*;
-    use crate::collector::CollectArgs;
-    use crate::local::local_collector::LocalCollector;
+    use crate as minitrace;
+    use minitrace::local::LocalCollector;
+    use minitrace::prelude::*;
     use std::sync::Arc;
 
     fn four_spans() {

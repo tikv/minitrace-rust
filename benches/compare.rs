@@ -21,15 +21,13 @@ fn rustracing_harness() {
 }
 
 fn init_opentelemetry() {
-    use opentelemetry::api::Provider;
-    use tracing_subscriber::layer::SubscriberExt;
     use tracing_subscriber::prelude::*;
-    use tracing_subscriber::Registry;
 
-    let tracer = opentelemetry::sdk::Provider::default().get_tracer("component_name");
-    let telemetry = tracing_opentelemetry::layer().with_tracer(tracer);
-
-    Registry::default().with(telemetry).init();
+    let opentelemetry = tracing_opentelemetry::layer();
+    tracing_subscriber::registry()
+        .with(opentelemetry)
+        .try_init()
+        .unwrap();
 }
 
 fn opentelemetry_harness() {

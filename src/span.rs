@@ -7,7 +7,7 @@ use minstant::Cycle;
 
 use crate::collector::acquirer::{Acquirer, SpanCollection};
 use crate::collector::Collector;
-use crate::local::local_scope_guard::AttachedSpan;
+use crate::local::local_parent_guard::AttachedSpan;
 use crate::local::raw_span::RawSpan;
 use crate::local::span_id::{DefaultIdGenerator, SpanId};
 use crate::local::{LocalCollector, LocalParentGuard, LocalSpans};
@@ -122,18 +122,11 @@ impl Span {
 
     #[inline]
     pub fn set_local_parent(&self) -> Option<LocalParentGuard> {
-        debug_assert!(
-            !AttachedSpan::is_occupied(),
-            "Current thread is occupied by another span"
-        );
-
-        if AttachedSpan::is_occupied() {
-            None
-        } else {
-            Some(LocalParentGuard::new_with_local_collector(
-                self,
-                LocalCollector::start(),
-            ))
+        match LocalCollector::start() {
+            Some(local_collector) if !AttachedSpan::is_occupied() => Some(
+                LocalParentGuard::new_with_local_collector(self, local_collector),
+            ),
+            _ => None,
         }
     }
 

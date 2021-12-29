@@ -19,12 +19,7 @@ let (root, collector) = Span::root("root");
 
 {
     let _child_span_1 = Span::enter_with_parent("child span 1", &root);
-    // some works
-}
-
-{
-    let _child_span_2 = Span::enter_with_parent("child span 2", &root);
-    // some works
+    // some work
 }
 
 drop(root);

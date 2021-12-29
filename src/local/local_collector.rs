@@ -39,15 +39,10 @@ impl LocalCollector {
     }
 
     pub fn start() -> Option<Self> {
-        let collector = LOCAL_SPAN_LINE.with(|span_line| {
+        LOCAL_SPAN_LINE.with(|span_line| {
             let s = &mut *span_line.borrow_mut();
             s.register_local_collector()
-        });
-        debug_assert!(
-            collector.is_some(),
-            "Current thread is occupied by another local collector"
-        );
-        collector
+        })
     }
 
     pub fn collect(mut self) -> LocalSpans {
