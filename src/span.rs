@@ -56,7 +56,7 @@ impl Span {
     }
 
     #[inline]
-    pub(crate) fn new_noop() -> Self {
+    pub fn new_noop() -> Self {
         Self { inner: None }
     }
 

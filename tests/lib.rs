@@ -386,12 +386,12 @@ fn build_span_graph(mut spans: Vec<SpanRecord>) -> String {
     // node 0 is not a real span
     dfs.next(&graph).unwrap();
     while let Some(nx) = dfs.next(&graph) {
-        let ident = dijkstra(&graph, 0, Some(nx), |_| 1)[&nx] - 1;
+        let depth = dijkstra(&graph, 0, Some(nx), |_| 1)[&nx] - 1;
         result.push_str(&format!(
             "{:indent$}{}\n",
             "",
             span_name[&nx],
-            indent = ident * 4
+            indent = depth * 4
         ));
     }
 
