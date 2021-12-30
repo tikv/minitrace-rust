@@ -9,13 +9,13 @@ fn four_spans() {
     {
         // wide
         for _ in 0..2 {
-            let _g = LocalSpan::enter_with_local_parent("iter span")
+            let _g = LocalSpan::enter_with_local_parent("iter-span")
                 .with_property(|| ("tmp_property", "tmp_value".into()));
         }
     }
 
     {
-        #[trace("rec span")]
+        #[trace("rec-span")]
         fn rec(mut i: u32) {
             i -= 1;
 
@@ -43,10 +43,10 @@ fn single_thread_single_span() {
 
     let expected_graph = r#"
 root
-    rec span
-        rec span
-    iter span
-    iter span
+    rec-span
+        rec-span
+    iter-span
+    iter-span
 "#;
     assert_graph(spans, expected_graph);
 }
@@ -81,24 +81,24 @@ fn single_thread_multiple_spans() {
 
     let expected_graph1 = r#"
 root1
-    rec span
-        rec span
-    iter span
-    iter span
+    rec-span
+        rec-span
+    iter-span
+    iter-span
 "#;
     let expected_graph2 = r#"
 root2
-    rec span
-        rec span
-    iter span
-    iter span
+    rec-span
+        rec-span
+    iter-span
+    iter-span
 "#;
     let expected_graph3 = r#"
 root3
-    rec span
-        rec span
-    iter span
-    iter span
+    rec-span
+        rec-span
+    iter-span
+    iter-span
 "#;
     assert_graph(spans1, expected_graph1);
     assert_graph(spans2, expected_graph2);
@@ -127,30 +127,30 @@ fn multiple_threads_single_span() {
 
     let expected_graph = r#"
 root
-    rec span
-        rec span
-    iter span
-    iter span
+    rec-span
+        rec-span
+    iter-span
+    iter-span
     cross-thread
-        rec span
-            rec span
-        iter span
-        iter span
+        rec-span
+            rec-span
+        iter-span
+        iter-span
     cross-thread
-        rec span
-            rec span
-        iter span
-        iter span
+        rec-span
+            rec-span
+        iter-span
+        iter-span
     cross-thread
-        rec span
-            rec span
-        iter span
-        iter span
+        rec-span
+            rec-span
+        iter-span
+        iter-span
     cross-thread
-        rec span
-            rec span
-        iter span
-        iter span
+        rec-span
+            rec-span
+        iter-span
+        iter-span
 "#;
     assert_graph(spans, expected_graph);
 }
@@ -192,57 +192,57 @@ fn multiple_threads_multiple_spans() {
 
     let expected_graph1 = r#"
 root1
-    rec span
-        rec span
+    rec-span
+        rec-span
     merged
-        rec span
-            rec span
-        iter span
-        iter span
+        rec-span
+            rec-span
+        iter-span
+        iter-span
     merged
-        rec span
-            rec span
-        iter span
-        iter span
+        rec-span
+            rec-span
+        iter-span
+        iter-span
     merged
-        rec span
-            rec span
-        iter span
-        iter span
+        rec-span
+            rec-span
+        iter-span
+        iter-span
     merged
-        rec span
-            rec span
-        iter span
-        iter span
-    iter span
-    iter span
+        rec-span
+            rec-span
+        iter-span
+        iter-span
+    iter-span
+    iter-span
 "#;
     let expected_graph2 = r#"
 root2
-    rec span
-        rec span
+    rec-span
+        rec-span
     merged
-        rec span
-            rec span
-        iter span
-        iter span
+        rec-span
+            rec-span
+        iter-span
+        iter-span
     merged
-        rec span
-            rec span
-        iter span
-        iter span
+        rec-span
+            rec-span
+        iter-span
+        iter-span
     merged
-        rec span
-            rec span
-        iter span
-        iter span
+        rec-span
+            rec-span
+        iter-span
+        iter-span
     merged
-        rec span
-            rec span
-        iter span
-        iter span
-    iter span
-    iter span
+        rec-span
+            rec-span
+        iter-span
+        iter-span
+    iter-span
+    iter-span
 "#;
     assert_graph(spans1, expected_graph1);
     assert_graph(spans2, expected_graph2);
