@@ -4,13 +4,14 @@ use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
 
 use minstant::Cycle;
+use smallvec::SmallVec;
 
 use crate::collector::acquirer::{Acquirer, SpanCollection};
 use crate::collector::Collector;
-use crate::local::local_parent_guard::AttachedSpan;
+use crate::local::local_span_line::LOCAL_SPAN_STACK;
 use crate::local::raw_span::RawSpan;
 use crate::local::span_id::{DefaultIdGenerator, SpanId};
-use crate::local::{LocalCollector, LocalParentGuard, LocalSpans};
+use crate::local::{LocalParentGuard, LocalSpans};
 
 #[must_use]
 #[derive(Debug)]
@@ -23,7 +24,7 @@ pub(crate) struct SpanInner {
     pub(crate) span_id: SpanId,
 
     // Report `RawSpan` to `Acquirer` when `SpanInner` is dropping
-    pub(crate) to_report: Vec<(RawSpan, Acquirer)>,
+    pub(crate) to_report: SmallVec<[(RawSpan, Acquirer); 1]>,
 }
 
 impl Span {
@@ -35,7 +36,7 @@ impl Span {
         let span_id = DefaultIdGenerator::next_id();
         let now = Cycle::now();
 
-        let mut to_report = Vec::new();
+        let mut to_report = SmallVec::new();
         for (parent_span_id, acq) in acquirers {
             if !acq.is_shutdown() {
                 to_report.push((
@@ -62,7 +63,7 @@ impl Span {
     pub fn root(event: &'static str) -> (Self, Collector) {
         let (tx, rx) = crossbeam::channel::unbounded();
         let closed = Arc::new(AtomicBool::new(false));
-        let acquirer = Acquirer::new(Arc::new(tx), closed.clone());
+        let acquirer = Acquirer::new(tx, closed.clone());
         let span = Self::new([(SpanId::new(0), &acquirer)], event);
         let collector = Collector::new(rx, closed);
         (span, collector)
@@ -94,7 +95,20 @@ impl Span {
 
     #[inline]
     pub fn enter_with_local_parent(event: &'static str) -> Self {
-        AttachedSpan::new_child_span(event).unwrap_or_else(Self::new_noop)
+        LOCAL_SPAN_STACK
+            .with(|span_line| {
+                let mut s = span_line.borrow_mut();
+                let span_line = s.current_span_line()?;
+                let parent_id = span_line.current_parent_id()?;
+                Some(Span::new(
+                    span_line
+                        .current_acquirers()?
+                        .iter()
+                        .map(|acq| (parent_id, acq)),
+                    event,
+                ))
+            })
+            .unwrap_or_else(Self::new_noop)
     }
 
     #[inline]
@@ -121,13 +135,8 @@ impl Span {
     }
 
     #[inline]
-    pub fn set_local_parent(&self) -> Option<LocalParentGuard> {
-        match LocalCollector::start() {
-            Some(local_collector) if !AttachedSpan::is_occupied() => Some(
-                LocalParentGuard::new_with_local_collector(self, local_collector),
-            ),
-            _ => None,
-        }
+    pub fn set_local_parent(&self) -> LocalParentGuard {
+        LocalParentGuard::new(self)
     }
 
     #[inline]

@@ -4,7 +4,8 @@ use std::marker::PhantomData;
 
 use minstant::Cycle;
 
-use crate::local::local_span_line::LOCAL_SPAN_LINE;
+use crate::local::local_parent_guard::LocalParentSpan;
+use crate::local::local_span_line::LOCAL_SPAN_STACK;
 use crate::local::raw_span::RawSpan;
 
 #[must_use]
@@ -38,19 +39,27 @@ impl LocalCollector {
         }
     }
 
-    pub fn start() -> Option<Self> {
-        LOCAL_SPAN_LINE.with(|span_line| {
+    pub fn start() -> Self {
+        LOCAL_SPAN_STACK.with(|span_line| {
             let s = &mut *span_line.borrow_mut();
-            s.register_local_collector()
+            s.register_local_collector(None)
+        })
+    }
+
+    pub(crate) fn start_with_parent(parent: LocalParentSpan) -> Self {
+        LOCAL_SPAN_STACK.with(|span_line| {
+            let s = &mut *span_line.borrow_mut();
+            s.register_local_collector(Some(parent))
         })
     }
 
     pub fn collect(mut self) -> LocalSpans {
-        LOCAL_SPAN_LINE.with(|span_line| {
+        LOCAL_SPAN_STACK.with(|span_line| {
             let s = &mut *span_line.borrow_mut();
             self.collected = true;
             LocalSpans {
-                spans: s.unregister_and_collect(self),
+                // This will panic if `LocalCollector` is started by `start_with_parent_span`
+                spans: s.unregister_and_collect(&self).unwrap(),
                 end_time: Cycle::now(),
             }
         })
@@ -61,9 +70,9 @@ impl Drop for LocalCollector {
     fn drop(&mut self) {
         if !self.collected {
             self.collected = true;
-            LOCAL_SPAN_LINE.with(|span_line| {
+            LOCAL_SPAN_STACK.with(|span_line| {
                 let s = &mut *span_line.borrow_mut();
-                s.clear();
+                s.unregister_and_collect(self);
             })
         }
     }

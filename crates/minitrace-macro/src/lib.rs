@@ -1,8 +1,8 @@
 // Copyright 2020 TiKV Project Authors. Licensed under Apache-2.0.
 
 // Intrumenting the async fn is not as straight forward as expected because `async_trait` rewrites `async fn`
-// into a normal fn which returns `Box<impl Future>`, and this stops the macro to distinguish `async fn` from `fn`.
-// The following code reuses the `async_trait` probes of [tokio-tracing](https://github.com/tokio-rs/tracing/blob/6a61897a5e834988ad9ac709e28c93c4dbf29116/tracing-attributes/src/expand.rs).
+// into a normal fn which returns `Box<impl Future>`, and this stops the macro from distinguishing `async fn` from `fn`.
+// The following code reused the `async_trait` probes from [tokio-tracing](https://github.com/tokio-rs/tracing/blob/6a61897a5e834988ad9ac709e28c93c4dbf29116/tracing-attributes/src/expand.rs).
 
 #![recursion_limit = "256"]
 

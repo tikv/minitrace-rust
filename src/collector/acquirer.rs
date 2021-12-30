@@ -20,12 +20,12 @@ pub(crate) enum SpanCollection {
 
 #[derive(Clone, Debug)]
 pub(crate) struct Acquirer {
-    sender: Arc<Sender<SpanCollection>>,
+    sender: Sender<SpanCollection>,
     closed: Arc<AtomicBool>,
 }
 
 impl Acquirer {
-    pub fn new(sender: Arc<Sender<SpanCollection>>, closed: Arc<AtomicBool>) -> Self {
+    pub fn new(sender: Sender<SpanCollection>, closed: Arc<AtomicBool>) -> Self {
         Acquirer { sender, closed }
     }
 
@@ -38,6 +38,6 @@ impl Acquirer {
     }
 
     pub fn is_shutdown(&self) -> bool {
-        self.closed.load(Ordering::SeqCst)
+        self.closed.load(Ordering::Relaxed)
     }
 }
