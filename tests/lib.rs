@@ -383,7 +383,7 @@ fn build_span_graph(mut spans: Vec<SpanRecord>) -> String {
     let mut result = String::new();
 
     let mut dfs = Dfs::new(&graph, 0);
-    // 0 node is not a real span
+    // node 0 is not a real span
     dfs.next(&graph).unwrap();
     while let Some(nx) = dfs.next(&graph) {
         let ident = dijkstra(&graph, 0, Some(nx), |_| 1)[&nx] - 1;
