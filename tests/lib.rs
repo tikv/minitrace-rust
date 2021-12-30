@@ -293,8 +293,15 @@ fn macro_with_async_trait() {
     impl Foo for Bar {
         #[trace("run")]
         async fn run(&self) {
-            let _g = LocalSpan::enter_with_local_parent("child");
+            let _g = Span::enter_with_local_parent("run-inner");
+            work().await
         }
+    }
+
+    #[trace("work", enter_on_poll = true)]
+    async fn work() {
+        let _g = Span::enter_with_local_parent("work-inner");
+        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
     }
 
     let spans = {
@@ -311,7 +318,10 @@ fn macro_with_async_trait() {
 root
     task
         run
-            child
+            work
+            work
+                work-inner
+            run-inner
 "#;
     assert_graph(spans, expected_graph);
 }
