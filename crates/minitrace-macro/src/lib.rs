@@ -54,13 +54,13 @@ pub fn trace(args: TokenStream, item: TokenStream) -> TokenStream {
         let vis = &input.vis;
         let sig = &input.sig;
         let attrs = &input.attrs;
-        quote! {
+        let func: proc_macro2::TokenStream = quote! {
             #(#attrs) *
             #vis #sig {
                 #(#out_stmts) *
             }
-        }
-        .into()
+        };
+        func.into()
     } else {
         gen_function(&input, args).into()
     }

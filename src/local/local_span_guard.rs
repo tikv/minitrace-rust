@@ -20,7 +20,7 @@ pub struct LocalSpanGuard {
 
 impl LocalSpanGuard {
     #[inline]
-    pub(crate) fn new(event: &'static str) -> Self {
+    pub(crate) fn new(event: &'static str) -> LocalSpanGuard {
         LOCAL_SPAN_STACK.with(|span_line| {
             let mut span_line = span_line.borrow_mut();
             let span_handle = span_line.enter_span(event);
@@ -32,6 +32,8 @@ impl LocalSpanGuard {
     }
 
     #[inline]
+    #[must_use]
+    #[allow(clippy::double_must_use)]
     pub fn with_property<F>(self, property: F) -> Self
     where
         F: FnOnce() -> (&'static str, String),
@@ -40,6 +42,8 @@ impl LocalSpanGuard {
     }
 
     #[inline]
+    #[must_use]
+    #[allow(clippy::double_must_use)]
     pub fn with_properties<I, F>(self, properties: F) -> Self
     where
         I: IntoIterator<Item = (&'static str, String)>,

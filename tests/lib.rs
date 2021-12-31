@@ -294,14 +294,17 @@ fn macro_with_async_trait() {
         #[trace("run")]
         async fn run(&self) {
             let _g = Span::enter_with_local_parent("run-inner");
-            work().await
+            work().await;
+            let _g = LocalSpan::enter_with_local_parent("local-span");
         }
     }
 
     #[trace("work", enter_on_poll = true)]
     async fn work() {
         let _g = Span::enter_with_local_parent("work-inner");
-        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+        tokio::time::sleep(std::time::Duration::from_millis(100))
+            .enter_on_poll("sleep")
+            .await;
     }
 
     let spans = {
@@ -319,9 +322,12 @@ root
     task
         run
             work
+                sleep
             work
                 work-inner
+                sleep
             run-inner
+            local-span
 "#;
     assert_graph(spans, expected_graph);
 }

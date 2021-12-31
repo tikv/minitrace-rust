@@ -152,10 +152,12 @@ pub struct CollectArgs {
 }
 
 impl CollectArgs {
+    #[must_use]
     pub fn sync(self, sync: bool) -> Self {
         Self { sync, ..self }
     }
 
+    #[must_use]
     pub fn duration_threshold(self, duration_threshold: Duration) -> Self {
         Self {
             duration_threshold: Some(duration_threshold),

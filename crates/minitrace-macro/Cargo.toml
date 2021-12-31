@@ -9,7 +9,7 @@ edition = "2018"
 proc-macro = true
 
 [dependencies]
-syn = { version = "1", features = ["full", "parsing", "printing", "visit", "visit-mut", "clone-impls", "extra-traits", "proc-macro"] }
+syn = { version = "1", features = ["full", "parsing", "extra-traits", "proc-macro"] }
 quote = "1"
 proc-macro2 = "1"
-proc-macro-error = "1.0"
+proc-macro-error = "1"
