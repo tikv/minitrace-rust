@@ -1,4 +1,6 @@
-// Copyright 2020 TiKV Project Authors. Licensed under Apache-2.0.
+// Copyright 2021 TiKV Project Authors. Licensed under Apache-2.0.
+
+pub(crate) mod acquirer;
 
 use crossbeam::channel::Receiver;
 
@@ -6,9 +8,36 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 
-use crate::span::Span;
-use crate::span::{Anchor, DefaultClock};
-use crate::trace::acquirer::SpanCollection;
+use minstant::Anchor;
+
+use crate::collector::acquirer::SpanCollection;
+use crate::local::raw_span::RawSpan;
+
+#[derive(Clone, Debug, Default)]
+pub struct SpanRecord {
+    pub id: u32,
+    pub parent_id: u32,
+    pub begin_unix_time_ns: u64,
+    pub duration_ns: u64,
+    pub event: &'static str,
+    pub properties: Vec<(&'static str, String)>,
+}
+
+impl SpanRecord {
+    #[inline]
+    pub(crate) fn from_raw_span(raw_span: RawSpan, anchor: Anchor) -> SpanRecord {
+        let begin_unix_time_ns = raw_span.begin_cycle.into_unix_time_ns(anchor);
+        let end_unix_time_ns = raw_span.end_cycle.into_unix_time_ns(anchor);
+        SpanRecord {
+            id: raw_span.id.0,
+            parent_id: raw_span.parent_id.0,
+            begin_unix_time_ns,
+            duration_ns: end_unix_time_ns - begin_unix_time_ns,
+            event: raw_span.event,
+            properties: raw_span.properties,
+        }
+    }
+}
 
 pub struct Collector {
     receiver: Receiver<SpanCollection>,
@@ -20,7 +49,7 @@ impl Collector {
         Collector { receiver, closed }
     }
 
-    pub fn collect(self) -> Vec<Span> {
+    pub fn collect(self) -> Vec<SpanRecord> {
         self.collect_with_args(CollectArgs {
             sync: false,
             duration_threshold: None,
@@ -37,7 +66,7 @@ impl Collector {
             sync,
             duration_threshold,
         }: CollectArgs,
-    ) -> Vec<Span> {
+    ) -> Vec<SpanRecord> {
         let span_collections: Vec<_> = if sync {
             self.receiver.iter().collect()
         } else {
@@ -45,14 +74,14 @@ impl Collector {
         };
         self.closed.store(true, Ordering::SeqCst);
 
-        let anchor = DefaultClock::anchor();
+        let anchor = Anchor::new();
         if let Some(duration) = duration_threshold {
             // find the root span and check its duration
             if let Some(root_span) = span_collections.iter().find_map(|s| match s {
                 SpanCollection::Span(s) if s.parent_id.0 == 0 => Some(s),
                 _ => None,
             }) {
-                let root_span = root_span.clone().into_span(anchor);
+                let root_span = SpanRecord::from_raw_span(root_span.clone(), anchor);
                 if root_span.duration_ns < duration.as_nanos() as _ {
                     return vec![root_span];
                 }
@@ -65,7 +94,7 @@ impl Collector {
 
 impl Collector {
     #[inline]
-    fn amend(span_collections: Vec<SpanCollection>, anchor: Anchor) -> Vec<Span> {
+    fn amend(span_collections: Vec<SpanCollection>, anchor: Anchor) -> Vec<SpanRecord> {
         let capacity = span_collections
             .iter()
             .map(|sc| match sc {
@@ -86,19 +115,18 @@ impl Collector {
                     parent_id_of_root: span_id,
                 } => {
                     for span in &raw_spans.spans {
-                        let begin_unix_time_ns =
-                            DefaultClock::cycle_to_unix_time_ns(span.begin_cycle, anchor);
+                        let begin_unix_time_ns = span.begin_cycle.into_unix_time_ns(anchor);
                         let end_unix_time_ns = if span.end_cycle.is_zero() {
-                            DefaultClock::cycle_to_unix_time_ns(raw_spans.end_time, anchor)
+                            raw_spans.end_time.into_unix_time_ns(anchor)
                         } else {
-                            DefaultClock::cycle_to_unix_time_ns(span.end_cycle, anchor)
+                            span.end_cycle.into_unix_time_ns(anchor)
                         };
                         let parent_id = if span.parent_id.0 == 0 {
                             span_id.0
                         } else {
                             span.parent_id.0
                         };
-                        spans.push(Span {
+                        spans.push(SpanRecord {
                             id: span.id.0,
                             parent_id,
                             begin_unix_time_ns,
@@ -108,7 +136,7 @@ impl Collector {
                         });
                     }
                 }
-                SpanCollection::Span(span) => spans.push(span.into_span(anchor)),
+                SpanCollection::Span(span) => spans.push(SpanRecord::from_raw_span(span, anchor)),
             }
         }
 
@@ -116,6 +144,7 @@ impl Collector {
     }
 }
 
+#[must_use]
 #[derive(Default, Debug)]
 pub struct CollectArgs {
     sync: bool,
@@ -123,10 +152,14 @@ pub struct CollectArgs {
 }
 
 impl CollectArgs {
+    #[must_use]
+    #[allow(clippy::double_must_use)]
     pub fn sync(self, sync: bool) -> Self {
         Self { sync, ..self }
     }
 
+    #[must_use]
+    #[allow(clippy::double_must_use)]
     pub fn duration_threshold(self, duration_threshold: Duration) -> Self {
         Self {
             duration_threshold: Some(duration_threshold),

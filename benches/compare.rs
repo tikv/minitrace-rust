@@ -21,15 +21,13 @@ fn rustracing_harness() {
 }
 
 fn init_opentelemetry() {
-    use opentelemetry::api::Provider;
-    use tracing_subscriber::layer::SubscriberExt;
     use tracing_subscriber::prelude::*;
-    use tracing_subscriber::Registry;
 
-    let tracer = opentelemetry::sdk::Provider::default().get_tracer("component_name");
-    let telemetry = tracing_opentelemetry::layer().with_tracer(tracer);
-
-    Registry::default().with(telemetry).init();
+    let opentelemetry = tracing_opentelemetry::layer();
+    tracing_subscriber::registry()
+        .with(opentelemetry)
+        .try_init()
+        .unwrap();
 }
 
 fn opentelemetry_harness() {
@@ -47,15 +45,17 @@ fn opentelemetry_harness() {
 }
 
 fn minitrace_harness() {
+    use minitrace::prelude::*;
+
     fn dummy_minitrace() {
         for _ in 0..99 {
-            let _guard = minitrace::LocalSpan::enter("child");
+            let _guard = LocalSpan::enter_with_local_parent("child");
         }
     }
 
     {
-        let (root_span, collector) = minitrace::Span::root("parent");
-        let _g = root_span.enter();
+        let (root_span, collector) = Span::root("parent");
+        let _g = root_span.set_local_parent();
 
         dummy_minitrace();
 

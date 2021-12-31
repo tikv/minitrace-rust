@@ -6,10 +6,11 @@ use std::sync::Arc;
 use crossbeam::channel::Sender;
 
 use crate::local::local_collector::LocalSpans;
-use crate::span::{RawSpan, SpanId};
+use crate::local::raw_span::RawSpan;
+use crate::local::span_id::SpanId;
 
 #[derive(Clone, Debug)]
-pub enum SpanCollection {
+pub(crate) enum SpanCollection {
     LocalSpans {
         local_spans: Arc<LocalSpans>,
         parent_id_of_root: SpanId,
@@ -18,13 +19,13 @@ pub enum SpanCollection {
 }
 
 #[derive(Clone, Debug)]
-pub struct Acquirer {
-    sender: Arc<Sender<SpanCollection>>,
+pub(crate) struct Acquirer {
+    sender: Sender<SpanCollection>,
     closed: Arc<AtomicBool>,
 }
 
 impl Acquirer {
-    pub fn new(sender: Arc<Sender<SpanCollection>>, closed: Arc<AtomicBool>) -> Self {
+    pub fn new(sender: Sender<SpanCollection>, closed: Arc<AtomicBool>) -> Self {
         Acquirer { sender, closed }
     }
 
@@ -37,6 +38,6 @@ impl Acquirer {
     }
 
     pub fn is_shutdown(&self) -> bool {
-        self.closed.load(Ordering::SeqCst)
+        self.closed.load(Ordering::Relaxed)
     }
 }

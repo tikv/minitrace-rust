@@ -1,15 +1,12 @@
 // Copyright 2020 TiKV Project Authors. Licensed under Apache-2.0.
 
-use minitrace::*;
-use minitrace_datadog::Reporter as DReporter;
-use minitrace_jaeger::Reporter as JReporter;
-use minitrace_macro::trace_async;
+use minitrace::prelude::*;
 
 fn parallel_job() -> Vec<tokio::task::JoinHandle<()>> {
     let mut v = Vec::with_capacity(4);
     for i in 0..4 {
         v.push(tokio::spawn(
-            iter_job(i).in_span(Span::from_local_parent("iter job")),
+            iter_job(i).in_span(Span::enter_with_local_parent("iter job")),
         ));
     }
     v
@@ -21,7 +18,7 @@ async fn iter_job(iter: u64) {
     other_job().await;
 }
 
-#[trace_async("other job")]
+#[trace("other job", enter_on_poll = true)]
 async fn other_job() {
     for i in 0..20 {
         if i == 10 {
@@ -37,8 +34,8 @@ async fn main() {
 
     let f = async {
         let jhs = {
-            let _s =
-                LocalSpan::enter("a span").with_property(|| ("a property", "a value"));
+            let _s = LocalSpan::enter_with_local_parent("a span")
+                .with_property(|| ("a property", "a value".to_owned()));
             parallel_job()
         };
 
@@ -55,12 +52,13 @@ async fn main() {
     let spans = collector.collect_with_args(CollectArgs::default().sync(true));
 
     // Report to Jaeger
-    let bytes = JReporter::encode("asynchronous".to_owned(), rand::random(), 0, 0, &spans).unwrap();
-    JReporter::report("127.0.0.1:6831".parse().unwrap(), &bytes).ok();
+    let bytes =
+        minitrace_jaeger::encode("asynchronous".to_owned(), rand::random(), 0, 0, &spans).unwrap();
+    minitrace_jaeger::report("127.0.0.1:6831".parse().unwrap(), &bytes).ok();
 
     // Report to Datadog
-    let bytes = DReporter::encode("asynchronous", "db", "select", 0, rand::random(), 0, 0, &spans).unwrap();
-    DReporter::report("127.0.0.1:8126".parse().unwrap(), bytes)
+    let bytes = minitrace_datadog::encode("asynchronous", "http", "/healthcheck", 0, rand::random(), 0, 0, &spans).unwrap();
+    minitrace_datadog::report("127.0.0.1:8126".parse().unwrap(), bytes)
         .await
         .ok();
 }
