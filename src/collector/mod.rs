@@ -131,7 +131,7 @@ impl Collector {
                             parent_id,
                             begin_unix_time_ns,
                             duration_ns: end_unix_time_ns - begin_unix_time_ns,
-                            event: span.event.clone(),
+                            event: span.event,
                             properties: span.properties.clone(),
                         });
                     }
