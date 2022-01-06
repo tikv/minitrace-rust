@@ -3,7 +3,7 @@
 use std::cell::RefCell;
 use std::sync::Arc;
 
-use minstant::Cycle;
+use minstant::Instant;
 
 use crate::collector::acquirer::{Acquirer, SpanCollection};
 use crate::local::local_collector::LocalCollector;
@@ -112,7 +112,7 @@ impl LocalSpanStack {
             if let Some(parent_span) = span_line.parent_span.take() {
                 let local_spans = Arc::new(LocalSpans {
                     spans: raw_spans,
-                    end_time: Cycle::now(),
+                    end_time: Instant::now(),
                 });
                 for acq in parent_span.acquirers {
                     acq.submit(SpanCollection::LocalSpans {

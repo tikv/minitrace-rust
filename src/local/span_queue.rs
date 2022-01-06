@@ -1,6 +1,6 @@
 // Copyright 2020 TiKV Project Authors. Licensed under Apache-2.0.
 
-use minstant::Cycle;
+use minstant::Instant;
 
 use crate::local::raw_span::RawSpan;
 use crate::local::span_id::{DefaultIdGenerator, SpanId};
@@ -27,7 +27,7 @@ impl SpanQueue {
         let span = RawSpan::begin_with(
             DefaultIdGenerator::next_id(),
             self.next_parent_id.unwrap_or(SpanId(0)),
-            Cycle::now(),
+            Instant::now(),
             event,
         );
         self.next_parent_id = Some(span.id);
@@ -47,7 +47,7 @@ impl SpanQueue {
         );
 
         let span = &mut self.span_queue[span_handle.index];
-        span.end_with(Cycle::now());
+        span.end_with(Instant::now());
 
         self.next_parent_id = Some(span.parent_id);
     }

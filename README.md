@@ -1,15 +1,18 @@
-# Minitrace
+# minitrace
+
 [![Actions Status](https://github.com/tikv/minitrace-rust/workflows/CI/badge.svg)](https://github.com/tikv/minitrace-rust/actions)
+[![Documentation](https://docs.rs/minitrace/badge.svg)](https://docs.rs/minitrace/)
+[![Crates.io](https://img.shields.io/crates/v/minitrace.svg)](https://crates.io/crates/minitrace)
 [![LICENSE](https://img.shields.io/github/license/tikv/minitrace-rust.svg)](https://github.com/tikv/minitrace-rust/blob/master/LICENSE)
 
-A high-performance, ergonomic timeline tracing library for Rust. Builtin supports [Jaeger](https://www.jaegertracing.io/) and [Datadog])(https://www.datadoghq.com/).
+A high-performance and ergonomic timeline tracing library for Rust. Builtin supports [Jaeger](https://www.jaegertracing.io/) and [Datadog](https://www.datadoghq.com/).
 
 ## Usage
 
 ```toml
 [dependencies]
-minitrace = { git = "https://github.com/tikv/minitrace-rust.git" }
-minitrace-jaeger = { git = "https://github.com/tikv/minitrace-rust.git" }
+minitrace = "0.2"
+minitrace-jaeger = "0.2"
 ```
 
 ```rust

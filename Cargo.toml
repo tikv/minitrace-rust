@@ -5,9 +5,14 @@ authors = ["The TiKV Project Authors"]
 description = "A high-performance timeline tracing library for Rust"
 license = "Apache-2.0"
 edition = "2018"
+homepage = "https://github.com/tikv/minitrace-rust"
+repository = "https://github.com/tikv/minitrace-rust"
+documentation = "https://docs.rs/minitrace"
+readme = "README.md"
+keywords = ["tracing", "span", "datadog", "jaeger", "opentracing"]
 
 [dependencies]
-minstant = { git = "https://github.com/zhongzc/minstant.git", rev = "dc7dd5c17c564601afff7c0b640fd430728bfcd5" }
+minstant = "0.1"
 minitrace-macro = { path = "crates/minitrace-macro" }
 crossbeam = "0.8"
 pin-project = "1.0"
