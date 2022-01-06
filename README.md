@@ -61,6 +61,10 @@ Benchmark platform is `Intel(R) Xeon(R) CPU E5-2630 v4 @ 2.20GHz` on CentOS 7.
 
 ```sh
 > cargo criterion
+
+100 spans/Tokio Tracing   time:   [152.47 us 153.10 us 153.91 us]
+100 spans/Rustracing      time:   [36.523 us 37.078 us 37.809 us]
+100 spans/minitrace       time:   [8.2892 us 8.4474 us 8.6355 us]
 ```
 
 ![Benchmark](img/benchmark.jpeg)

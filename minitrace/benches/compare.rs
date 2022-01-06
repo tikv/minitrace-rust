@@ -71,7 +71,7 @@ fn tracing_comparison(c: &mut Criterion) {
 
     bgroup.bench_function("Tokio Tracing", |b| b.iter(opentelemetry_harness));
     bgroup.bench_function("Rustracing", |b| b.iter(rustracing_harness));
-    bgroup.bench_function("Minitrace", |b| b.iter(minitrace_harness));
+    bgroup.bench_function("minitrace", |b| b.iter(minitrace_harness));
 
     bgroup.finish();
 }
