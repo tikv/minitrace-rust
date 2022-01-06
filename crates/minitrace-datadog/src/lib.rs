@@ -7,9 +7,10 @@ use std::collections::HashMap;
 use std::error::Error;
 use std::net::SocketAddr;
 
+#[allow(clippy::too_many_arguments)]
 pub fn encode(
     service_name: &str,
-    r#type: &str,
+    trace_type: &str,
     resource: &str,
     error_code: i32,
     trace_id: u64,
@@ -20,7 +21,7 @@ pub fn encode(
     let spans = spans.iter().map(|s| MPSpan {
         name: s.event,
         service: service_name,
-        r#type,
+        trace_type,
         resource,
         start: s.begin_unix_time_ns as i64,
         duration: s.duration_ns as i64,
@@ -92,7 +93,8 @@ pub async fn report(
 struct MPSpan<'a> {
     name: &'a str,
     service: &'a str,
-    r#type: &'a str,
+    #[serde(rename = "type")]
+    trace_type: &'a str,
     resource: &'a str,
     start: i64,
     duration: i64,
