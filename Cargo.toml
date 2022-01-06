@@ -1,50 +1,10 @@
-[package]
-name = "minitrace"
-version = "0.2.0"
-authors = ["The TiKV Project Authors"]
-description = "A high-performance timeline tracing library for Rust"
-license = "Apache-2.0"
-edition = "2018"
-homepage = "https://github.com/tikv/minitrace-rust"
-repository = "https://github.com/tikv/minitrace-rust"
-documentation = "https://docs.rs/minitrace"
-readme = "README.md"
-keywords = ["tracing", "span", "datadog", "jaeger", "opentracing"]
-
-[dependencies]
-minstant = "0.1"
-minitrace-macro = { path = "crates/minitrace-macro" }
-crossbeam = "0.8"
-pin-project = "1.0"
-smallvec = "1.7"
-
-[dev-dependencies]
-criterion = "0.3"
-minitrace-jaeger = { path = "crates/minitrace-jaeger" }
-minitrace-datadog = { path = "crates/minitrace-datadog" }
-tokio = { version = "1.15", features = ["full"] }
-rustracing = "0.5"
-opentelemetry = { version = "0.16", default-features = false, features = ["trace"] }
-opentelemetry-jaeger = "0.15"
-tracing-opentelemetry = "0.15"
-tracing = "0.1"
-tracing-core = "0.1"
-tracing-subscriber = "0.2"
-rand = "0.8"
-futures = "0.3"
-async-trait = "0.1.52"
-petgraph = "0.6"
-
-[[bench]]
-name = "trace"
-harness = false
-
-[[bench]]
-name = "compare"
-harness = false
-
 [workspace]
-members = [ "crates/*" ]
+members = [
+    "minitrace",
+    "minitrace-macro",
+    "minitrace-jaeger",
+    "minitrace-datadog",
+]
 
 [profile.bench]
 opt-level = 3
