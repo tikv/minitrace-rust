@@ -23,7 +23,7 @@ let (root, collector) = Span::root("root");
 }
 
 drop(root);
-let records: Vec<SpanRecord> = collector.colelct();
+let records: Vec<SpanRecord> = collector.collect();
 ```
 
 ## Examples

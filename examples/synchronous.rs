@@ -36,6 +36,16 @@ fn main() {
     minitrace_jaeger::report("127.0.0.1:6831".parse().unwrap(), &bytes).ok();
 
     // Report to Datadog
-    let bytes = minitrace_datadog::encode("synchronous", rand::random(), 0, 0, &spans).unwrap();
+    let bytes = minitrace_datadog::encode(
+        "synchronous",
+        "web",
+        "/health",
+        0,
+        rand::random(),
+        0,
+        0,
+        &spans,
+    )
+    .unwrap();
     minitrace_datadog::report_blocking("127.0.0.1:8126".parse().unwrap(), bytes).ok();
 }
