@@ -2,9 +2,9 @@
 name = "minitrace"
 version = "0.2.0"
 authors = ["The TiKV Project Authors"]
-description = "A high-performance timeline tracing library for Rust"
 license = "Apache-2.0"
 edition = "2018"
+description = "A high-performance timeline tracing library for Rust"
 homepage = "https://github.com/tikv/minitrace-rust"
 repository = "https://github.com/tikv/minitrace-rust"
 documentation = "https://docs.rs/minitrace"

@@ -54,3 +54,13 @@ Open http://localhost:16686 to see the results.
 ### Asynchronous
 
 ![Jaeger Asynchronous](img/jaeger-asynchronous.png)
+
+### Benchmark
+
+Benchmark platform is `Intel(R) Xeon(R) CPU E5-2630 v4 @ 2.20GHz` on CentOS 7.
+
+```sh
+> cargo criterion
+```
+
+![Benchmark](img/benchmark.jpeg)
