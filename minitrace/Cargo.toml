@@ -16,7 +16,7 @@ minstant = "0.1"
 minitrace-macro = { path = "../minitrace-macro" }
 crossbeam = "0.8"
 pin-project = "1.0"
-smallvec = "1.7"
+smallvec = "1"
 
 [dev-dependencies]
 criterion = "0.3"

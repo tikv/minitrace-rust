@@ -4,7 +4,6 @@ use minitrace::local::LocalCollector;
 use minitrace::prelude::*;
 use std::sync::Arc;
 
-#[test]
 fn four_spans() {
     {
         // wide
