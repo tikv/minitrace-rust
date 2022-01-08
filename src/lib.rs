@@ -237,7 +237,7 @@ mod test_readme {
     macro_rules! external_doc_test {
         ($x:expr) => {
             #[doc = $x]
-            mod readme {}
+            extern {}
         };
     }
 
