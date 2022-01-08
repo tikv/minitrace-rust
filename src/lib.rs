@@ -231,3 +231,15 @@ pub mod prelude {
     pub use crate::span::Span;
     pub use minitrace_macro::trace;
 }
+
+#[cfg(doctest)]
+mod test_readme {
+    macro_rules! external_doc_test {
+        ($x:expr) => {
+            #[doc = $x]
+            mod readme {}
+        };
+    }
+
+    external_doc_test!(include_str!("../README.md"));
+}
