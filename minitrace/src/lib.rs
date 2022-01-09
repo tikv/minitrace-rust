@@ -226,7 +226,7 @@ pub mod span;
 
 pub mod prelude {
     pub use crate::collector::{CollectArgs, Collector, SpanRecord};
-    pub use crate::future::FutureExt;
+    pub use crate::future::FutureExt as _;
     pub use crate::local::LocalSpan;
     pub use crate::span::Span;
     pub use minitrace_macro::trace;
