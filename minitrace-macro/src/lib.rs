@@ -114,7 +114,7 @@ fn gen_block(block: &Block, async_context: bool, args: Args) -> proc_macro2::Tok
     if async_context {
         if args.enter_on_poll {
             quote_spanned!(block.span()=>
-                minitrace::prelude::FutureExt::enter_on_poll(
+                minitrace::future::FutureExt::enter_on_poll(
                     async move { #block },
                     #event
                 )
@@ -122,7 +122,7 @@ fn gen_block(block: &Block, async_context: bool, args: Args) -> proc_macro2::Tok
             )
         } else {
             quote_spanned!(block.span()=>
-                minitrace::prelude::FutureExt::in_span(
+                minitrace::future::FutureExt::in_span(
                     async move { #block },
                     minitrace::prelude::Span::enter_with_local_parent( #event )
                 )
