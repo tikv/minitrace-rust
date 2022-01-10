@@ -381,7 +381,7 @@ root
 }
 
 fn assert_graph(spans: Vec<SpanRecord>, expected_graph: &str) {
-    let result = build_span_graph(spans.clone()).trim().to_string();
+    let result = build_span_graph(spans).trim().to_string();
     let expected_graph = expected_graph.trim();
 
     if result != expected_graph {
