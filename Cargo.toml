@@ -14,7 +14,7 @@ pin-project = "1.0"
 smallvec = "1.7"
 
 [dev-dependencies]
-criterion = "0.3"
+criterion = { version =  "0.3", features = ["html_reports"] }
 minitrace-jaeger = { path = "crates/minitrace-jaeger" }
 minitrace-datadog = { path = "crates/minitrace-datadog" }
 tokio = { version = "1.15", features = ["full"] }
