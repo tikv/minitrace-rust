@@ -54,7 +54,7 @@ fn bench_trace_wide(c: &mut Criterion) {
         });
         group.bench_function(format!("without-collect-{}", len), |b| {
             b.iter(|| {
-                let (root_span, collector) = Span::root("root");
+                let (root_span, _) = Span::root("root");
                 let _sg = root_span.set_local_parent();
                 dummy_iter(*len - 1);
             })
@@ -97,7 +97,7 @@ fn bench_trace_deep(c: &mut Criterion) {
         });
         group.bench_function(format!("without-collect-{}", len), |b| {
             b.iter(|| {
-                let (root_span, collector) = Span::root("root");
+                let (root_span, _) = Span::root("root");
                 let _sg = root_span.set_local_parent();
                 dummy_rec(*len - 1);
             })
