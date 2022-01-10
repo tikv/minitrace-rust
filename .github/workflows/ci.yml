@@ -33,7 +33,9 @@ jobs:
     - name: Build
       run: cargo build --workspace --all-targets
     - name: Run tests
-      run: cargo test --workspace --all-targets -- --nocapture
+      run: |
+        cargo test --workspace --all-targets -- --nocapture
+        cargo test --doc
     - name: Run benches
       run: cargo bench --workspace --all-targets
     - name: Run examples
