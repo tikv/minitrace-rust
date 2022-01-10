@@ -21,7 +21,7 @@ fn dummy_rec(i: usize) {
     }
 }
 
-fn trace_wide_raw_bench(c: &mut Criterion) {
+fn bench_trace_wide_raw(c: &mut Criterion) {
     let mut group = c.benchmark_group("trace_wide_raw");
 
     for len in &[1, 10, 100, 1000, 10000] {
@@ -37,11 +37,11 @@ fn trace_wide_raw_bench(c: &mut Criterion) {
     group.finish();
 }
 
-fn trace_wide_bench(c: &mut Criterion) {
+fn bench_trace_wide(c: &mut Criterion) {
     let mut group = c.benchmark_group("trace_wide");
 
     for len in &[1, 10, 100, 1000, 10000] {
-        group.bench_function(len.to_string(), |b| {
+        group.bench_function(format!("with-collect-{}", len), |b| {
             b.iter(|| {
                 {
                     let (root_span, collector) = Span::root("root");
@@ -52,12 +52,19 @@ fn trace_wide_bench(c: &mut Criterion) {
                 .collect()
             })
         });
+        group.bench_function(format!("without-collect-{}", len), |b| {
+            b.iter(|| {
+                let (root_span, collector) = Span::root("root");
+                let _sg = root_span.set_local_parent();
+                dummy_iter(*len - 1);
+            })
+        });
     }
 
     group.finish();
 }
 
-fn trace_deep_raw_bench(c: &mut Criterion) {
+fn bench_trace_deep_raw(c: &mut Criterion) {
     let mut group = c.benchmark_group("trace_deep_raw");
 
     for len in &[1, 10, 100, 1000] {
@@ -73,11 +80,11 @@ fn trace_deep_raw_bench(c: &mut Criterion) {
     group.finish();
 }
 
-fn trace_deep_bench(c: &mut Criterion) {
+fn bench_trace_deep(c: &mut Criterion) {
     let mut group = c.benchmark_group("trace_deep");
 
     for len in &[1, 10, 100, 1000] {
-        group.bench_function(len.to_string(), |b| {
+        group.bench_function(format!("with-collect-{}", len), |b| {
             b.iter(|| {
                 {
                     let (root_span, collector) = Span::root("root");
@@ -88,12 +95,19 @@ fn trace_deep_bench(c: &mut Criterion) {
                 .collect()
             })
         });
+        group.bench_function(format!("without-collect-{}", len), |b| {
+            b.iter(|| {
+                let (root_span, collector) = Span::root("root");
+                let _sg = root_span.set_local_parent();
+                dummy_rec(*len - 1);
+            })
+        });
     }
 
     group.finish();
 }
 
-fn trace_future_bench(c: &mut Criterion) {
+fn bench_trace_future(c: &mut Criterion) {
     async fn f(i: u32) {
         for _ in 0..i - 1 {
             async {}.enter_on_poll(black_box("")).await
@@ -120,10 +134,10 @@ fn trace_future_bench(c: &mut Criterion) {
 
 criterion_group!(
     benches,
-    trace_wide_raw_bench,
-    trace_wide_bench,
-    trace_deep_raw_bench,
-    trace_deep_bench,
-    trace_future_bench
+    bench_trace_wide_raw,
+    bench_trace_wide,
+    bench_trace_deep_raw,
+    bench_trace_deep,
+    bench_trace_future
 );
 criterion_main!(benches);
