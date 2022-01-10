@@ -4,7 +4,6 @@ use minitrace::local::LocalCollector;
 use minitrace::prelude::*;
 use std::sync::Arc;
 
-#[test]
 fn four_spans() {
     {
         // wide
@@ -359,8 +358,30 @@ root
     assert_graph(spans, expected_graph);
 }
 
+#[test]
+fn early_local_collect() {
+    let local_collector = LocalCollector::start();
+    let _g1 = LocalSpan::enter_with_local_parent("span1");
+    let _g2 = LocalSpan::enter_with_local_parent("span2");
+    drop(_g2);
+    let local_spans = local_collector.collect();
+
+    let (root, collector) = Span::root("root");
+    root.push_child_spans(Arc::new(local_spans));
+    drop(root);
+
+    let spans = collector.collect_with_args(CollectArgs::default().sync(true));
+
+    let expected_graph = r#"
+root
+    span1
+        span2
+"#;
+    assert_graph(spans, expected_graph);
+}
+
 fn assert_graph(spans: Vec<SpanRecord>, expected_graph: &str) {
-    let result = build_span_graph(spans).trim().to_string();
+    let result = build_span_graph(spans.clone()).trim().to_string();
     let expected_graph = expected_graph.trim();
 
     if result != expected_graph {
@@ -368,6 +389,10 @@ fn assert_graph(spans: Vec<SpanRecord>, expected_graph: &str) {
             "assertion failed: `(result == expected)`\nresult:\n{}\nexpected:\n{}",
             result, expected_graph
         );
+    }
+
+    if minstant::is_tsc_available() {
+        assert_eq!(spans.iter().filter(|span| span.duration_ns == 0).count(), 0);
     }
 }
 

@@ -2,7 +2,7 @@
 
 use std::marker::PhantomData;
 
-use minstant::Cycle;
+use minstant::Instant;
 
 use crate::local::local_parent_guard::LocalParentSpan;
 use crate::local::local_span_line::LOCAL_SPAN_STACK;
@@ -27,7 +27,7 @@ pub struct LocalCollector {
 #[derive(Debug)]
 pub struct LocalSpans {
     pub(crate) spans: Vec<RawSpan>,
-    pub(crate) end_time: Cycle,
+    pub(crate) end_time: Instant,
 }
 
 impl LocalCollector {
@@ -60,7 +60,7 @@ impl LocalCollector {
             LocalSpans {
                 // This will panic if `LocalCollector` is started by `start_with_parent_span`
                 spans: s.unregister_and_collect(&self).unwrap(),
-                end_time: Cycle::now(),
+                end_time: Instant::now(),
             }
         })
     }

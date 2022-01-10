@@ -3,7 +3,7 @@
 use std::cell::RefCell;
 use std::sync::Arc;
 
-use minstant::Cycle;
+use minstant::Instant;
 
 use crate::collector::acquirer::{Acquirer, SpanCollection};
 use crate::local::local_collector::LocalCollector;
@@ -59,8 +59,6 @@ impl LocalSpanStack {
 
     #[inline]
     pub fn exit_span(&mut self, local_span_handle: LocalSpanHandle) {
-        debug_assert!(self.current_span_line().is_some());
-
         if let Some(span_line) = self.current_span_line() {
             debug_assert_eq!(
                 span_line.local_collector_epoch,
@@ -112,7 +110,7 @@ impl LocalSpanStack {
             if let Some(parent_span) = span_line.parent_span.take() {
                 let local_spans = Arc::new(LocalSpans {
                     spans: raw_spans,
-                    end_time: Cycle::now(),
+                    end_time: Instant::now(),
                 });
                 for acq in parent_span.acquirers {
                     acq.submit(SpanCollection::LocalSpans {

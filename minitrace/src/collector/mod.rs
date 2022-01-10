@@ -25,9 +25,9 @@ pub struct SpanRecord {
 
 impl SpanRecord {
     #[inline]
-    pub(crate) fn from_raw_span(raw_span: RawSpan, anchor: Anchor) -> SpanRecord {
-        let begin_unix_time_ns = raw_span.begin_cycle.into_unix_time_ns(anchor);
-        let end_unix_time_ns = raw_span.end_cycle.into_unix_time_ns(anchor);
+    pub(crate) fn from_raw_span(raw_span: RawSpan, anchor: &Anchor) -> SpanRecord {
+        let begin_unix_time_ns = raw_span.begin_instant.as_unix_nanos(anchor);
+        let end_unix_time_ns = raw_span.end_instant.as_unix_nanos(anchor);
         SpanRecord {
             id: raw_span.id.0,
             parent_id: raw_span.parent_id.0,
@@ -81,20 +81,20 @@ impl Collector {
                 SpanCollection::Span(s) if s.parent_id.0 == 0 => Some(s),
                 _ => None,
             }) {
-                let root_span = SpanRecord::from_raw_span(root_span.clone(), anchor);
+                let root_span = SpanRecord::from_raw_span(root_span.clone(), &anchor);
                 if root_span.duration_ns < duration.as_nanos() as _ {
                     return vec![root_span];
                 }
             }
         }
 
-        Self::amend(span_collections, anchor)
+        Self::amend(span_collections, &anchor)
     }
 }
 
 impl Collector {
     #[inline]
-    fn amend(span_collections: Vec<SpanCollection>, anchor: Anchor) -> Vec<SpanRecord> {
+    fn amend(span_collections: Vec<SpanCollection>, anchor: &Anchor) -> Vec<SpanRecord> {
         let capacity = span_collections
             .iter()
             .map(|sc| match sc {
@@ -115,11 +115,11 @@ impl Collector {
                     parent_id_of_root: span_id,
                 } => {
                     for span in &raw_spans.spans {
-                        let begin_unix_time_ns = span.begin_cycle.into_unix_time_ns(anchor);
-                        let end_unix_time_ns = if span.end_cycle.is_zero() {
-                            raw_spans.end_time.into_unix_time_ns(anchor)
+                        let begin_unix_time_ns = span.begin_instant.as_unix_nanos(anchor);
+                        let end_unix_time_ns = if span.end_instant == span.begin_instant {
+                            raw_spans.end_time.as_unix_nanos(anchor)
                         } else {
-                            span.end_cycle.into_unix_time_ns(anchor)
+                            span.end_instant.as_unix_nanos(anchor)
                         };
                         let parent_id = if span.parent_id.0 == 0 {
                             span_id.0

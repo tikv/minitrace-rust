@@ -3,7 +3,7 @@
 use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
 
-use minstant::Cycle;
+use minstant::Instant;
 use smallvec::SmallVec;
 
 use crate::collector::acquirer::{Acquirer, SpanCollection};
@@ -34,13 +34,13 @@ impl Span {
         event: &'static str,
     ) -> Self {
         let span_id = DefaultIdGenerator::next_id();
-        let now = Cycle::now();
+        let begin_instant = Instant::now();
 
         let mut to_report = SmallVec::new();
         for (parent_span_id, acq) in acquirers {
             if !acq.is_shutdown() {
                 to_report.push((
-                    RawSpan::begin_with(span_id, parent_span_id, now, event),
+                    RawSpan::begin_with(span_id, parent_span_id, begin_instant, event),
                     acq.clone(),
                 ))
             }
@@ -154,9 +154,9 @@ impl Span {
 
 impl Drop for SpanInner {
     fn drop(&mut self) {
-        let now = Cycle::now();
+        let end_instant = Instant::now();
         for (mut span, collector) in self.to_report.drain(..) {
-            span.end_with(now);
+            span.end_with(end_instant);
             collector.submit(SpanCollection::Span(span))
         }
     }
