@@ -390,8 +390,6 @@ fn assert_graph(spans: Vec<SpanRecord>, expected_graph: &str) {
             result, expected_graph
         );
     }
-
-    assert_eq!(spans.iter().filter(|span| span.duration_ns == 0).count(), 0);
 }
 
 fn build_span_graph(mut spans: Vec<SpanRecord>) -> String {
