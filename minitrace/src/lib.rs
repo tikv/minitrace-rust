@@ -193,7 +193,7 @@
 //!   let collector = LocalCollector::start();
 //!   let _span1 = LocalSpan::enter_with_local_parent("a child span");
 //!   drop(_span1);
-//!   let local_spans = Arc::new(collector.collect());
+//!   let local_spans = collector.collect();
 //!
 //!   // Link the local spans to a parent
 //!   let (root, collector) = Span::root("root");

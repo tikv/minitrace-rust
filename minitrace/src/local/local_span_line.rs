@@ -6,9 +6,9 @@ use std::sync::Arc;
 use minstant::Instant;
 
 use crate::collector::acquirer::{Acquirer, SpanCollection};
+use crate::collector::RawSpans;
 use crate::local::local_collector::LocalCollector;
 use crate::local::local_parent_guard::LocalParentSpan;
-use crate::local::raw_span::RawSpan;
 use crate::local::span_id::SpanId;
 use crate::local::span_queue::{SpanHandle, SpanQueue};
 use crate::local::LocalSpans;
@@ -82,7 +82,7 @@ impl LocalSpanStack {
         self.next_local_collector_epoch = self.next_local_collector_epoch.wrapping_add(1);
 
         let span_line = SpanLine {
-            span_queue: SpanQueue::with_capacity(0),
+            span_queue: SpanQueue::new(),
             local_collector_epoch: epoch,
             parent_span,
         };
@@ -93,10 +93,7 @@ impl LocalSpanStack {
     }
 
     // Raw spans will be sent to acquirers directly and return None if parent span exists.
-    pub fn unregister_and_collect(
-        &mut self,
-        local_collector: &LocalCollector,
-    ) -> Option<Vec<RawSpan>> {
+    pub fn unregister_and_collect(&mut self, local_collector: &LocalCollector) -> Option<RawSpans> {
         debug_assert_eq!(
             self.current_span_line()
                 .map(|span_line| span_line.local_collector_epoch),
@@ -108,15 +105,24 @@ impl LocalSpanStack {
             let raw_spans = span_line.span_queue.take_queue();
 
             if let Some(parent_span) = span_line.parent_span.take() {
-                let local_spans = Arc::new(LocalSpans {
+                let local_spans = LocalSpans {
                     spans: raw_spans,
                     end_time: Instant::now(),
-                });
-                for acq in parent_span.acquirers {
-                    acq.submit(SpanCollection::LocalSpans {
-                        local_spans: local_spans.clone(),
+                };
+                if parent_span.acquirers.len() == 1 {
+                    // fast path for single acquirer
+                    parent_span.acquirers[0].submit(SpanCollection::LocalSpans {
+                        local_spans,
                         parent_id_of_root: parent_span.span_id,
-                    })
+                    });
+                } else {
+                    let local_spans = Arc::new(local_spans);
+                    for acq in parent_span.acquirers {
+                        acq.submit(SpanCollection::SharedLocalSpans {
+                            local_spans: local_spans.clone(),
+                            parent_id_of_root: parent_span.span_id,
+                        });
+                    }
                 }
                 None
             } else {

@@ -3,6 +3,8 @@
 pub(crate) mod acquirer;
 
 use crossbeam::channel::Receiver;
+use lockfree_object_pool::{LinearObjectPool, LinearReusable};
+use once_cell::sync::Lazy;
 
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
@@ -12,6 +14,13 @@ use minstant::Anchor;
 
 use crate::collector::acquirer::SpanCollection;
 use crate::local::raw_span::RawSpan;
+use crate::local::span_id::SpanId;
+use crate::local::LocalSpans;
+
+pub(crate) static RAW_SPAN_VEC_POOL: Lazy<LinearObjectPool<Vec<RawSpan>>> =
+    Lazy::new(|| LinearObjectPool::new(Vec::new, Vec::clear));
+
+pub(crate) type RawSpans = LinearReusable<'static, Vec<RawSpan>>;
 
 #[derive(Clone, Debug, Default)]
 pub struct SpanRecord {
@@ -67,6 +76,7 @@ impl Collector {
             duration_threshold,
         }: CollectArgs,
     ) -> Vec<SpanRecord> {
+        // TODO: avoid allocation
         let span_collections: Vec<_> = if sync {
             self.receiver.iter().collect()
         } else {
@@ -102,6 +112,10 @@ impl Collector {
                     local_spans: raw_spans,
                     ..
                 } => raw_spans.spans.len(),
+                SpanCollection::SharedLocalSpans {
+                    local_spans: raw_spans,
+                    ..
+                } => raw_spans.spans.len(),
                 SpanCollection::Span(_) => 1,
             })
             .sum();
@@ -111,36 +125,51 @@ impl Collector {
         for span_collection in span_collections {
             match span_collection {
                 SpanCollection::LocalSpans {
-                    local_spans: raw_spans,
-                    parent_id_of_root: span_id,
+                    local_spans,
+                    parent_id_of_root,
                 } => {
-                    for span in &raw_spans.spans {
-                        let begin_unix_time_ns = span.begin_instant.as_unix_nanos(anchor);
-                        let end_unix_time_ns = if span.end_instant == span.begin_instant {
-                            raw_spans.end_time.as_unix_nanos(anchor)
-                        } else {
-                            span.end_instant.as_unix_nanos(anchor)
-                        };
-                        let parent_id = if span.parent_id.0 == 0 {
-                            span_id.0
-                        } else {
-                            span.parent_id.0
-                        };
-                        spans.push(SpanRecord {
-                            id: span.id.0,
-                            parent_id,
-                            begin_unix_time_ns,
-                            duration_ns: end_unix_time_ns - begin_unix_time_ns,
-                            event: span.event,
-                            properties: span.properties.clone(),
-                        });
-                    }
+                    Self::amend_local_span(&local_spans, parent_id_of_root, &mut spans, anchor);
+                }
+                SpanCollection::SharedLocalSpans {
+                    local_spans,
+                    parent_id_of_root,
+                } => {
+                    Self::amend_local_span(&*local_spans, parent_id_of_root, &mut spans, anchor);
                 }
                 SpanCollection::Span(span) => spans.push(SpanRecord::from_raw_span(span, anchor)),
             }
         }
 
         spans
+    }
+
+    fn amend_local_span(
+        local_spans: &LocalSpans,
+        parent_id_of_root: SpanId,
+        spans: &mut Vec<SpanRecord>,
+        anchor: &Anchor,
+    ) {
+        for span in local_spans.spans.iter() {
+            let begin_unix_time_ns = span.begin_instant.as_unix_nanos(anchor);
+            let end_unix_time_ns = if span.end_instant == span.begin_instant {
+                local_spans.end_time.as_unix_nanos(anchor)
+            } else {
+                span.end_instant.as_unix_nanos(anchor)
+            };
+            let parent_id = if span.parent_id.0 == 0 {
+                parent_id_of_root.0
+            } else {
+                span.parent_id.0
+            };
+            spans.push(SpanRecord {
+                id: span.id.0,
+                parent_id,
+                begin_unix_time_ns,
+                duration_ns: end_unix_time_ns - begin_unix_time_ns,
+                event: span.event,
+                properties: span.properties.clone(),
+            });
+        }
     }
 }
 

@@ -4,9 +4,9 @@ use std::marker::PhantomData;
 
 use minstant::Instant;
 
+use crate::collector::{RawSpans, RAW_SPAN_VEC_POOL};
 use crate::local::local_parent_guard::LocalParentSpan;
 use crate::local::local_span_line::LOCAL_SPAN_STACK;
-use crate::local::raw_span::RawSpan;
 
 #[must_use]
 #[derive(Debug, Ord, PartialOrd, Eq, PartialEq)]
@@ -24,9 +24,8 @@ pub struct LocalCollector {
     _p: PhantomData<*const ()>,
 }
 
-#[derive(Debug)]
 pub struct LocalSpans {
-    pub(crate) spans: Vec<RawSpan>,
+    pub(crate) spans: RawSpans,
     pub(crate) end_time: Instant,
 }
 
@@ -74,6 +73,17 @@ impl Drop for LocalCollector {
                 let s = &mut *span_line.borrow_mut();
                 s.unregister_and_collect(self);
             })
+        }
+    }
+}
+
+impl Clone for LocalSpans {
+    fn clone(&self) -> Self {
+        let mut spans = RAW_SPAN_VEC_POOL.pull();
+        spans.extend_from_slice(&self.spans);
+        LocalSpans {
+            spans,
+            end_time: self.end_time,
         }
     }
 }

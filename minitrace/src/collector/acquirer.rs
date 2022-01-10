@@ -9,9 +9,12 @@ use crate::local::local_collector::LocalSpans;
 use crate::local::raw_span::RawSpan;
 use crate::local::span_id::SpanId;
 
-#[derive(Clone, Debug)]
 pub(crate) enum SpanCollection {
     LocalSpans {
+        local_spans: LocalSpans,
+        parent_id_of_root: SpanId,
+    },
+    SharedLocalSpans {
         local_spans: Arc<LocalSpans>,
         parent_id_of_root: SpanId,
     },

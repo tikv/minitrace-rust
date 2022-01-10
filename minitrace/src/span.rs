@@ -140,13 +140,21 @@ impl Span {
     }
 
     #[inline]
-    pub fn push_child_spans(&self, local_spans: Arc<LocalSpans>) {
+    pub fn push_child_spans(&self, local_spans: LocalSpans) {
         if let Some(inner) = &self.inner {
-            for (_, acq) in &inner.to_report {
-                acq.submit(SpanCollection::LocalSpans {
-                    local_spans: local_spans.clone(),
+            if inner.to_report.len() == 1 {
+                inner.to_report[0].1.submit(SpanCollection::LocalSpans {
+                    local_spans,
                     parent_id_of_root: inner.span_id,
-                })
+                });
+            } else {
+                let local_spans = Arc::new(local_spans);
+                for (_, acq) in &inner.to_report {
+                    acq.submit(SpanCollection::SharedLocalSpans {
+                        local_spans: local_spans.clone(),
+                        parent_id_of_root: inner.span_id,
+                    })
+                }
             }
         }
     }
@@ -155,9 +163,9 @@ impl Span {
 impl Drop for SpanInner {
     fn drop(&mut self) {
         let end_instant = Instant::now();
-        for (mut span, collector) in self.to_report.drain(..) {
+        for (mut span, acq) in self.to_report.drain(..) {
             span.end_with(end_instant);
-            collector.submit(SpanCollection::Span(span))
+            acq.submit(SpanCollection::Span(span))
         }
     }
 }

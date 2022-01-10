@@ -2,7 +2,6 @@
 
 use minitrace::local::LocalCollector;
 use minitrace::prelude::*;
-use std::sync::Arc;
 
 fn four_spans() {
     {
@@ -62,7 +61,7 @@ fn single_thread_multiple_spans() {
 
             four_spans();
 
-            let local_spans = Arc::new(local_collector.collect());
+            let local_spans = local_collector.collect();
 
             root_span1.push_child_spans(local_spans.clone());
             root_span2.push_child_spans(local_spans.clone());
@@ -170,14 +169,14 @@ fn multiple_threads_multiple_spans() {
 
                     four_spans();
 
-                    let local_spans = Arc::new(local_collector.collect());
+                    let local_spans = local_collector.collect();
                     merged.push_child_spans(local_spans);
                 });
             }
 
             four_spans();
 
-            let local_spans = Arc::new(local_collector.collect());
+            let local_spans = local_collector.collect();
             root_span1.push_child_spans(local_spans.clone());
             root_span2.push_child_spans(local_spans);
             (collector1, collector2)
@@ -257,7 +256,7 @@ fn multiple_spans_without_local_spans() {
 
             let local_collector = LocalCollector::start();
 
-            let local_spans = Arc::new(local_collector.collect());
+            let local_spans = local_collector.collect();
             root_span1.push_child_spans(local_spans.clone());
             root_span2.push_child_spans(local_spans.clone());
             root_span3.push_child_spans(local_spans);
@@ -367,7 +366,7 @@ fn early_local_collect() {
     let local_spans = local_collector.collect();
 
     let (root, collector) = Span::root("root");
-    root.push_child_spans(Arc::new(local_spans));
+    root.push_child_spans(local_spans);
     drop(root);
 
     let spans = collector.collect_with_args(CollectArgs::default().sync(true));
