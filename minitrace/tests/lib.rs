@@ -381,7 +381,7 @@ root
 }
 
 fn assert_graph(spans: Vec<SpanRecord>, expected_graph: &str) {
-    let result = build_span_graph(spans).trim().to_string();
+    let result = build_span_graph(spans.clone()).trim().to_string();
     let expected_graph = expected_graph.trim();
 
     if result != expected_graph {
@@ -389,6 +389,10 @@ fn assert_graph(spans: Vec<SpanRecord>, expected_graph: &str) {
             "assertion failed: `(result == expected)`\nresult:\n{}\nexpected:\n{}",
             result, expected_graph
         );
+    }
+
+    if minstant::is_tsc_available() {
+        assert_eq!(spans.iter().filter(|span| span.duration_ns == 0).count(), 0);
     }
 }
 
