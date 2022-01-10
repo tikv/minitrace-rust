@@ -59,8 +59,6 @@ impl LocalSpanStack {
 
     #[inline]
     pub fn exit_span(&mut self, local_span_handle: LocalSpanHandle) {
-        debug_assert!(self.current_span_line().is_some());
-
         if let Some(span_line) = self.current_span_line() {
             debug_assert_eq!(
                 span_line.local_collector_epoch,
