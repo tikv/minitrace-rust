@@ -29,7 +29,7 @@ jobs:
     - name: Check format
       run: cargo fmt --all -- --check
     - name: Lints
-      run: cargo clippy --all-targets --all-features -- --deny warnings
+      run: cargo clippy --all-targets --all-features
     - name: Build
       run: cargo build --workspace --all-targets
     - name: Run tests
