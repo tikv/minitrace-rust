@@ -21,16 +21,7 @@ impl<T> Pool<T> {
     }
 
     #[inline]
-    pub fn len(&self) -> usize {
-        self.objects.lock().len()
-    }
-
-    #[inline]
-    pub fn is_empty(&self) -> bool {
-        self.objects.lock().is_empty()
-    }
-
-    #[inline]
+    #[allow(dead_code)]
     pub fn pull(&self) -> Reusable<T> {
         self.objects
             .lock()
@@ -105,6 +96,7 @@ impl<'a, T> Reusable<'a, T> {
     }
 
     #[inline]
+    #[allow(dead_code)]
     pub fn into_inner(mut self) -> (&'a Pool<T>, T) {
         let ret = unsafe { (self.pool, self.take()) };
         forget(self);

@@ -4,7 +4,7 @@ use std::marker::PhantomData;
 
 use minstant::Instant;
 
-use crate::collector::{alloc_raw_spans, RawSpans};
+use crate::collector::RawSpans;
 use crate::local::local_parent_guard::LocalParentSpan;
 use crate::local::local_span_line::LOCAL_SPAN_STACK;
 
@@ -73,18 +73,6 @@ impl Drop for LocalCollector {
                 let s = &mut *span_line.borrow_mut();
                 s.unregister_and_collect(self);
             })
-        }
-    }
-}
-
-impl Clone for LocalSpans {
-    fn clone(&self) -> Self {
-        let mut spans = alloc_raw_spans();
-        spans.clear();
-        spans.extend_from_slice(&self.spans);
-        LocalSpans {
-            spans,
-            end_time: self.end_time,
         }
     }
 }

@@ -140,21 +140,13 @@ impl Span {
     }
 
     #[inline]
-    pub fn push_child_spans(&self, local_spans: LocalSpans) {
+    pub fn push_child_spans(&self, local_spans: Arc<LocalSpans>) {
         if let Some(inner) = &self.inner {
-            if inner.to_report.len() == 1 {
-                inner.to_report[0].1.submit(SpanCollection::LocalSpans {
-                    local_spans,
+            for (_, acq) in &inner.to_report {
+                acq.submit(SpanCollection::SharedLocalSpans {
+                    local_spans: local_spans.clone(),
                     parent_id_of_root: inner.span_id,
-                });
-            } else {
-                let local_spans = Arc::new(local_spans);
-                for (_, acq) in &inner.to_report {
-                    acq.submit(SpanCollection::SharedLocalSpans {
-                        local_spans: local_spans.clone(),
-                        parent_id_of_root: inner.span_id,
-                    })
-                }
+                })
             }
         }
     }

@@ -197,7 +197,7 @@
 //!
 //!   // Link the local spans to a parent
 //!   let (root, collector) = Span::root("root");
-//!   root.push_child_spans(local_spans);
+//!   root.push_child_spans(Arc::new(local_spans));
 //!   drop(root);
 //!
 //!   let records: Vec<SpanRecord> = collector.collect();

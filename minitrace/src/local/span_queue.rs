@@ -17,8 +17,7 @@ pub(crate) struct SpanHandle {
 
 impl SpanQueue {
     pub fn new() -> Self {
-        let mut span_queue = alloc_raw_spans();
-        span_queue.clear();
+        let span_queue = alloc_raw_spans();
         Self {
             span_queue,
             next_parent_id: None,
