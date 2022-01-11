@@ -1,11 +1,13 @@
 // Copyright 2021 TiKV Project Authors. Licensed under Apache-2.0.
 
 pub(crate) mod acquirer;
+pub(crate) mod object_pool;
 
 use crossbeam::channel::Receiver;
-use object_pool::{Pool, Reusable};
+use object_pool::{Pool, Puller, Reusable};
 use once_cell::sync::Lazy;
 
+use std::cell::UnsafeCell;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
@@ -17,10 +19,17 @@ use crate::local::raw_span::RawSpan;
 use crate::local::span_id::SpanId;
 use crate::local::LocalSpans;
 
-pub(crate) static RAW_SPAN_VEC_POOL: Lazy<Pool<Vec<RawSpan>>> =
-    Lazy::new(|| Pool::new(100, Vec::new));
+static RAW_SPANS_POOL: Lazy<Pool<Vec<RawSpan>>> = Lazy::new(|| Pool::new(Vec::new, Vec::clear));
+
+thread_local! {
+    static RAW_SPANS_PULLER: UnsafeCell<Puller<'static, Vec<RawSpan>>> = UnsafeCell::new(RAW_SPANS_POOL.puller(128));
+}
 
 pub(crate) type RawSpans = Reusable<'static, Vec<RawSpan>>;
+
+pub(crate) fn alloc_raw_spans() -> RawSpans {
+    unsafe { RAW_SPANS_PULLER.with(|puller| (*puller.get()).pull()) }
+}
 
 #[derive(Clone, Debug, Default)]
 pub struct SpanRecord {

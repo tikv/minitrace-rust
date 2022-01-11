@@ -4,7 +4,7 @@ use std::marker::PhantomData;
 
 use minstant::Instant;
 
-use crate::collector::{RawSpans, RAW_SPAN_VEC_POOL};
+use crate::collector::{alloc_raw_spans, RawSpans};
 use crate::local::local_parent_guard::LocalParentSpan;
 use crate::local::local_span_line::LOCAL_SPAN_STACK;
 
@@ -79,7 +79,7 @@ impl Drop for LocalCollector {
 
 impl Clone for LocalSpans {
     fn clone(&self) -> Self {
-        let mut spans = RAW_SPAN_VEC_POOL.pull(Vec::new);
+        let mut spans = alloc_raw_spans();
         spans.clear();
         spans.extend_from_slice(&self.spans);
         LocalSpans {

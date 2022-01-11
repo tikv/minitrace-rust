@@ -2,7 +2,7 @@
 
 use minstant::Instant;
 
-use crate::collector::{RawSpans, RAW_SPAN_VEC_POOL};
+use crate::collector::{alloc_raw_spans, RawSpans};
 use crate::local::raw_span::RawSpan;
 use crate::local::span_id::{DefaultIdGenerator, SpanId};
 
@@ -17,7 +17,7 @@ pub(crate) struct SpanHandle {
 
 impl SpanQueue {
     pub fn new() -> Self {
-        let mut span_queue = RAW_SPAN_VEC_POOL.pull(Vec::new);
+        let mut span_queue = alloc_raw_spans();
         span_queue.clear();
         Self {
             span_queue,
