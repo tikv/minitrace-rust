@@ -3,7 +3,7 @@
 pub(crate) mod acquirer;
 
 use crossbeam::channel::Receiver;
-use lockfree_object_pool::{LinearObjectPool, LinearReusable};
+use object_pool::{Pool, Reusable};
 use once_cell::sync::Lazy;
 
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -17,10 +17,10 @@ use crate::local::raw_span::RawSpan;
 use crate::local::span_id::SpanId;
 use crate::local::LocalSpans;
 
-pub(crate) static RAW_SPAN_VEC_POOL: Lazy<LinearObjectPool<Vec<RawSpan>>> =
-    Lazy::new(|| LinearObjectPool::new(Vec::new, Vec::clear));
+pub(crate) static RAW_SPAN_VEC_POOL: Lazy<Pool<Vec<RawSpan>>> =
+    Lazy::new(|| Pool::new(100, Vec::new));
 
-pub(crate) type RawSpans = LinearReusable<'static, Vec<RawSpan>>;
+pub(crate) type RawSpans = Reusable<'static, Vec<RawSpan>>;
 
 #[derive(Clone, Debug, Default)]
 pub struct SpanRecord {

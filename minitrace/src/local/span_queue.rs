@@ -17,8 +17,10 @@ pub(crate) struct SpanHandle {
 
 impl SpanQueue {
     pub fn new() -> Self {
+        let mut span_queue = RAW_SPAN_VEC_POOL.pull(Vec::new);
+        span_queue.clear();
         Self {
-            span_queue: RAW_SPAN_VEC_POOL.pull(),
+            span_queue,
             next_parent_id: None,
         }
     }

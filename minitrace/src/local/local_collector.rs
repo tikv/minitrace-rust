@@ -79,7 +79,8 @@ impl Drop for LocalCollector {
 
 impl Clone for LocalSpans {
     fn clone(&self) -> Self {
-        let mut spans = RAW_SPAN_VEC_POOL.pull();
+        let mut spans = RAW_SPAN_VEC_POOL.pull(Vec::new);
+        spans.clear();
         spans.extend_from_slice(&self.spans);
         LocalSpans {
             spans,
