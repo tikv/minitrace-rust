@@ -26,7 +26,7 @@ let (root, collector) = Span::root("root");
 }
 
 drop(root);
-let records: Vec<SpanRecord> = collector.collect();
+let records: Vec<SpanRecord> = futures::executor::block_on(collector.collect());
 ```
 
 ## Examples

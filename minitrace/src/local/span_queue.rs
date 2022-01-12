@@ -2,9 +2,9 @@
 
 use minstant::Instant;
 
-use crate::collector::{alloc_raw_spans, RawSpans};
 use crate::local::raw_span::RawSpan;
 use crate::local::span_id::{DefaultIdGenerator, SpanId};
+use crate::util::{alloc_raw_spans, RawSpans};
 
 pub(crate) struct SpanQueue {
     span_queue: RawSpans,

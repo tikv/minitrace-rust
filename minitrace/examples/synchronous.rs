@@ -15,7 +15,7 @@ fn func2(i: u64) {
 }
 
 fn main() {
-    let spans = {
+    let collector = {
         let (span, collector) = Span::root("root");
 
         let _sg1 = span.set_local_parent();
@@ -27,8 +27,9 @@ fn main() {
         }
 
         collector
-    }
-    .collect_with_args(CollectArgs::default().sync(true));
+    };
+
+    let spans = futures::executor::block_on(collector.collect());
 
     // Report to Jaeger
     let bytes =

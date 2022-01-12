@@ -73,7 +73,7 @@ pub struct Puller<'a, T> {
 
 impl<'a, T> Puller<'a, T> {
     #[inline]
-    pub fn pull(&mut self) -> Reusable<T> {
+    pub fn pull(&mut self) -> Reusable<'a, T> {
         self.buffer.pop().unwrap_or_else(|| {
             self.pool.batch_pull(self.buffer_size, &mut self.buffer);
             self.buffer.pop().unwrap()
@@ -105,6 +105,15 @@ impl<'a, T> Reusable<'a, T> {
 
     unsafe fn take(&mut self) -> T {
         ManuallyDrop::take(&mut self.obj)
+    }
+}
+
+impl<'a, T> std::fmt::Debug for Reusable<'a, T>
+where
+    T: std::fmt::Debug,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.obj.fmt(f)
     }
 }
 

@@ -4,9 +4,7 @@ use std::marker::PhantomData;
 
 use minstant::Instant;
 
-use crate::collector::RawSpans;
-use crate::local::local_parent_guard::LocalParentSpan;
-use crate::local::local_span_line::LOCAL_SPAN_STACK;
+use crate::{collector::ParentSpans, local::local_span_line::LOCAL_SPAN_STACK, util::RawSpans};
 
 #[must_use]
 #[derive(Debug, Ord, PartialOrd, Eq, PartialEq)]
@@ -24,6 +22,7 @@ pub struct LocalCollector {
     _p: PhantomData<*const ()>,
 }
 
+#[derive(Debug)]
 pub struct LocalSpans {
     pub(crate) spans: RawSpans,
     pub(crate) end_time: Instant,
@@ -45,7 +44,7 @@ impl LocalCollector {
         })
     }
 
-    pub(crate) fn start_with_parent(parent: LocalParentSpan) -> Self {
+    pub(crate) fn start_with_parent(parent: ParentSpans) -> Self {
         LOCAL_SPAN_STACK.with(|span_line| {
             let s = &mut *span_line.borrow_mut();
             s.register_local_collector(Some(parent))

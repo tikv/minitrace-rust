@@ -15,7 +15,7 @@
 //! use minitrace::prelude::*;
 //!
 //! let (_, collector) = Span::root("root");
-//! let spans: Vec<SpanRecord> = collector.collect();
+//! let spans: Vec<SpanRecord> = futures::executor::block_on(collector.collect());
 //!
 //! let socket = SocketAddr::new("127.0.0.1".parse().unwrap(), 6831);
 //!

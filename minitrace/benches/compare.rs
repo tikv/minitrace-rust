@@ -53,7 +53,7 @@ fn minitrace_harness() {
         }
     }
 
-    {
+    let _spans = {
         let (root_span, collector) = Span::root("parent");
         let _g = root_span.set_local_parent();
 

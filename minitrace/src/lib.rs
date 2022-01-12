@@ -27,7 +27,7 @@
 //!   }
 //!
 //!   drop(root);
-//!   let records: Vec<SpanRecord> = collector.collect();
+//!   let records: Vec<SpanRecord> = futures::executor::block_on(collector.collect());
 //!   ```
 //!
 //!
@@ -41,7 +41,7 @@
 //!   let (root, collector) = Span::root("root");
 //!   drop(root);
 //!
-//!   let records: Vec<SpanRecord> = collector.collect();
+//!   let records: Vec<SpanRecord> = futures::executor::block_on(collector.collect());
 //!   ```
 //!
 //!
@@ -200,7 +200,7 @@
 //!   root.push_child_spans(Arc::new(local_spans));
 //!   drop(root);
 //!
-//!   let records: Vec<SpanRecord> = collector.collect();
+//!   let records: Vec<SpanRecord> = futures::executor::block_on(collector.collect());
 //!   ```
 //!
 //! [`Span`]: crate::prelude::Span
@@ -223,9 +223,11 @@ pub mod collector;
 pub mod future;
 pub mod local;
 pub mod span;
+#[doc(hidden)]
+pub mod util;
 
 pub mod prelude {
-    pub use crate::collector::{CollectArgs, Collector, SpanRecord};
+    pub use crate::collector::{Collector, SpanRecord};
     pub use crate::future::FutureExt as _;
     pub use crate::local::LocalSpan;
     pub use crate::span::Span;

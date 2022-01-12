@@ -31,15 +31,16 @@ fn four_spans() {
 
 #[test]
 fn single_thread_single_span() {
-    let spans = {
+    let collector = {
         let (root_span, collector) = Span::root("root");
         let _g = root_span.set_local_parent();
 
         four_spans();
 
         collector
-    }
-    .collect_with_args(CollectArgs::default().sync(true));
+    };
+
+    let spans = futures::executor::block_on(collector.collect());
 
     let expected_graph = r#"
 root
@@ -73,9 +74,9 @@ fn single_thread_multiple_spans() {
         };
 
         (
-            c1.collect_with_args(CollectArgs::default().sync(true)),
-            c2.collect_with_args(CollectArgs::default().sync(true)),
-            c3.collect_with_args(CollectArgs::default().sync(true)),
+            futures::executor::block_on(c1.collect()),
+            futures::executor::block_on(c2.collect()),
+            futures::executor::block_on(c3.collect()),
         )
     };
 
@@ -107,7 +108,7 @@ root3
 
 #[test]
 fn multiple_threads_single_span() {
-    let spans = {
+    let collector = {
         let (span, collector) = Span::root("root");
         let _g = span.set_local_parent();
 
@@ -122,8 +123,9 @@ fn multiple_threads_single_span() {
         four_spans();
 
         collector
-    }
-    .collect_with_args(CollectArgs::default().sync(true));
+    };
+
+    let spans = futures::executor::block_on(collector.collect());
 
     let expected_graph = r#"
 root
@@ -185,8 +187,8 @@ fn multiple_threads_multiple_spans() {
         };
 
         (
-            c1.collect_with_args(CollectArgs::default().sync(true)),
-            c2.collect_with_args(CollectArgs::default().sync(true)),
+            futures::executor::block_on(c1.collect()),
+            futures::executor::block_on(c2.collect()),
         )
     };
 
@@ -267,9 +269,9 @@ fn multiple_spans_without_local_spans() {
         };
 
         (
-            c1.collect_with_args(CollectArgs::default().sync(true)),
-            c2.collect_with_args(CollectArgs::default().sync(true)),
-            c3.collect_with_args(CollectArgs::default().sync(true)),
+            futures::executor::block_on(c1.collect()),
+            futures::executor::block_on(c2.collect()),
+            futures::executor::block_on(c3.collect()),
         )
     };
 
@@ -307,15 +309,16 @@ fn macro_with_async_trait() {
             .await;
     }
 
-    let spans = {
+    let collector = {
         let (root, collector) = Span::root("root");
         tokio::runtime::Runtime::new()
             .unwrap()
             .block_on(async { Bar.run().await }.in_span(Span::enter_with_parent("task", &root)));
 
         collector
-    }
-    .collect_with_args(CollectArgs::default().sync(true));
+    };
+
+    let spans = futures::executor::block_on(collector.collect());
 
     let expected_graph = r#"
 root
@@ -334,7 +337,7 @@ root
 
 #[test]
 fn multiple_local_parent() {
-    let spans = {
+    let collector = {
         let (root, collector) = Span::root("root");
         let _g = root.set_local_parent();
         let _g = LocalSpan::enter_with_local_parent("span1");
@@ -346,8 +349,9 @@ fn multiple_local_parent() {
         let _g = LocalSpan::enter_with_local_parent("span4");
 
         collector
-    }
-    .collect_with_args(CollectArgs::default().sync(true));
+    };
+
+    let spans = futures::executor::block_on(collector.collect());
 
     let expected_graph = r#"
 root
@@ -371,7 +375,7 @@ fn early_local_collect() {
     root.push_child_spans(local_spans);
     drop(root);
 
-    let spans = collector.collect_with_args(CollectArgs::default().sync(true));
+    let spans = futures::executor::block_on(collector.collect());
 
     let expected_graph = r#"
 root

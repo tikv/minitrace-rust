@@ -1,17 +1,15 @@
 // Copyright 2020 TiKV Project Authors. Licensed under Apache-2.0.
 
 use std::cell::RefCell;
-use std::sync::Arc;
 
 use minstant::Instant;
 
-use crate::collector::acquirer::{Acquirer, SpanCollection};
-use crate::collector::RawSpans;
+use crate::collector::global_collector::SpanSet;
+use crate::collector::{global_collector, ParentSpan, ParentSpans};
 use crate::local::local_collector::LocalCollector;
-use crate::local::local_parent_guard::LocalParentSpan;
-use crate::local::span_id::SpanId;
 use crate::local::span_queue::{SpanHandle, SpanQueue};
 use crate::local::LocalSpans;
+use crate::util::RawSpans;
 
 thread_local! {
     pub(crate) static LOCAL_SPAN_STACK: RefCell<LocalSpanStack> = RefCell::new(LocalSpanStack::new());
@@ -25,7 +23,7 @@ pub(crate) struct LocalSpanStack {
 pub(crate) struct SpanLine {
     span_queue: SpanQueue,
     local_collector_epoch: usize,
-    parent_span: Option<LocalParentSpan>,
+    parents: Option<ParentSpans>,
 }
 
 pub(crate) struct LocalSpanHandle {
@@ -74,17 +72,14 @@ impl LocalSpanStack {
     }
 
     #[inline]
-    pub fn register_local_collector(
-        &mut self,
-        parent_span: Option<LocalParentSpan>,
-    ) -> LocalCollector {
+    pub fn register_local_collector(&mut self, parents: Option<ParentSpans>) -> LocalCollector {
         let epoch = self.next_local_collector_epoch;
         self.next_local_collector_epoch = self.next_local_collector_epoch.wrapping_add(1);
 
         let span_line = SpanLine {
             span_queue: SpanQueue::new(),
             local_collector_epoch: epoch,
-            parent_span,
+            parents,
         };
 
         self.span_lines.push(span_line);
@@ -104,26 +99,12 @@ impl LocalSpanStack {
         if span_line.local_collector_epoch == local_collector.local_collector_epoch {
             let raw_spans = span_line.span_queue.take_queue();
 
-            if let Some(parent_span) = span_line.parent_span.take() {
+            if let Some(parents) = span_line.parents.take() {
                 let local_spans = LocalSpans {
                     spans: raw_spans,
                     end_time: Instant::now(),
                 };
-                if parent_span.acquirers.len() == 1 {
-                    // fast path for single acquirer
-                    parent_span.acquirers[0].submit(SpanCollection::LocalSpans {
-                        local_spans,
-                        parent_id_of_root: parent_span.span_id,
-                    });
-                } else {
-                    let local_spans = Arc::new(local_spans);
-                    for acq in parent_span.acquirers {
-                        acq.submit(SpanCollection::SharedLocalSpans {
-                            local_spans: local_spans.clone(),
-                            parent_id_of_root: parent_span.span_id,
-                        });
-                    }
-                }
+                global_collector::submit_spans(SpanSet::LocalSpans(local_spans), parents);
                 None
             } else {
                 Some(raw_spans)
@@ -158,14 +139,15 @@ impl LocalSpanStack {
 
 impl SpanLine {
     #[inline]
-    pub fn current_parent_id(&self) -> Option<SpanId> {
-        self.span_queue
-            .next_parent_id
-            .or_else(|| self.parent_span.as_ref().map(|parent| parent.span_id))
-    }
-
-    #[inline]
-    pub fn current_acquirers(&self) -> Option<&[Acquirer]> {
-        Some(&self.parent_span.as_ref()?.acquirers)
+    pub fn current_parents<'a>(&'a self) -> Option<ParentSpans> {
+        self.parents.as_ref().map(|parents| {
+            parents
+                .iter()
+                .map(|parent| ParentSpan {
+                    parent_id: self.span_queue.next_parent_id.unwrap_or(parent.parent_id),
+                    collect_id: parent.collect_id,
+                })
+                .collect()
+        })
     }
 }
