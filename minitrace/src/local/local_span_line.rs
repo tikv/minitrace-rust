@@ -5,11 +5,11 @@ use std::cell::RefCell;
 use minstant::Instant;
 
 use crate::collector::global_collector::SpanSet;
-use crate::collector::{global_collector, ParentSpan, ParentSpans};
+use crate::collector::{global_collector, ParentSpan};
 use crate::local::local_collector::LocalCollector;
 use crate::local::span_queue::{SpanHandle, SpanQueue};
 use crate::local::LocalSpans;
-use crate::util::RawSpans;
+use crate::util::{alloc_parent_spans, ParentSpans, RawSpans};
 
 thread_local! {
     pub(crate) static LOCAL_SPAN_STACK: RefCell<LocalSpanStack> = RefCell::new(LocalSpanStack::new());
@@ -141,13 +141,12 @@ impl SpanLine {
     #[inline]
     pub fn current_parents<'a>(&'a self) -> Option<ParentSpans> {
         self.parents.as_ref().map(|parents| {
-            parents
-                .iter()
-                .map(|parent| ParentSpan {
-                    parent_id: self.span_queue.next_parent_id.unwrap_or(parent.parent_id),
-                    collect_id: parent.collect_id,
-                })
-                .collect()
+            let mut parents_spans = alloc_parent_spans();
+            parents_spans.extend(parents.iter().map(|parent| ParentSpan {
+                parent_id: self.span_queue.next_parent_id.unwrap_or(parent.parent_id),
+                collect_id: parent.collect_id,
+            }));
+            parents_spans
         })
     }
 }

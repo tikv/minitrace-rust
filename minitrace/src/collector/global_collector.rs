@@ -10,11 +10,12 @@ use once_cell::sync::Lazy;
 use parking_lot::Mutex;
 use retain_mut::RetainMut;
 
-use crate::collector::{ParentSpans, SpanRecord};
+use crate::collector::SpanRecord;
 use crate::local::raw_span::RawSpan;
 use crate::local::span_id::SpanId;
 use crate::local::LocalSpans;
 use crate::util::spsc::{self, Receiver, Sender};
+use crate::util::ParentSpans;
 
 const COLLECT_LOOP_INTERVAL: Duration = Duration::from_millis(10);
 
@@ -169,7 +170,7 @@ impl GlobalCollector {
                         }
                     } else {
                         let spans = Arc::new(spans);
-                        for parent_span in parents {
+                        for parent_span in parents.iter() {
                             if let Some(buf) = self.collection.get_mut(&parent_span.collect_id) {
                                 buf.push(SpanCollection::Shared {
                                     spans: spans.clone(),

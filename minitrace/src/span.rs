@@ -5,11 +5,12 @@ use std::sync::Arc;
 use minstant::Instant;
 
 use crate::collector::global_collector::SpanSet;
-use crate::collector::{global_collector, Collector, ParentSpan, ParentSpans};
+use crate::collector::{global_collector, Collector, ParentSpan};
 use crate::local::local_span_line::LOCAL_SPAN_STACK;
 use crate::local::raw_span::RawSpan;
 use crate::local::span_id::{DefaultIdGenerator, SpanId};
 use crate::local::{LocalParentGuard, LocalSpans};
+use crate::util::{alloc_parent_spans, ParentSpans};
 
 #[must_use]
 #[derive(Debug)]
@@ -46,7 +47,10 @@ impl Span {
             parent_id: SpanId::new(0),
             collect_id: collector.collect_id,
         };
-        let span = Self::new(vec![parent], event);
+        let mut parents = alloc_parent_spans();
+        parents.push(parent);
+        let span = Self::new(parents, event);
+
         (span, collector)
     }
 
@@ -60,14 +64,15 @@ impl Span {
         event: &'static str,
         parents: impl IntoIterator<Item = &'a Span>,
     ) -> Self {
-        Self::new(
+        let mut parents_spans = alloc_parent_spans();
+        parents_spans.extend(
             parents
                 .into_iter()
                 .filter_map(|span| span.inner.as_ref())
-                .flat_map(|inner| inner.as_parent())
-                .collect(),
-            event,
-        )
+                .flat_map(|inner| inner.as_parent()),
+        );
+
+        Self::new(parents_spans, event)
     }
 
     #[inline]
@@ -110,10 +115,9 @@ impl Span {
     #[inline]
     pub fn push_child_spans(&self, local_spans: Arc<LocalSpans>) {
         if let Some(inner) = &self.inner {
-            global_collector::submit_spans(
-                SpanSet::SharedLocalSpans(local_spans),
-                inner.as_parent().collect(),
-            );
+            let mut parents = alloc_parent_spans();
+            parents.extend(inner.as_parent());
+            global_collector::submit_spans(SpanSet::SharedLocalSpans(local_spans), parents);
         }
     }
 }

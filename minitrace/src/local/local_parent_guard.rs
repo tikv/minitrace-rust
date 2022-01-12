@@ -2,6 +2,7 @@
 
 use crate::local::local_collector::LocalCollector;
 use crate::span::Span;
+use crate::util::alloc_parent_spans;
 
 #[must_use]
 pub struct LocalParentGuard {
@@ -10,10 +11,11 @@ pub struct LocalParentGuard {
 
 impl LocalParentGuard {
     pub(crate) fn new(span: &Span) -> Self {
-        let local_collector = span
-            .inner
-            .as_ref()
-            .map(|inner| LocalCollector::start_with_parent(inner.as_parent().collect()));
+        let local_collector = span.inner.as_ref().map(|inner| {
+            let mut parents = alloc_parent_spans();
+            parents.extend(inner.as_parent());
+            LocalCollector::start_with_parent(parents)
+        });
 
         Self {
             _local_collector: local_collector,

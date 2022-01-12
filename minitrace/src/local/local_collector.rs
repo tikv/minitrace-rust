@@ -4,7 +4,10 @@ use std::marker::PhantomData;
 
 use minstant::Instant;
 
-use crate::{collector::ParentSpans, local::local_span_line::LOCAL_SPAN_STACK, util::RawSpans};
+use crate::{
+    local::local_span_line::LOCAL_SPAN_STACK,
+    util::{ParentSpans, RawSpans},
+};
 
 #[must_use]
 #[derive(Debug, Ord, PartialOrd, Eq, PartialEq)]

@@ -14,8 +14,6 @@ pub struct SpanRecord {
     pub properties: Vec<(&'static str, String)>,
 }
 
-pub(crate) type ParentSpans = Vec<ParentSpan>;
-
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct ParentSpan {
     pub(crate) parent_id: SpanId,
