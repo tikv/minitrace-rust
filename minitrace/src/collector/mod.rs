@@ -25,6 +25,7 @@ pub struct Collector {
 }
 
 impl Collector {
+    #[allow(clippy::new_without_default)]
     pub fn new() -> Self {
         Collector {
             collect_id: global_collector::start_collect(),

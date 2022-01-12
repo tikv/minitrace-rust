@@ -100,11 +100,14 @@ impl LocalSpanStack {
             let raw_spans = span_line.span_queue.take_queue();
 
             if let Some(parents) = span_line.parents.take() {
-                let local_spans = LocalSpans {
-                    spans: raw_spans,
-                    end_time: Instant::now(),
-                };
-                global_collector::submit_spans(SpanSet::LocalSpans(local_spans), parents);
+                if !raw_spans.is_empty() {
+                    let local_spans = LocalSpans {
+                        spans: raw_spans,
+                        end_time: Instant::now(),
+                    };
+
+                    global_collector::submit_spans(SpanSet::LocalSpans(local_spans), parents);
+                }
                 None
             } else {
                 Some(raw_spans)
@@ -139,7 +142,7 @@ impl LocalSpanStack {
 
 impl SpanLine {
     #[inline]
-    pub fn current_parents<'a>(&'a self) -> Option<ParentSpans> {
+    pub fn current_parents(&self) -> Option<ParentSpans> {
         self.parents.as_ref().map(|parents| {
             let mut parents_spans = alloc_parent_spans();
             parents_spans.extend(parents.iter().map(|parent| ParentSpan {

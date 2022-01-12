@@ -26,7 +26,7 @@ pub(crate) struct SpanInner {
 
 impl Span {
     #[inline]
-    pub(crate) fn new<'a>(parents: ParentSpans, event: &'static str) -> Self {
+    pub(crate) fn new(parents: ParentSpans, event: &'static str) -> Self {
         let span_id = DefaultIdGenerator::next_id();
         let begin_instant = Instant::now();
         let raw_span = RawSpan::begin_with(span_id, SpanId::new(0), begin_instant, event);
@@ -124,7 +124,7 @@ impl Span {
 
 impl SpanInner {
     #[inline]
-    pub(crate) fn as_parent<'a>(&'a self) -> impl Iterator<Item = ParentSpan> + 'a {
+    pub(crate) fn as_parent(&self) -> impl Iterator<Item = ParentSpan> + '_ {
         self.parents
             .iter()
             .map(move |ParentSpan { collect_id, .. }| ParentSpan {
