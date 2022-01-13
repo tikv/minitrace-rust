@@ -25,7 +25,7 @@ static GLOBAL_COLLECTOR: Lazy<Mutex<GlobalCollector>> =
 
 thread_local! {
     static COMMAND_SENDER: Sender<CollectCommand> = {
-        let (tx, rx) = spsc::unbounded();
+        let (tx, rx) = spsc::bounded(10240);
         GLOBAL_COLLECTOR.lock().register_receiver(rx);
         tx
     };
@@ -43,10 +43,9 @@ pub(crate) fn drop_collect(collect_id: u32) {
 
 pub(crate) fn commit_collect(
     collect_id: u32,
-) -> futures::channel::oneshot::Receiver<Vec<SpanRecord>> {
-    let (tx, rx) = futures::channel::oneshot::channel();
+    tx: futures::channel::oneshot::Sender<Vec<SpanRecord>>,
+) {
     send_command(CollectCommand::CommitCollect { collect_id, tx });
-    rx
 }
 
 pub(crate) fn submit_spans(spans: SpanSet, parents: ParentSpans) {
@@ -54,7 +53,7 @@ pub(crate) fn submit_spans(spans: SpanSet, parents: ParentSpans) {
 }
 
 fn send_command(cmd: CollectCommand) {
-    COMMAND_SENDER.with(|sender| sender.send(cmd));
+    COMMAND_SENDER.with(|sender| sender.send(cmd).ok());
 }
 
 #[derive(Debug)]
@@ -96,7 +95,6 @@ enum CollectCommand {
 pub(crate) struct GlobalCollector {
     collection: HashMap<u32, Vec<SpanCollection>>,
     rxs: Vec<Receiver<CollectCommand>>,
-    committing: Vec<(u32, futures::channel::oneshot::Sender<Vec<SpanRecord>>)>,
 }
 
 impl GlobalCollector {
@@ -110,7 +108,6 @@ impl GlobalCollector {
         GlobalCollector {
             collection: HashMap::new(),
             rxs: Vec::new(),
-            committing: Vec::new(),
         }
     }
 
@@ -138,14 +135,12 @@ impl GlobalCollector {
             let to_sort_key = |cmd: &CollectCommand| match *cmd {
                 CollectCommand::StartCollect { .. } => 0,
                 CollectCommand::DropCollect { .. } => 1,
-                CollectCommand::CommitCollect { .. } => 2,
-                CollectCommand::SubmitSpans { .. } => 3,
+                CollectCommand::SubmitSpans { .. } => 2,
+                CollectCommand::CommitCollect { .. } => 3,
             };
 
             to_sort_key(a).cmp(&to_sort_key(b))
         });
-
-        let old_committing = std::mem::take(&mut self.committing);
 
         for cmd in cmds {
             match cmd {
@@ -154,9 +149,6 @@ impl GlobalCollector {
                 }
                 CollectCommand::DropCollect { collect_id } => {
                     self.collection.remove(&collect_id);
-                }
-                CollectCommand::CommitCollect { collect_id, tx } => {
-                    self.committing.push((collect_id, tx));
                 }
                 CollectCommand::SubmitSpans { spans, parents } => {
                     debug_assert!(!parents.is_empty());
@@ -181,16 +173,15 @@ impl GlobalCollector {
                         }
                     }
                 }
+                CollectCommand::CommitCollect { collect_id, tx } => {
+                    let records = self
+                        .collection
+                        .remove(&collect_id)
+                        .map(merge_collection)
+                        .unwrap_or_else(Vec::new);
+                    tx.send(records).ok();
+                }
             }
-        }
-
-        for (collect_id, tx) in old_committing {
-            let records = self
-                .collection
-                .remove(&collect_id)
-                .map(merge_collection)
-                .unwrap_or_else(Vec::new);
-            tx.send(records).ok();
         }
     }
 }

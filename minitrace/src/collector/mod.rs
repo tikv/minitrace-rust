@@ -32,9 +32,9 @@ impl Collector {
     }
 
     pub async fn collect(self) -> Vec<SpanRecord> {
-        global_collector::commit_collect(self.collect_id)
-            .await
-            .unwrap()
+        let (tx, rx) = futures::channel::oneshot::channel();
+        global_collector::commit_collect(self.collect_id, tx);
+        rx.await.unwrap_or_else(|_| Vec::new())
     }
 }
 

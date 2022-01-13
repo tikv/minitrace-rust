@@ -3,7 +3,7 @@
 use criterion::{criterion_group, criterion_main, Criterion};
 
 fn crossbeam(nmsg: usize) {
-    let (tx, rx) = crossbeam::channel::unbounded();
+    let (tx, rx) = crossbeam::channel::bounded(10240);
 
     crossbeam::scope(|scope| {
         scope.spawn(|_| {
@@ -20,7 +20,7 @@ fn crossbeam(nmsg: usize) {
 }
 
 fn crossbeam_send_only(nmsg: usize) {
-    let (tx, _rx) = crossbeam::channel::unbounded();
+    let (tx, _rx) = crossbeam::channel::bounded(10240);
 
     for i in 0..nmsg {
         tx.send(i).unwrap();
@@ -28,12 +28,12 @@ fn crossbeam_send_only(nmsg: usize) {
 }
 
 fn minitrace(nmsg: usize) {
-    let (tx, mut rx) = minitrace::util::spsc::unbounded();
+    let (tx, mut rx) = minitrace::util::spsc::bounded(10240);
 
     crossbeam::scope(|scope| {
         scope.spawn(|_| {
             for i in 0..nmsg {
-                tx.send(i);
+                tx.send(i).unwrap();
             }
         });
 
@@ -45,10 +45,10 @@ fn minitrace(nmsg: usize) {
 }
 
 fn minitrace_send_only(nmsg: usize) {
-    let (tx, _rx) = minitrace::util::spsc::unbounded();
+    let (tx, _rx) = minitrace::util::spsc::bounded(10240);
 
     for i in 0..nmsg {
-        tx.send(i);
+        tx.send(i).unwrap();
     }
 }
 

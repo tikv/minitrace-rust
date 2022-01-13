@@ -42,7 +42,7 @@ impl Span {
     }
 
     pub fn root(event: &'static str) -> (Self, Collector) {
-         let (collector, collect_id) = Collector::start_collect();
+        let (collector, collect_id) = Collector::start_collect();
         let parent = ParentSpan {
             parent_id: SpanId::new(0),
             collect_id,

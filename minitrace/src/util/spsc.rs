@@ -3,10 +3,13 @@
 use parking_lot::Mutex;
 use std::sync::Arc;
 
-pub fn unbounded<T>() -> (Sender<T>, Receiver<T>) {
-    let page = Arc::new(Mutex::new(Vec::new()));
+pub fn bounded<T>(capacity: usize) -> (Sender<T>, Receiver<T>) {
+    let page = Arc::new(Mutex::new(Vec::with_capacity(capacity)));
     (
-        Sender { page: page.clone() },
+        Sender {
+            page: page.clone(),
+            capacity,
+        },
         Receiver {
             page,
             received: Vec::new(),
@@ -16,6 +19,7 @@ pub fn unbounded<T>() -> (Sender<T>, Receiver<T>) {
 
 pub struct Sender<T> {
     page: Arc<Mutex<Vec<T>>>,
+    capacity: usize,
 }
 
 pub struct Receiver<T> {
@@ -24,12 +28,20 @@ pub struct Receiver<T> {
 }
 
 #[derive(Debug)]
+pub struct ChannelFull;
+
+#[derive(Debug)]
 pub struct ChannelClosed;
 
 impl<T> Sender<T> {
-    pub fn send(&self, value: T) {
+    pub fn send(&self, value: T) -> Result<(), ChannelFull> {
         let mut page = self.page.lock();
-        page.push(value);
+        if page.len() < self.capacity {
+            page.push(value);
+            Ok(())
+        } else {
+            Err(ChannelFull)
+        }
     }
 }
 
