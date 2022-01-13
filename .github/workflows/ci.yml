@@ -37,7 +37,7 @@ jobs:
         cargo test --workspace --all-targets -- --nocapture
         cargo test --doc
     - name: Run benches
-      run: cargo bench --workspace --all-targets
+      run: cargo bench --workspace --bench compare --bench trace
     - name: Run examples
       run: |
         cargo run --example asynchronous
