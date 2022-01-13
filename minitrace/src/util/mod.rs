@@ -17,7 +17,7 @@ static PARENT_SPANS_POOL: Lazy<Pool<Vec<ParentSpan>>> =
 
 thread_local! {
     static RAW_SPANS_PULLER: RefCell<Puller<'static,Vec<RawSpan>>> = RefCell::new(RAW_SPANS_POOL.puller(512));
-    static PARENT_SPANS_PULLER: RefCell<Puller< 'static,Vec<ParentSpan>>>  = RefCell::new(PARENT_SPANS_POOL.puller(128));
+    static PARENT_SPANS_PULLER: RefCell<Puller< 'static,Vec<ParentSpan>>>  = RefCell::new(PARENT_SPANS_POOL.puller(512));
 }
 
 pub(crate) type RawSpans = Reusable<'static, Vec<RawSpan>>;
