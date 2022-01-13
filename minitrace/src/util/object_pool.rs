@@ -26,10 +26,7 @@ impl<T> Pool<T> {
         self.objects
             .lock()
             .pop()
-            .map(|mut obj| {
-                (self.reset)(&mut obj);
-                Reusable::new(self, obj)
-            })
+            .map(|obj| Reusable::new(self, obj))
             .unwrap_or_else(|| Reusable::new(self, (self.init)()))
     }
 
@@ -40,10 +37,6 @@ impl<T> Pool<T> {
         buffer.extend(
             objects
                 .drain(len.saturating_sub(n)..)
-                .map(|mut obj| {
-                    (self.reset)(&mut obj);
-                    obj
-                })
                 .chain(std::iter::repeat_with(self.init))
                 .take(n)
                 .map(|obj| Reusable::new(self, obj)),
@@ -60,8 +53,9 @@ impl<T> Pool<T> {
     }
 
     #[inline]
-    pub fn recycle(&self, t: T) {
-        self.objects.lock().push(t)
+    pub fn recycle(&self, mut obj: T) {
+        (self.reset)(&mut obj);
+        self.objects.lock().push(obj)
     }
 }
 

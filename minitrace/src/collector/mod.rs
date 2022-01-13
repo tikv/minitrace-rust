@@ -21,15 +21,14 @@ pub(crate) struct ParentSpan {
 }
 
 pub struct Collector {
-    pub(crate) collect_id: u32,
+    collect_id: u32,
 }
 
 impl Collector {
-    #[allow(clippy::new_without_default)]
-    pub fn new() -> Self {
-        Collector {
-            collect_id: global_collector::start_collect(),
-        }
+    pub fn start_collect() -> (Self, u32) {
+        let collect_id = global_collector::start_collect();
+
+        (Collector { collect_id }, collect_id)
     }
 
     pub async fn collect(self) -> Vec<SpanRecord> {

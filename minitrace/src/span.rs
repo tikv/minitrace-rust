@@ -42,10 +42,10 @@ impl Span {
     }
 
     pub fn root(event: &'static str) -> (Self, Collector) {
-        let collector = Collector::new();
+         let (collector, collect_id) = Collector::start_collect();
         let parent = ParentSpan {
             parent_id: SpanId::new(0),
-            collect_id: collector.collect_id,
+            collect_id,
         };
         let mut parents = alloc_parent_spans();
         parents.push(parent);

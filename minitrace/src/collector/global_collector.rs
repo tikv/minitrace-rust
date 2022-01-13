@@ -128,6 +128,7 @@ impl GlobalCollector {
                     return true;
                 }
                 Err(_) => {
+                    // Channel disconnected. It must be because the sender thread has stopped.
                     return false;
                 }
             }
