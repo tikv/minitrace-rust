@@ -131,7 +131,7 @@ impl GlobalCollector {
             }
         });
 
-        cmds.sort_by(|a, b| {
+        cmds.sort_unstable_by(|a, b| {
             let to_sort_key = |cmd: &CollectCommand| match *cmd {
                 CollectCommand::StartCollect { .. } => 0,
                 CollectCommand::DropCollect { .. } => 1,
