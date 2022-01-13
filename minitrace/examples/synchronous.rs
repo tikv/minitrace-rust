@@ -1,7 +1,7 @@
 // Copyright 2020 TiKV Project Authors. Licensed under Apache-2.0.
 
+use futures::executor::block_on;
 use minitrace::prelude::*;
-use minitrace_macro::trace;
 
 fn func1(i: u64) {
     let _guard = LocalSpan::enter_with_local_parent("func1");
@@ -29,7 +29,7 @@ fn main() {
         collector
     };
 
-    let spans = futures::executor::block_on(collector.collect());
+    let spans = block_on(collector.collect());
 
     // Report to Jaeger
     let bytes =

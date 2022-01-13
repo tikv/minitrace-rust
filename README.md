@@ -17,6 +17,7 @@ minitrace-jaeger = "0.2"
 
 ```rust
 use minitrace::prelude::*;
+use futures::executor::block_on;
 
 let (root, collector) = Span::root("root");
 
@@ -26,7 +27,7 @@ let (root, collector) = Span::root("root");
 }
 
 drop(root);
-let records: Vec<SpanRecord> = futures::executor::block_on(collector.collect());
+let records: Vec<SpanRecord> = block_on(collector.collect());
 ```
 
 ## Examples

@@ -18,6 +18,7 @@
 //!
 //!   ```rust
 //!   use minitrace::prelude::*;
+//!   use futures::executor::block_on;
 //!
 //!   let (root, collector) = Span::root("root");
 //!
@@ -27,7 +28,7 @@
 //!   }
 //!
 //!   drop(root);
-//!   let records: Vec<SpanRecord> = futures::executor::block_on(collector.collect());
+//!   let records: Vec<SpanRecord> = block_on(collector.collect());
 //!   ```
 //!
 //!
@@ -40,11 +41,12 @@
 //!
 //!   ```rust
 //!   use minitrace::prelude::*;
+//!   use futures::executor::block_on;
 //!
 //!   let (root, collector) = Span::root("root");
 //!   drop(root);
 //!
-//!   let records: Vec<SpanRecord> = futures::executor::block_on(collector.collect());
+//!   let records: Vec<SpanRecord> = block_on(collector.collect());
 //!   ```
 //!
 //!
@@ -190,6 +192,7 @@
 //!   ```rust
 //!   use minitrace::prelude::*;
 //!   use minitrace::local::LocalCollector;
+//!   use futures::executor::block_on;
 //!   use std::sync::Arc;
 //!
 //!   // Collect local spans in advance without parent
@@ -203,14 +206,14 @@
 //!   root.push_child_spans(Arc::new(local_spans));
 //!   drop(root);
 //!
-//!   let records: Vec<SpanRecord> = futures::executor::block_on(collector.collect());
+//!   let records: Vec<SpanRecord> = block_on(collector.collect());
 //!   ```
 //!
 //! [`Span`]: crate::prelude::Span
 //! [`LocalSpan`]: crate::prelude::LocalSpan
 //! [`Collector`]: crate::prelude::Collector
 //! [`SpanRecord`]: crate::prelude::SpanRecord
-//! [`FutureExt`]: crate::prelude::FutureExt
+//! [`FutureExt`]: crate::future::FutureExt
 //! [\#\[trace\]]: crate::prelude::trace
 //! [`LocalCollector`]: crate::local::LocalCollector
 //! [`Future`]: std::future::Future
@@ -219,8 +222,8 @@
 //! [`Span::enter_with_parent`]: crate::prelude::Span::enter_with_parent
 //! [`Span::set_local_parent`]: crate::prelude::Span::set_local_parent
 //! [`LocalSpan::enter_with_local_parent`]: crate::prelude::LocalSpan::enter_with_local_parent
-//! [`in_span`]: crate::prelude::FutureExt::in_span
-//! [`enter_on_poll`]: crate::prelude::FutureExt::enter_on_poll
+//! [`in_span`]: crate::future::FutureExt::in_span
+//! [`enter_on_poll`]: crate::future::FutureExt::enter_on_poll
 
 pub mod collector;
 pub mod future;
@@ -230,7 +233,7 @@ pub mod span;
 pub mod util;
 
 pub mod prelude {
-    pub use crate::collector::{Collector, SpanRecord};
+    pub use crate::collector::{CollectArgs, Collector, SpanRecord};
     pub use crate::future::FutureExt as _;
     pub use crate::local::LocalSpan;
     pub use crate::span::Span;

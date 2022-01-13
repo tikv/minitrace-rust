@@ -10,7 +10,7 @@ use once_cell::sync::Lazy;
 use parking_lot::Mutex;
 use retain_mut::RetainMut;
 
-use crate::collector::SpanRecord;
+use crate::collector::{CollectArgs, SpanRecord};
 use crate::local::raw_span::RawSpan;
 use crate::local::span_id::SpanId;
 use crate::local::LocalSpans;
@@ -31,29 +31,39 @@ thread_local! {
     };
 }
 
-pub(crate) fn start_collect() -> u32 {
+pub(crate) fn start_collect(collect_args: CollectArgs) -> u32 {
     let collect_id = NEXT_COLLECT_ID.fetch_add(1, Ordering::AcqRel);
-    send_command(CollectCommand::StartCollect { collect_id });
+    send_command(CollectCommand::StartCollect(StartCollect {
+        collect_id,
+        collect_args,
+    }));
     collect_id
 }
 
 pub(crate) fn drop_collect(collect_id: u32) {
-    send_command(CollectCommand::DropCollect { collect_id });
+    force_send_command(CollectCommand::DropCollect(DropCollect { collect_id }));
 }
 
 pub(crate) fn commit_collect(
     collect_id: u32,
     tx: futures::channel::oneshot::Sender<Vec<SpanRecord>>,
 ) {
-    send_command(CollectCommand::CommitCollect { collect_id, tx });
+    force_send_command(CollectCommand::CommitCollect(CommitCollect {
+        collect_id,
+        tx,
+    }));
 }
 
 pub(crate) fn submit_spans(spans: SpanSet, parents: ParentSpans) {
-    send_command(CollectCommand::SubmitSpans { spans, parents });
+    send_command(CollectCommand::SubmitSpans(SubmitSpans { spans, parents }));
 }
 
 fn send_command(cmd: CollectCommand) {
     COMMAND_SENDER.with(|sender| sender.send(cmd).ok());
+}
+
+fn force_send_command(cmd: CollectCommand) {
+    COMMAND_SENDER.with(|sender| sender.force_send(cmd));
 }
 
 #[derive(Debug)]
@@ -63,6 +73,7 @@ pub(crate) enum SpanSet {
     SharedLocalSpans(Arc<LocalSpans>),
 }
 
+#[derive(Debug)]
 enum SpanCollection {
     Owned {
         spans: SpanSet,
@@ -76,25 +87,44 @@ enum SpanCollection {
 
 #[derive(Debug)]
 enum CollectCommand {
-    StartCollect {
-        collect_id: u32,
-    },
-    DropCollect {
-        collect_id: u32,
-    },
-    CommitCollect {
-        collect_id: u32,
-        tx: futures::channel::oneshot::Sender<Vec<SpanRecord>>,
-    },
-    SubmitSpans {
-        spans: SpanSet,
-        parents: ParentSpans,
-    },
+    StartCollect(StartCollect),
+    DropCollect(DropCollect),
+    CommitCollect(CommitCollect),
+    SubmitSpans(SubmitSpans),
+}
+
+#[derive(Debug)]
+struct StartCollect {
+    collect_id: u32,
+    collect_args: CollectArgs,
+}
+
+#[derive(Debug)]
+struct DropCollect {
+    collect_id: u32,
+}
+
+#[derive(Debug)]
+struct CommitCollect {
+    collect_id: u32,
+    tx: futures::channel::oneshot::Sender<Vec<SpanRecord>>,
+}
+
+#[derive(Debug)]
+struct SubmitSpans {
+    spans: SpanSet,
+    parents: ParentSpans,
 }
 
 pub(crate) struct GlobalCollector {
-    collection: HashMap<u32, Vec<SpanCollection>>,
+    collection: HashMap<u32, (Vec<SpanCollection>, usize, CollectArgs)>,
     rxs: Vec<Receiver<CollectCommand>>,
+
+    // Vectors to be reused by collection loops. They must be empty outside of the `handle_commands` loop.
+    start_collects: Vec<StartCollect>,
+    drop_collects: Vec<DropCollect>,
+    commit_collects: Vec<CommitCollect>,
+    submit_spans: Vec<SubmitSpans>,
 }
 
 impl GlobalCollector {
@@ -108,6 +138,11 @@ impl GlobalCollector {
         GlobalCollector {
             collection: HashMap::new(),
             rxs: Vec::new(),
+
+            start_collects: Vec::new(),
+            drop_collects: Vec::new(),
+            commit_collects: Vec::new(),
+            submit_spans: Vec::new(),
         }
     }
 
@@ -116,11 +151,17 @@ impl GlobalCollector {
     }
 
     fn handle_commands(&mut self) {
-        let mut cmds = Vec::with_capacity(128);
+        debug_assert!(self.start_collects.is_empty());
+        debug_assert!(self.drop_collects.is_empty());
+        debug_assert!(self.commit_collects.is_empty());
+        debug_assert!(self.submit_spans.is_empty());
 
         RetainMut::retain_mut(&mut self.rxs, |rx| loop {
             match rx.try_recv() {
-                Ok(Some(cmd)) => cmds.push(cmd),
+                Ok(Some(CollectCommand::StartCollect(cmd))) => self.start_collects.push(cmd),
+                Ok(Some(CollectCommand::DropCollect(cmd))) => self.drop_collects.push(cmd),
+                Ok(Some(CollectCommand::CommitCollect(cmd))) => self.commit_collects.push(cmd),
+                Ok(Some(CollectCommand::SubmitSpans(cmd))) => self.submit_spans.push(cmd),
                 Ok(None) => {
                     return true;
                 }
@@ -131,74 +172,74 @@ impl GlobalCollector {
             }
         });
 
-        cmds.sort_unstable_by(|a, b| {
-            let to_sort_key = |cmd: &CollectCommand| match *cmd {
-                CollectCommand::StartCollect { .. } => 0,
-                CollectCommand::DropCollect { .. } => 1,
-                CollectCommand::SubmitSpans { .. } => 2,
-                CollectCommand::CommitCollect { .. } => 3,
-            };
+        for StartCollect {
+            collect_id,
+            collect_args,
+        } in self.start_collects.drain(..)
+        {
+            self.collection
+                .insert(collect_id, (Vec::new(), 0, collect_args));
+        }
 
-            to_sort_key(a).cmp(&to_sort_key(b))
-        });
+        for DropCollect { collect_id } in self.drop_collects.drain(..) {
+            self.collection.remove(&collect_id);
+        }
 
-        for cmd in cmds {
-            match cmd {
-                CollectCommand::StartCollect { collect_id } => {
-                    self.collection.insert(collect_id, Vec::new());
+        for SubmitSpans { spans, parents } in self.submit_spans.drain(..) {
+            debug_assert!(!parents.is_empty());
+
+            if parents.len() == 1 {
+                let parent_span = parents[0];
+                if let Some((buf, span_count, collect_args)) =
+                    self.collection.get_mut(&parent_span.collect_id)
+                {
+                    if *span_count < collect_args.max_span_count.unwrap_or(usize::MAX)
+                        || parent_span.span_id == SpanId::new(0)
+                    {
+                        *span_count += spans.len();
+                        buf.push(SpanCollection::Owned {
+                            spans,
+                            parent_id: parent_span.span_id,
+                        });
+                    }
                 }
-                CollectCommand::DropCollect { collect_id } => {
-                    self.collection.remove(&collect_id);
-                }
-                CollectCommand::SubmitSpans { spans, parents } => {
-                    debug_assert!(!parents.is_empty());
-
-                    if parents.len() == 1 {
-                        let parent_span = parents[0];
-                        if let Some(buf) = self.collection.get_mut(&parent_span.collect_id) {
-                            buf.push(SpanCollection::Owned {
-                                spans,
-                                parent_id: parent_span.parent_id,
+            } else {
+                let spans = Arc::new(spans);
+                for parent_span in parents.iter() {
+                    if let Some((buf, span_count, collect_args)) =
+                        self.collection.get_mut(&parent_span.collect_id)
+                    {
+                        if *span_count < collect_args.max_span_count.unwrap_or(usize::MAX)
+                            || parent_span.span_id == SpanId::new(0)
+                        {
+                            *span_count += spans.len();
+                            buf.push(SpanCollection::Shared {
+                                spans: spans.clone(),
+                                parent_id: parent_span.span_id,
                             });
-                        }
-                    } else {
-                        let spans = Arc::new(spans);
-                        for parent_span in parents.iter() {
-                            if let Some(buf) = self.collection.get_mut(&parent_span.collect_id) {
-                                buf.push(SpanCollection::Shared {
-                                    spans: spans.clone(),
-                                    parent_id: parent_span.parent_id,
-                                });
-                            }
                         }
                     }
                 }
-                CollectCommand::CommitCollect { collect_id, tx } => {
-                    let records = self
-                        .collection
-                        .remove(&collect_id)
-                        .map(merge_collection)
-                        .unwrap_or_else(Vec::new);
-                    tx.send(records).ok();
-                }
             }
+        }
+
+        for CommitCollect { collect_id, tx } in self.commit_collects.drain(..) {
+            let records = self
+                .collection
+                .remove(&collect_id)
+                .map(|(span_collections, span_count, _)| {
+                    merge_collection(span_collections, span_count)
+                })
+                .unwrap_or_else(Vec::new);
+            tx.send(records).ok();
         }
     }
 }
 
-fn merge_collection(span_collections: Vec<SpanCollection>) -> Vec<SpanRecord> {
+fn merge_collection(span_collections: Vec<SpanCollection>, span_count: usize) -> Vec<SpanRecord> {
     let anchor = Anchor::new();
 
-    let capacity = span_collections
-        .iter()
-        .map(|sc| match sc.spans() {
-            SpanSet::LocalSpans(local_spans) => local_spans.spans.len(),
-            SpanSet::SharedLocalSpans(local_spans) => local_spans.spans.len(),
-            SpanSet::Span(_) => 1,
-        })
-        .sum();
-
-    let mut records = Vec::with_capacity(capacity);
+    let mut records = Vec::with_capacity(span_count);
 
     for span_collection in span_collections {
         match span_collection {
@@ -248,7 +289,7 @@ fn amend_local_span(
             id: span.id.0,
             parent_id,
             begin_unix_time_ns,
-            duration_ns: end_unix_time_ns - begin_unix_time_ns,
+            duration_ns: end_unix_time_ns.saturating_sub(begin_unix_time_ns),
             event: span.event,
             properties: span.properties.clone(),
         });
@@ -262,17 +303,18 @@ fn amend_span(raw_span: &RawSpan, parent_id: SpanId, spans: &mut Vec<SpanRecord>
         id: raw_span.id.0,
         parent_id: parent_id.0,
         begin_unix_time_ns,
-        duration_ns: end_unix_time_ns - begin_unix_time_ns,
+        duration_ns: end_unix_time_ns.saturating_sub(begin_unix_time_ns),
         event: raw_span.event,
         properties: raw_span.properties.clone(),
     });
 }
 
-impl SpanCollection {
-    fn spans(&self) -> &SpanSet {
+impl SpanSet {
+    fn len(&self) -> usize {
         match self {
-            SpanCollection::Owned { spans, .. } => spans,
-            SpanCollection::Shared { spans, .. } => spans,
+            SpanSet::LocalSpans(local_spans) => local_spans.spans.len(),
+            SpanSet::SharedLocalSpans(local_spans) => local_spans.spans.len(),
+            SpanSet::Span(_) => 1,
         }
     }
 }

@@ -12,7 +12,7 @@ pub fn bounded<T>(capacity: usize) -> (Sender<T>, Receiver<T>) {
         },
         Receiver {
             page,
-            received: Vec::new(),
+            received: Vec::with_capacity(capacity),
         },
     )
 }
@@ -42,6 +42,11 @@ impl<T> Sender<T> {
         } else {
             Err(ChannelFull)
         }
+    }
+
+    pub fn force_send(&self, value: T) {
+        let mut page = self.page.lock();
+        page.push(value);
     }
 }
 

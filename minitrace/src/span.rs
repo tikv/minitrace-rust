@@ -5,7 +5,7 @@ use std::sync::Arc;
 use minstant::Instant;
 
 use crate::collector::global_collector::SpanSet;
-use crate::collector::{global_collector, Collector, ParentSpan};
+use crate::collector::{global_collector, CollectArgs, Collector, ParentSpan};
 use crate::local::local_span_line::LOCAL_SPAN_STACK;
 use crate::local::raw_span::RawSpan;
 use crate::local::span_id::{DefaultIdGenerator, SpanId};
@@ -42,9 +42,13 @@ impl Span {
     }
 
     pub fn root(event: &'static str) -> (Self, Collector) {
-        let (collector, collect_id) = Collector::start_collect();
+        Self::root_with_args(event, CollectArgs::default())
+    }
+
+    pub fn root_with_args(event: &'static str, args: CollectArgs) -> (Self, Collector) {
+        let (collector, collect_id) = Collector::start_collect(args);
         let parent = ParentSpan {
-            parent_id: SpanId::new(0),
+            span_id: SpanId::new(0),
             collect_id,
         };
         let mut parents = alloc_parent_spans();
@@ -128,7 +132,7 @@ impl SpanInner {
         self.parents
             .iter()
             .map(move |ParentSpan { collect_id, .. }| ParentSpan {
-                parent_id: self.raw_span.id,
+                span_id: self.raw_span.id,
                 collect_id: *collect_id,
             })
     }

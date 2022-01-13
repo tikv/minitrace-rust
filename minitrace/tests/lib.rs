@@ -2,6 +2,8 @@
 
 use std::sync::Arc;
 
+use futures::executor::block_on;
+
 use minitrace::local::LocalCollector;
 use minitrace::prelude::*;
 
@@ -40,7 +42,7 @@ fn single_thread_single_span() {
         collector
     };
 
-    let spans = futures::executor::block_on(collector.collect());
+    let spans = block_on(collector.collect());
 
     let expected_graph = r#"
 root
@@ -74,9 +76,9 @@ fn single_thread_multiple_spans() {
         };
 
         (
-            futures::executor::block_on(c1.collect()),
-            futures::executor::block_on(c2.collect()),
-            futures::executor::block_on(c3.collect()),
+            block_on(c1.collect()),
+            block_on(c2.collect()),
+            block_on(c3.collect()),
         )
     };
 
@@ -125,7 +127,7 @@ fn multiple_threads_single_span() {
         collector
     };
 
-    let spans = futures::executor::block_on(collector.collect());
+    let spans = block_on(collector.collect());
 
     let expected_graph = r#"
 root
@@ -186,10 +188,7 @@ fn multiple_threads_multiple_spans() {
             (collector1, collector2)
         };
 
-        (
-            futures::executor::block_on(c1.collect()),
-            futures::executor::block_on(c2.collect()),
-        )
+        (block_on(c1.collect()), block_on(c2.collect()))
     };
 
     let expected_graph1 = r#"
@@ -269,9 +268,9 @@ fn multiple_spans_without_local_spans() {
         };
 
         (
-            futures::executor::block_on(c1.collect()),
-            futures::executor::block_on(c2.collect()),
-            futures::executor::block_on(c3.collect()),
+            block_on(c1.collect()),
+            block_on(c2.collect()),
+            block_on(c3.collect()),
         )
     };
 
@@ -318,7 +317,7 @@ fn macro_with_async_trait() {
         collector
     };
 
-    let spans = futures::executor::block_on(collector.collect());
+    let spans = block_on(collector.collect());
 
     let expected_graph = r#"
 root
@@ -351,7 +350,7 @@ fn multiple_local_parent() {
         collector
     };
 
-    let spans = futures::executor::block_on(collector.collect());
+    let spans = block_on(collector.collect());
 
     let expected_graph = r#"
 root
@@ -375,12 +374,66 @@ fn early_local_collect() {
     root.push_child_spans(local_spans);
     drop(root);
 
-    let spans = futures::executor::block_on(collector.collect());
+    let spans = block_on(collector.collect());
 
     let expected_graph = r#"
 root
     span1
         span2
+"#;
+    assert_graph(spans, expected_graph);
+}
+
+#[test]
+fn max_span_count() {
+    fn block_until_next_collect_loop() {
+        let (_, collector) = Span::root("dummy");
+        block_on(collector.collect());
+    }
+
+    #[trace("recursive")]
+    fn recursive(n: usize) {
+        if n > 1 {
+            recursive(n - 1);
+        }
+    }
+
+    let collector = {
+        let (root, collector) =
+            Span::root_with_args("root", CollectArgs::default().max_span_count(Some(5)));
+
+        {
+            let _g = root.set_local_parent();
+            recursive(3);
+        }
+        block_until_next_collect_loop();
+        {
+            let _g = root.set_local_parent();
+            recursive(3);
+        }
+        {
+            let _g = root.set_local_parent();
+            recursive(3);
+        }
+        block_until_next_collect_loop();
+        {
+            let _g = root.set_local_parent();
+            recursive(3);
+        }
+
+        collector
+    };
+
+    let spans = block_on(collector.collect());
+
+    let expected_graph = r#"
+root
+    recursive
+        recursive
+            recursive
+    recursive
+        recursive
+            recursive
 "#;
     assert_graph(spans, expected_graph);
 }
