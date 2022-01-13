@@ -35,6 +35,9 @@
 //!
 //!   A [`Collector`] will be provided when statring a root [`Span`]. Use it to collect all spans related to a request.
 //!
+//!   To extremely eliminate the overhead of tracing, the heavy computation and thread synchronization work are moved to a background thread,
+//!   and thus, we have to wait for the background thread to send the result back.
+//!
 //!   ```rust
 //!   use minitrace::prelude::*;
 //!
