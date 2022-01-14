@@ -68,6 +68,4 @@ Benchmark platform is `Intel(R) Xeon(R) CPU E5-2630 v4 @ 2.20GHz` on CentOS 7.
 100 spans/minitrace       time:   [3.7514 us 3.7564 us 3.7689 us]
 ```
 
-
-
 ![Benchmark](img/benchmark.jpeg)
