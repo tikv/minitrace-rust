@@ -111,13 +111,13 @@ root3
 
 #[test]
 fn multiple_threads_single_span() {
-    let collector = {
+    let collector = crossbeam::scope(|scope| {
         let (span, collector) = Span::root("root");
         let _g = span.set_local_parent();
 
         for _ in 0..4 {
             let child_span = Span::enter_with_local_parent("cross-thread");
-            std::thread::spawn(move || {
+            scope.spawn(move |_| {
                 let _g = child_span.set_local_parent();
                 four_spans();
             });
@@ -126,7 +126,8 @@ fn multiple_threads_single_span() {
         four_spans();
 
         collector
-    };
+    })
+    .unwrap();
 
     let spans = block_on(collector.collect());
 
@@ -163,7 +164,7 @@ root
 #[test]
 fn multiple_threads_multiple_spans() {
     let (spans1, spans2) = {
-        let (c1, c2) = {
+        let (c1, c2) = crossbeam::scope(|scope| {
             let (root_span1, collector1) = Span::root("root1");
             let (root_span2, collector2) = Span::root("root2");
             let local_collector = LocalCollector::start();
@@ -171,7 +172,7 @@ fn multiple_threads_multiple_spans() {
             for _ in 0..4 {
                 let merged =
                     Span::enter_with_parents("merged", vec![&root_span1, &root_span2].into_iter());
-                std::thread::spawn(move || {
+                scope.spawn(move |_| {
                     let local_collector = LocalCollector::start();
 
                     four_spans();
@@ -187,7 +188,8 @@ fn multiple_threads_multiple_spans() {
             root_span1.push_child_spans(local_spans.clone());
             root_span2.push_child_spans(local_spans);
             (collector1, collector2)
-        };
+        })
+        .unwrap();
 
         (block_on(c1.collect()), block_on(c2.collect()))
     };
