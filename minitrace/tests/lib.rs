@@ -6,6 +6,7 @@ use futures::executor::block_on;
 
 use minitrace::local::LocalCollector;
 use minitrace::prelude::*;
+use tokio::runtime::Builder;
 
 fn four_spans() {
     {
@@ -280,7 +281,7 @@ fn multiple_spans_without_local_spans() {
 }
 
 #[test]
-fn macro_with_async_trait() {
+fn trace_macro() {
     use async_trait::async_trait;
 
     #[async_trait]
@@ -308,12 +309,36 @@ fn macro_with_async_trait() {
             .await;
     }
 
+    impl Bar {
+        #[trace("work2")]
+        async fn work2(&self) {
+            let _g = Span::enter_with_local_parent("work-inner");
+            tokio::time::sleep(std::time::Duration::from_millis(100))
+                .enter_on_poll("sleep")
+                .await;
+        }
+    }
+
+    #[trace("work3")]
+    async fn work3() {
+        let _g = Span::enter_with_local_parent("work-inner");
+        tokio::time::sleep(std::time::Duration::from_millis(100))
+            .enter_on_poll("sleep")
+            .await;
+    }
+
     let collector = {
         let (root, collector) = Span::root("root");
         let _g = root.set_local_parent();
 
-        let runtime = tokio::runtime::Runtime::new().unwrap();
+        let runtime = Builder::new_multi_thread()
+            .worker_threads(4)
+            .enable_all()
+            .build()
+            .unwrap();
         block_on(runtime.spawn(Bar.run())).unwrap();
+        block_on(runtime.spawn(Bar.work2())).unwrap();
+        block_on(runtime.spawn(work3())).unwrap();
 
         collector
     };
@@ -322,6 +347,14 @@ fn macro_with_async_trait() {
 
     let expected_graph = r#"
 root
+    work3
+        work-inner
+        sleep
+        sleep
+    work2
+        work-inner
+        sleep
+        sleep
     run
         work
             sleep
