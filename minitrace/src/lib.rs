@@ -163,24 +163,22 @@ pub use crate::span::Span;
 /// # use minitrace::prelude::*;
 /// # use minitrace::local::LocalSpan;
 /// fn foo() {
-///     let _span1 = LocalSpan::enter_with_local_parent("foo");
+///     let __guard = LocalSpan::enter_with_local_parent("foo");
 ///     // some work
 /// }
 ///
-/// async fn bar() {
+/// fn bar() -> impl core::future::Future<Output = ()> {
 ///     async {
 ///         // some work
 ///     }
 ///     .in_span(Span::enter_with_local_parent("bar"))
-///     .await
 /// }
 ///
-/// async fn qux() {
+/// fn qux() -> impl core::future::Future<Output = ()> {
 ///     async {
 ///         // some work
 ///     }
 ///     .enter_on_poll("qux")
-///     .await
 /// }
 /// ```
 ///

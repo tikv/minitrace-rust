@@ -312,9 +312,8 @@ fn macro_with_async_trait() {
         let (root, collector) = Span::root("root");
         let _g = root.set_local_parent();
 
-        tokio::runtime::Runtime::new()
-            .unwrap()
-            .block_on(async { Bar.run().await });
+        let runtime = tokio::runtime::Runtime::new().unwrap();
+        block_on(runtime.spawn(Bar.run())).unwrap();
 
         collector
     };
