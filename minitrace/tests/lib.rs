@@ -281,12 +281,12 @@ fn multiple_spans_without_local_spans() {
 }
 
 #[test]
-fn trace_macro() {
+fn test_macro() {
     use async_trait::async_trait;
 
     #[async_trait]
     trait Foo {
-        async fn run(&self);
+        async fn run(&self, millis: &u64);
     }
 
     struct Bar;
@@ -294,35 +294,35 @@ fn trace_macro() {
     #[async_trait]
     impl Foo for Bar {
         #[trace("run")]
-        async fn run(&self) {
+        async fn run(&self, millis: &u64) {
             let _g = Span::enter_with_local_parent("run-inner");
-            work().await;
+            work(millis).await;
             let _g = LocalSpan::enter_with_local_parent("local-span");
         }
     }
 
     #[trace("work", enter_on_poll = true)]
-    async fn work() {
+    async fn work(millis: &u64) {
         let _g = Span::enter_with_local_parent("work-inner");
-        tokio::time::sleep(std::time::Duration::from_millis(100))
+        tokio::time::sleep(std::time::Duration::from_millis(*millis))
             .enter_on_poll("sleep")
             .await;
     }
 
     impl Bar {
         #[trace("work2")]
-        async fn work2(&self) {
+        async fn work2(&self, millis: &u64) {
             let _g = Span::enter_with_local_parent("work-inner");
-            tokio::time::sleep(std::time::Duration::from_millis(100))
+            tokio::time::sleep(std::time::Duration::from_millis(*millis))
                 .enter_on_poll("sleep")
                 .await;
         }
     }
 
     #[trace("work3")]
-    async fn work3() {
+    async fn work3(millis: &u64) {
         let _g = Span::enter_with_local_parent("work-inner");
-        tokio::time::sleep(std::time::Duration::from_millis(100))
+        tokio::time::sleep(std::time::Duration::from_millis(*millis))
             .enter_on_poll("sleep")
             .await;
     }
@@ -336,9 +336,9 @@ fn trace_macro() {
             .enable_all()
             .build()
             .unwrap();
-        block_on(runtime.spawn(Bar.run())).unwrap();
-        block_on(runtime.spawn(Bar.work2())).unwrap();
-        block_on(runtime.spawn(work3())).unwrap();
+        block_on(runtime.spawn(Bar.run(&100))).unwrap();
+        block_on(runtime.spawn(Bar.work2(&100))).unwrap();
+        block_on(runtime.spawn(work3(&100))).unwrap();
 
         collector
     };

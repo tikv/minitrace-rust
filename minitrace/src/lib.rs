@@ -269,8 +269,8 @@ pub use crate::span::Span;
 /// [`in_span()`]: crate::future::FutureExt::in_span
 pub use minitrace_macro::trace;
 
-///	A “prelude” for crates using the `minitrace` crate.
 pub mod prelude {
+    //! A “prelude” for crates using the `minitrace` crate.
     #[doc(no_inline)]
     pub use crate::collector::{CollectArgs, Collector, SpanRecord};
     #[doc(no_inline)]
