@@ -156,12 +156,17 @@ impl GlobalCollector {
         debug_assert!(self.commit_collects.is_empty());
         debug_assert!(self.submit_spans.is_empty());
 
+        let start_collects = &mut self.start_collects;
+        let drop_collects = &mut self.drop_collects;
+        let commit_collects = &mut self.commit_collects;
+        let submit_spans = &mut self.submit_spans;
+
         RetainMut::retain_mut(&mut self.rxs, |rx| loop {
             match rx.try_recv() {
-                Ok(Some(CollectCommand::StartCollect(cmd))) => self.start_collects.push(cmd),
-                Ok(Some(CollectCommand::DropCollect(cmd))) => self.drop_collects.push(cmd),
-                Ok(Some(CollectCommand::CommitCollect(cmd))) => self.commit_collects.push(cmd),
-                Ok(Some(CollectCommand::SubmitSpans(cmd))) => self.submit_spans.push(cmd),
+                Ok(Some(CollectCommand::StartCollect(cmd))) => start_collects.push(cmd),
+                Ok(Some(CollectCommand::DropCollect(cmd))) => drop_collects.push(cmd),
+                Ok(Some(CollectCommand::CommitCollect(cmd))) => commit_collects.push(cmd),
+                Ok(Some(CollectCommand::SubmitSpans(cmd))) => submit_spans.push(cmd),
                 Ok(None) => {
                     return true;
                 }
