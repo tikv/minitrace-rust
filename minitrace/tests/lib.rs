@@ -320,9 +320,12 @@ fn test_macro() {
     }
 
     #[trace("work3")]
-    async fn work3(millis: &u64) {
+    async fn work3<'a>(millis1: &'a u64, millis2: &u64) {
         let _g = Span::enter_with_local_parent("work-inner");
-        tokio::time::sleep(std::time::Duration::from_millis(*millis))
+        tokio::time::sleep(std::time::Duration::from_millis(*millis1))
+            .enter_on_poll("sleep")
+            .await;
+        tokio::time::sleep(std::time::Duration::from_millis(*millis2))
             .enter_on_poll("sleep")
             .await;
     }
@@ -338,7 +341,7 @@ fn test_macro() {
             .unwrap();
         block_on(runtime.spawn(Bar.run(&100))).unwrap();
         block_on(runtime.spawn(Bar.work2(&100))).unwrap();
-        block_on(runtime.spawn(work3(&100))).unwrap();
+        block_on(runtime.spawn(work3(&100, &100))).unwrap();
 
         collector
     };
@@ -349,6 +352,8 @@ fn test_macro() {
 root
     work3
         work-inner
+        sleep
+        sleep
         sleep
         sleep
     work2
