@@ -30,6 +30,26 @@
 //!
 //!   drop(root);
 //!   let records: Vec<SpanRecord> = block_on(collector.collect());
+//!
+//!   println!("{:#?}", records);
+//!   // [
+//!   //     SpanRecord {
+//!   //         id: 1,
+//!   //         parent_id: 0,
+//!   //         begin_unix_time_ns: 1642166520139678013,
+//!   //         duration_ns: 16008,
+//!   //         event: "root",
+//!   //         properties: [],
+//!   //     },
+//!   //     SpanRecord {
+//!   //         id: 2,
+//!   //         parent_id: 1,
+//!   //         begin_unix_time_ns: 1642166520139692070,
+//!   //         duration_ns: 634,
+//!   //         event: "a child span",
+//!   //         properties: [],
+//!   //     },
+//!   // ]
 //!   ```
 //!
 //!
@@ -70,14 +90,50 @@
 //!
 //!   ```
 //!   use minitrace::prelude::*;
+//!   use futures::executor::block_on;
 //!
 //!   let (mut root, collector) = Span::root("root");
 //!   root.with_property(|| ("key", "value".to_owned()));
 //!
-//!   let _guard = root.set_local_parent();
+//!   {
+//!       let _guard = root.set_local_parent();
 //!
-//!   let _span1 = LocalSpan::enter_with_local_parent("a child span")
-//!       .with_property(|| ("key", "value".to_owned()));
+//!       let _span1 = LocalSpan::enter_with_local_parent("a child span")
+//!           .with_property(|| ("key", "value".to_owned()));
+//!   }
+//!
+//!   drop(root);
+//!   let records: Vec<SpanRecord> = block_on(collector.collect());
+//!
+//!   println!("{:#?}", records);
+//!   // [
+//!   //     SpanRecord {
+//!   //         id: 1,
+//!   //         parent_id: 0,
+//!   //         begin_unix_time_ns: 1642166791041022255,
+//!   //         duration_ns: 121705,
+//!   //         event: "root",
+//!   //         properties: [
+//!   //             (
+//!   //                 "key",
+//!   //                 "value",
+//!   //             ),
+//!   //         ],
+//!   //     },
+//!   //     SpanRecord {
+//!   //         id: 2,
+//!   //         parent_id: 1,
+//!   //         begin_unix_time_ns: 1642166791041132550,
+//!   //         duration_ns: 7724,
+//!   //         event: "a child span",
+//!   //         properties: [
+//!   //             (
+//!   //                 "key",
+//!   //                 "value",
+//!   //             ),
+//!   //         ],
+//!   //     },
+//!   // ]
 //!   ```
 //!
 //! ## Macro
@@ -109,6 +165,34 @@
 //!
 //!   drop(root);
 //!   let records: Vec<SpanRecord> = block_on(collector.collect());
+//!
+//!   println!("{:#?}", records);
+//!   // [
+//!   //     SpanRecord {
+//!   //         id: 1,
+//!   //         parent_id: 0,
+//!   //         begin_unix_time_ns: 1642167988459480418,
+//!   //         duration_ns: 200741472,
+//!   //         event: "root",
+//!   //         properties: [],
+//!   //     },
+//!   //     SpanRecord {
+//!   //         id: 2,
+//!   //         parent_id: 1,
+//!   //         begin_unix_time_ns: 1642167988459571971,
+//!   //         duration_ns: 100084126,
+//!   //         event: "do_something",
+//!   //         properties: [],
+//!   //     },
+//!   //     SpanRecord {
+//!   //         id: 3,
+//!   //         parent_id: 1,
+//!   //         begin_unix_time_ns: 1642167988559887219,
+//!   //         duration_ns: 100306947,
+//!   //         event: "do_something_async",
+//!   //         properties: [],
+//!   //     },
+//!   // ]
 //!   ```
 //!
 //! [`Span`]: crate::Span

@@ -51,7 +51,7 @@ impl SpanQueue {
         let span = &mut self.span_queue[span_handle.index];
         span.end_with(Instant::now());
 
-        self.next_parent_id = Some(span.parent_id);
+        self.next_parent_id = Some(span.parent_id).filter(|id| id.0 != 0);
     }
 
     #[inline]

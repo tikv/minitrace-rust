@@ -368,6 +368,37 @@ root
 }
 
 #[test]
+fn macro_example() {
+    #[trace("do_something")]
+    fn do_something(i: u64) {
+        std::thread::sleep(std::time::Duration::from_millis(i));
+    }
+
+    #[trace("do_something_async")]
+    async fn do_something_async(i: u64) {
+        futures_timer::Delay::new(std::time::Duration::from_millis(i)).await;
+    }
+
+    let (root, collector) = Span::root("root");
+
+    {
+        let _g = root.set_local_parent();
+        do_something(100);
+        block_on(do_something_async(100));
+    }
+
+    drop(root);
+    let spans = block_on(collector.collect());
+
+    let expected_graph = r#"
+root
+    do_something_async
+    do_something
+"#;
+    assert_graph(spans, expected_graph);
+}
+
+#[test]
 fn multiple_local_parent() {
     let collector = {
         let (root, collector) = Span::root("root");
