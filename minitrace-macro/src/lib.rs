@@ -14,8 +14,8 @@ extern crate proc_macro_error;
 use proc_macro::TokenStream;
 use quote::quote_spanned;
 use syn::{
-    spanned::Spanned, AttributeArgs, Block, Expr, ExprAsync, ExprCall, Generics, Item, ItemFn, Lit,
-    Meta, MetaNameValue, NestedMeta, Path, Signature, Stmt,
+    parse_quote, spanned::Spanned, AttributeArgs, Block, Expr, ExprAsync, ExprCall, Generics, Item,
+    ItemFn, Lit, Meta, MetaNameValue, NestedMeta, Path, ReturnType, Signature, Stmt, Type,
 };
 
 #[proc_macro_attribute]
@@ -26,53 +26,32 @@ pub fn trace(args: TokenStream, item: TokenStream) -> TokenStream {
 
     // check for async_trait-like patterns in the block, and instrument
     // the future instead of the wrapper
-    if let Some(internal_fun) = get_async_trait_info(&input.block, input.sig.asyncness.is_some()) {
+    let func_body = if let Some(internal_fun) =
+        get_async_trait_info(&input.block, input.sig.asyncness.is_some())
+    {
         // let's rewrite some statements!
-        let mut out_stmts = Vec::with_capacity(input.block.stmts.len());
-        for stmt in &input.block.stmts {
-            if stmt == internal_fun.source_stmt {
-                match internal_fun.kind {
-                    // async-trait <= 0.1.43
-                    AsyncTraitKind::Function(fun) => {
-                        out_stmts.push(gen_function(fun, args));
-                    }
-                    // async-trait >= 0.1.44
-                    AsyncTraitKind::Async(async_expr) => {
-                        // fallback if we couldn't find the '__async_trait' binding, might be
-                        // useful for crates exhibiting the same behaviors as async-trait
-                        let instrumented_block = gen_block(&async_expr.block, true, args);
-                        let async_attrs = &async_expr.attrs;
-                        out_stmts.push(quote! {
-                            Box::pin(#(#async_attrs) * async move { #instrumented_block })
-                        });
-                    }
+        match internal_fun.kind {
+            // async-trait <= 0.1.43
+            AsyncTraitKind::Function(_) => {
+                unimplemented!("Please upgrade crate `async-trait` to a version higher than 0.1.44")
+            }
+            // async-trait >= 0.1.44
+            AsyncTraitKind::Async(async_expr) => {
+                // fallback if we couldn't find the '__async_trait' binding, might be
+                // useful for crates exhibiting the same behaviors as async-trait
+                let instrumented_block = gen_block(&async_expr.block, true, args);
+                let async_attrs = &async_expr.attrs;
+                quote! {
+                    Box::pin(#(#async_attrs) * { #instrumented_block })
                 }
-                break;
             }
         }
-
-        let vis = &input.vis;
-        let sig = &input.sig;
-        let attrs = &input.attrs;
-        let func: proc_macro2::TokenStream = quote! {
-            #(#attrs) *
-            #vis #sig {
-                #(#out_stmts) *
-            }
-        };
-        func.into()
     } else {
-        gen_function(&input, args).into()
-    }
-}
+        gen_block(&input.block, input.sig.asyncness.is_some(), args)
+    };
 
-/// Given an existing function, generate an instrumented version of that function
-fn gen_function(input: &ItemFn, args: Args) -> proc_macro2::TokenStream {
     let ItemFn {
-        attrs,
-        vis,
-        block,
-        sig,
+        attrs, vis, sig, ..
     } = input;
 
     let Signature {
@@ -92,16 +71,25 @@ fn gen_function(input: &ItemFn, args: Args) -> proc_macro2::TokenStream {
         ..
     } = sig;
 
-    let body = gen_block(block, asyncness.is_some(), args);
+    let return_type: ReturnType = if asyncness.is_some() {
+        let output_type: Type = match return_type {
+            ReturnType::Default => parse_quote! { () },
+            ReturnType::Type(_, ty) => *ty.clone(),
+        };
+        parse_quote! { -> impl core::future::Future<Output = #output_type> }
+    } else {
+        return_type.clone()
+    };
 
     quote::quote!(
         #(#attrs) *
-        #vis #constness #unsafety #asyncness #abi fn #ident<#gen_params>(#params) #return_type
+        #vis #constness #unsafety #abi fn #ident<#gen_params>(#params) #return_type
         #where_clause
         {
-            #body
+            #func_body
         }
     )
+    .into()
 }
 
 /// Instrument a block
@@ -118,15 +106,13 @@ fn gen_block(block: &Block, async_context: bool, args: Args) -> proc_macro2::Tok
                     async move { #block },
                     #event
                 )
-                .await
             )
         } else {
             quote_spanned!(block.span()=>
                 minitrace::future::FutureExt::in_span(
                     async move { #block },
-                    minitrace::prelude::Span::enter_with_local_parent( #event )
+                    minitrace::Span::enter_with_local_parent( #event )
                 )
-                .await
             )
         }
     } else {
@@ -135,7 +121,7 @@ fn gen_block(block: &Block, async_context: bool, args: Args) -> proc_macro2::Tok
         }
 
         quote_spanned!(block.span()=>
-            let __guard = minitrace::prelude::LocalSpan::enter_with_local_parent( #event );
+            let __guard = minitrace::local::LocalSpan::enter_with_local_parent( #event );
             #block
         )
     }
@@ -186,7 +172,7 @@ enum AsyncTraitKind<'a> {
 
 struct AsyncTraitInfo<'a> {
     // statement that must be patched
-    source_stmt: &'a Stmt,
+    _source_stmt: &'a Stmt,
     kind: AsyncTraitKind<'a>,
 }
 
@@ -264,7 +250,7 @@ fn get_async_trait_info(block: &Block, block_is_async: bool) -> Option<AsyncTrai
         async_expr.capture?;
 
         return Some(AsyncTraitInfo {
-            source_stmt: last_expr_stmt,
+            _source_stmt: last_expr_stmt,
             kind: AsyncTraitKind::Async(async_expr),
         });
     }
@@ -288,7 +274,7 @@ fn get_async_trait_info(block: &Block, block_is_async: bool) -> Option<AsyncTrai
         .find(|(_, fun)| fun.sig.ident == func_name)?;
 
     Some(AsyncTraitInfo {
-        source_stmt: stmt_func_declaration,
+        _source_stmt: stmt_func_declaration,
         kind: AsyncTraitKind::Function(func),
     })
 }

@@ -117,7 +117,7 @@ struct SubmitSpans {
 }
 
 pub(crate) struct GlobalCollector {
-    collection: HashMap<u32, (Vec<SpanCollection>, usize, CollectArgs)>,
+    active_collector: HashMap<u32, (Vec<SpanCollection>, usize, CollectArgs)>,
     rxs: Vec<Receiver<CollectCommand>>,
 
     // Vectors to be reused by collection loops. They must be empty outside of the `handle_commands` loop.
@@ -136,7 +136,7 @@ impl GlobalCollector {
         });
 
         GlobalCollector {
-            collection: HashMap::new(),
+            active_collector: HashMap::new(),
             rxs: Vec::new(),
 
             start_collects: Vec::new(),
@@ -177,12 +177,12 @@ impl GlobalCollector {
             collect_args,
         } in self.start_collects.drain(..)
         {
-            self.collection
+            self.active_collector
                 .insert(collect_id, (Vec::new(), 0, collect_args));
         }
 
         for DropCollect { collect_id } in self.drop_collects.drain(..) {
-            self.collection.remove(&collect_id);
+            self.active_collector.remove(&collect_id);
         }
 
         for SubmitSpans { spans, parents } in self.submit_spans.drain(..) {
@@ -191,7 +191,7 @@ impl GlobalCollector {
             if parents.len() == 1 {
                 let parent_span = parents[0];
                 if let Some((buf, span_count, collect_args)) =
-                    self.collection.get_mut(&parent_span.collect_id)
+                    self.active_collector.get_mut(&parent_span.collect_id)
                 {
                     if *span_count < collect_args.max_span_count.unwrap_or(usize::MAX)
                         || parent_span.span_id == SpanId::new(0)
@@ -207,7 +207,7 @@ impl GlobalCollector {
                 let spans = Arc::new(spans);
                 for parent_span in parents.iter() {
                     if let Some((buf, span_count, collect_args)) =
-                        self.collection.get_mut(&parent_span.collect_id)
+                        self.active_collector.get_mut(&parent_span.collect_id)
                     {
                         if *span_count < collect_args.max_span_count.unwrap_or(usize::MAX)
                             || parent_span.span_id == SpanId::new(0)
@@ -225,7 +225,7 @@ impl GlobalCollector {
 
         for CommitCollect { collect_id, tx } in self.commit_collects.drain(..) {
             let records = self
-                .collection
+                .active_collector
                 .remove(&collect_id)
                 .map(|(span_collections, span_count, _)| {
                     merge_collection(span_collections, span_count)

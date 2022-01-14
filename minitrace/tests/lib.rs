@@ -310,9 +310,11 @@ fn macro_with_async_trait() {
 
     let collector = {
         let (root, collector) = Span::root("root");
+        let _g = root.set_local_parent();
+
         tokio::runtime::Runtime::new()
             .unwrap()
-            .block_on(async { Bar.run().await }.in_span(Span::enter_with_parent("task", &root)));
+            .block_on(async { Bar.run().await });
 
         collector
     };
@@ -321,15 +323,14 @@ fn macro_with_async_trait() {
 
     let expected_graph = r#"
 root
-    task
-        run
-            work
-                sleep
-            work
-                work-inner
-                sleep
-            run-inner
-            local-span
+    run
+        work
+            sleep
+        work
+            work-inner
+            sleep
+        run-inner
+        local-span
 "#;
     assert_graph(spans, expected_graph);
 }
