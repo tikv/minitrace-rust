@@ -11,8 +11,8 @@ A high-performance and ergonomic timeline tracing library for Rust. Builtin supp
 
 ```toml
 [dependencies]
-minitrace = "0.2"
-minitrace-jaeger = "0.2"
+minitrace = "0.3"
+minitrace-jaeger = "0.3"
 ```
 
 ```rust
