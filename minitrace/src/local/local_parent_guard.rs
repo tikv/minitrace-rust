@@ -1,8 +1,8 @@
 // Copyright 2020 TiKV Project Authors. Licensed under Apache-2.0.
 
 use crate::local::local_collector::LocalCollector;
-use crate::span::Span;
 use crate::util::alloc_parent_spans;
+use crate::Span;
 
 #[must_use]
 pub struct LocalParentGuard {

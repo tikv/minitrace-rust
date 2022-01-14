@@ -12,6 +12,7 @@ use crate::local::span_id::{DefaultIdGenerator, SpanId};
 use crate::local::{LocalParentGuard, LocalSpans};
 use crate::util::{alloc_parent_spans, ParentSpans};
 
+/// A thread-safe span.
 #[must_use]
 #[derive(Debug)]
 pub struct Span {
@@ -36,6 +37,7 @@ impl Span {
         }
     }
 
+    /// Create a place-holder span that never starts recording.
     #[inline]
     pub fn new_noop() -> Self {
         Self { inner: None }

@@ -10,7 +10,7 @@
 //!
 //! ## Report to Jaeger
 //!
-//! ```rust,no_run
+//! ```,no_run
 //! use std::net::SocketAddr;
 //! use futures::executor::block_on;
 //! use minitrace::prelude::*;
