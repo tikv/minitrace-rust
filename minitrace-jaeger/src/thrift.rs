@@ -94,7 +94,7 @@ impl From<Log> for Struct {
 /// Span reference kind.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum SpanRefKind {
-    ChildOf = 0,
+    // ChildOf = 0,
     FollowsFrom = 1,
 }
 
