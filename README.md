@@ -5,7 +5,7 @@
 [![Crates.io](https://img.shields.io/crates/v/minitrace.svg)](https://crates.io/crates/minitrace)
 [![LICENSE](https://img.shields.io/github/license/tikv/minitrace-rust.svg)](https://github.com/tikv/minitrace-rust/blob/master/LICENSE)
 
-A high-performance and ergonomic timeline tracing library for Rust. Builtin supports [Jaeger](https://www.jaegertracing.io/) and [Datadog](https://www.datadoghq.com/).
+A high-performance and ergonomic timeline tracing library for Rust. Builtin supports [Jaeger](https://crates.io/crates/minitrace-jaeger) and [Datadog](https://crates.io/crates/minitrace-datadog).
 
 ## Usage
 

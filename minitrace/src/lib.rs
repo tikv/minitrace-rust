@@ -12,8 +12,8 @@
 //!
 //!   To record such a span record, we create a [`Span`] to start clocking and drop it to stop recording.
 //!
-//!   A new `Span` can be started via [`Span::root()`], [`Span::enter_with_parent()`]. The span started by the
-//!   latter method will be the child span of parent.
+//!   A new `Span` can be started via [`Span::root()`] and [`Span::enter_with_parent()`]. `Span::enter_with_parent()`
+//!   will start a child span to a given parent span.
 //!
 //!   `Span` is thread-safe and can be sent across threads.
 //!
