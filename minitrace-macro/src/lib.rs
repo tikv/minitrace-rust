@@ -11,135 +11,11 @@ extern crate proc_macro;
 #[macro_use]
 extern crate proc_macro_error;
 
-use proc_macro::TokenStream;
-use quote::quote_spanned;
-use syn::{
-    spanned::Spanned, AttributeArgs, Block, Expr, ExprAsync, ExprCall, Generics, Item, ItemFn, Lit,
-    Meta, MetaNameValue, NestedMeta, Path, Signature, Stmt,
-};
-
-#[proc_macro_attribute]
-#[proc_macro_error]
-pub fn trace(args: TokenStream, item: TokenStream) -> TokenStream {
-    let input = syn::parse_macro_input!(item as ItemFn);
-    let args = Args::parse(syn::parse_macro_input!(args as AttributeArgs));
-
-    // check for async_trait-like patterns in the block, and instrument
-    // the future instead of the wrapper
-    if let Some(internal_fun) = get_async_trait_info(&input.block, input.sig.asyncness.is_some()) {
-        // let's rewrite some statements!
-        let mut out_stmts = Vec::with_capacity(input.block.stmts.len());
-        for stmt in &input.block.stmts {
-            if stmt == internal_fun.source_stmt {
-                match internal_fun.kind {
-                    // async-trait <= 0.1.43
-                    AsyncTraitKind::Function(fun) => {
-                        out_stmts.push(gen_function(fun, args));
-                    }
-                    // async-trait >= 0.1.44
-                    AsyncTraitKind::Async(async_expr) => {
-                        // fallback if we couldn't find the '__async_trait' binding, might be
-                        // useful for crates exhibiting the same behaviors as async-trait
-                        let instrumented_block = gen_block(&async_expr.block, true, args);
-                        let async_attrs = &async_expr.attrs;
-                        out_stmts.push(quote! {
-                            Box::pin(#(#async_attrs) * async move { #instrumented_block })
-                        });
-                    }
-                }
-                break;
-            }
-        }
-
-        let vis = &input.vis;
-        let sig = &input.sig;
-        let attrs = &input.attrs;
-        let func: proc_macro2::TokenStream = quote! {
-            #(#attrs) *
-            #vis #sig {
-                #(#out_stmts) *
-            }
-        };
-        func.into()
-    } else {
-        gen_function(&input, args).into()
-    }
-}
-
-/// Given an existing function, generate an instrumented version of that function
-fn gen_function(input: &ItemFn, args: Args) -> proc_macro2::TokenStream {
-    let ItemFn {
-        attrs,
-        vis,
-        block,
-        sig,
-    } = input;
-
-    let Signature {
-        output: return_type,
-        inputs: params,
-        unsafety,
-        asyncness,
-        constness,
-        abi,
-        ident,
-        generics:
-            Generics {
-                params: gen_params,
-                where_clause,
-                ..
-            },
-        ..
-    } = sig;
-
-    let body = gen_block(block, asyncness.is_some(), args);
-
-    quote::quote!(
-        #(#attrs) *
-        #vis #constness #unsafety #asyncness #abi fn #ident<#gen_params>(#params) #return_type
-        #where_clause
-        {
-            #body
-        }
-    )
-}
-
-/// Instrument a block
-fn gen_block(block: &Block, async_context: bool, args: Args) -> proc_macro2::TokenStream {
-    let event = args.event;
-
-    // Generate the instrumented function body.
-    // If the function is an `async fn`, this will wrap it in an async block.
-    // Otherwise, this will enter the span and then perform the rest of the body.
-    if async_context {
-        if args.enter_on_poll {
-            quote_spanned!(block.span()=>
-                minitrace::future::FutureExt::enter_on_poll(
-                    async move { #block },
-                    #event
-                )
-                .await
-            )
-        } else {
-            quote_spanned!(block.span()=>
-                minitrace::future::FutureExt::in_span(
-                    async move { #block },
-                    minitrace::prelude::Span::enter_with_local_parent( #event )
-                )
-                .await
-            )
-        }
-    } else {
-        if args.enter_on_poll {
-            abort_call_site!("`enter_on_poll` can not be applied on non-async function");
-        }
-
-        quote_spanned!(block.span()=>
-            let __guard = minitrace::prelude::LocalSpan::enter_with_local_parent( #event );
-            #block
-        )
-    }
-}
+use proc_macro2::TokenStream;
+use proc_macro2::{Span, TokenTree};
+use quote::{format_ident, quote_spanned};
+use syn::spanned::Spanned;
+use syn::{punctuated::Punctuated, visit_mut::VisitMut, *};
 
 struct Args {
     event: String,
@@ -177,6 +53,379 @@ impl Args {
     }
 }
 
+#[proc_macro_attribute]
+#[proc_macro_error]
+pub fn trace(
+    args: proc_macro::TokenStream,
+    item: proc_macro::TokenStream,
+) -> proc_macro::TokenStream {
+    let input = syn::parse_macro_input!(item as ItemFn);
+    let args = Args::parse(syn::parse_macro_input!(args as AttributeArgs));
+
+    // check for async_trait-like patterns in the block, and instrument
+    // the future instead of the wrapper
+    let func_body = if let Some(internal_fun) =
+        get_async_trait_info(&input.block, input.sig.asyncness.is_some())
+    {
+        // let's rewrite some statements!
+        match internal_fun.kind {
+            // async-trait <= 0.1.43
+            AsyncTraitKind::Function(_) => {
+                unimplemented!("Please upgrade crate `async-trait` to a version higher than 0.1.44")
+            }
+            // async-trait >= 0.1.44
+            AsyncTraitKind::Async(async_expr) => {
+                // fallback if we couldn't find the '__async_trait' binding, might be
+                // useful for crates exhibiting the same behaviors as async-trait
+                let instrumented_block = gen_block(&async_expr.block, true, args);
+                let async_attrs = &async_expr.attrs;
+                quote! {
+                        Box::pin(#(#async_attrs) * { #instrumented_block })
+                }
+            }
+        }
+    } else {
+        gen_block(&input.block, input.sig.asyncness.is_some(), args)
+    };
+
+    let ItemFn {
+        attrs,
+        vis,
+        mut sig,
+        ..
+    } = input;
+
+    if sig.asyncness.is_some() {
+        let has_self = has_self_in_sig(&mut sig);
+        transform_sig(&mut sig, has_self, true);
+    }
+
+    let Signature {
+        output: return_type,
+        inputs: params,
+        unsafety,
+        constness,
+        abi,
+        ident,
+        generics:
+            Generics {
+                params: gen_params,
+                where_clause,
+                ..
+            },
+        ..
+    } = sig;
+
+    quote::quote!(
+        #(#attrs) *
+        #vis #constness #unsafety #abi fn #ident<#gen_params>(#params) #return_type
+        #where_clause
+        {
+            #func_body
+        }
+    )
+    .into()
+}
+
+/// Instrument a block
+fn gen_block(block: &Block, async_context: bool, args: Args) -> proc_macro2::TokenStream {
+    let event = args.event;
+
+    // Generate the instrumented function body.
+    // If the function is an `async fn`, this will wrap it in an async block.
+    // Otherwise, this will enter the span and then perform the rest of the body.
+    if async_context {
+        if args.enter_on_poll {
+            quote_spanned!(block.span()=>
+                minitrace::future::FutureExt::enter_on_poll(
+                    async move { #block },
+                    #event
+                )
+            )
+        } else {
+            quote_spanned!(block.span()=>
+                minitrace::future::FutureExt::in_span(
+                    async move { #block },
+                    minitrace::Span::enter_with_local_parent( #event )
+                )
+            )
+        }
+    } else {
+        if args.enter_on_poll {
+            abort_call_site!("`enter_on_poll` can not be applied on non-async function");
+        }
+
+        quote_spanned!(block.span()=>
+            let __guard = minitrace::local::LocalSpan::enter_with_local_parent( #event );
+            #block
+        )
+    }
+}
+
+fn transform_sig(sig: &mut Signature, has_self: bool, is_local: bool) {
+    sig.fn_token.span = sig.asyncness.take().unwrap().span;
+
+    let ret = match &sig.output {
+        ReturnType::Default => quote!(()),
+        ReturnType::Type(_, ret) => quote!(#ret),
+    };
+
+    let default_span = sig
+        .ident
+        .span()
+        .join(sig.paren_token.span)
+        .unwrap_or_else(|| sig.ident.span());
+
+    let mut lifetimes = CollectLifetimes::new("'life", default_span);
+    for arg in sig.inputs.iter_mut() {
+        match arg {
+            FnArg::Receiver(arg) => lifetimes.visit_receiver_mut(arg),
+            FnArg::Typed(arg) => lifetimes.visit_type_mut(&mut arg.ty),
+        }
+    }
+
+    for param in sig.generics.params.iter() {
+        match param {
+            GenericParam::Type(param) => {
+                let param = &param.ident;
+                let span = param.span();
+                where_clause_or_default(&mut sig.generics.where_clause)
+                    .predicates
+                    .push(parse_quote_spanned!(span=> #param: 'minitrace));
+            }
+            GenericParam::Lifetime(param) => {
+                let param = &param.lifetime;
+                let span = param.span();
+                where_clause_or_default(&mut sig.generics.where_clause)
+                    .predicates
+                    .push(parse_quote_spanned!(span=> #param: 'minitrace));
+            }
+            GenericParam::Const(_) => {}
+        }
+    }
+
+    if sig.generics.lt_token.is_none() {
+        sig.generics.lt_token = Some(Token![<](sig.ident.span()));
+    }
+    if sig.generics.gt_token.is_none() {
+        sig.generics.gt_token = Some(Token![>](sig.paren_token.span));
+    }
+
+    for elided in lifetimes.elided {
+        sig.generics.params.push(parse_quote!(#elided));
+        where_clause_or_default(&mut sig.generics.where_clause)
+            .predicates
+            .push(parse_quote_spanned!(elided.span()=> #elided: 'minitrace));
+    }
+
+    sig.generics
+        .params
+        .push(parse_quote_spanned!(default_span=> 'minitrace));
+
+    if has_self {
+        let bound_span = sig.ident.span();
+        let bound = match sig.inputs.iter().next() {
+            Some(FnArg::Receiver(Receiver {
+                reference: Some(_),
+                mutability: None,
+                ..
+            })) => Ident::new("Sync", bound_span),
+            Some(FnArg::Typed(arg))
+                if match (arg.pat.as_ref(), arg.ty.as_ref()) {
+                    (Pat::Ident(pat), Type::Reference(ty)) => {
+                        pat.ident == "self" && ty.mutability.is_none()
+                    }
+                    _ => false,
+                } =>
+            {
+                Ident::new("Sync", bound_span)
+            }
+            _ => Ident::new("Send", bound_span),
+        };
+
+        let where_clause = where_clause_or_default(&mut sig.generics.where_clause);
+        where_clause.predicates.push(if is_local {
+            parse_quote_spanned!(bound_span=> Self: 'minitrace)
+        } else {
+            parse_quote_spanned!(bound_span=> Self: ::core::marker::#bound + 'minitrace)
+        });
+    }
+
+    for (i, arg) in sig.inputs.iter_mut().enumerate() {
+        match arg {
+            FnArg::Receiver(Receiver {
+                reference: Some(_), ..
+            }) => {}
+            FnArg::Receiver(arg) => arg.mutability = None,
+            FnArg::Typed(arg) => {
+                if let Pat::Ident(ident) = &mut *arg.pat {
+                    ident.by_ref = None;
+                    ident.mutability = None;
+                } else {
+                    let positional = positional_arg(i, &arg.pat);
+                    let m = mut_pat(&mut arg.pat);
+                    arg.pat = parse_quote!(#m #positional);
+                }
+            }
+        }
+    }
+
+    let ret_span = sig.ident.span();
+    let bounds = if is_local {
+        quote_spanned!(ret_span=> 'minitrace)
+    } else {
+        quote_spanned!(ret_span=> ::core::marker::Send + 'minitrace)
+    };
+    sig.output = parse_quote_spanned! {ret_span=>
+        -> impl ::core::future::Future<Output = #ret> + #bounds
+    };
+}
+
+struct CollectLifetimes {
+    pub elided: Vec<Lifetime>,
+    pub explicit: Vec<Lifetime>,
+    pub name: &'static str,
+    pub default_span: Span,
+}
+
+impl CollectLifetimes {
+    pub fn new(name: &'static str, default_span: Span) -> Self {
+        CollectLifetimes {
+            elided: Vec::new(),
+            explicit: Vec::new(),
+            name,
+            default_span,
+        }
+    }
+
+    fn visit_opt_lifetime(&mut self, lifetime: &mut Option<Lifetime>) {
+        match lifetime {
+            None => *lifetime = Some(self.next_lifetime(None)),
+            Some(lifetime) => self.visit_lifetime(lifetime),
+        }
+    }
+
+    fn visit_lifetime(&mut self, lifetime: &mut Lifetime) {
+        if lifetime.ident == "_" {
+            *lifetime = self.next_lifetime(lifetime.span());
+        } else {
+            self.explicit.push(lifetime.clone());
+        }
+    }
+
+    fn next_lifetime<S: Into<Option<Span>>>(&mut self, span: S) -> Lifetime {
+        let name = format!("{}{}", self.name, self.elided.len());
+        let span = span.into().unwrap_or(self.default_span);
+        let life = Lifetime::new(&name, span);
+        self.elided.push(life.clone());
+        life
+    }
+}
+
+impl VisitMut for CollectLifetimes {
+    fn visit_receiver_mut(&mut self, arg: &mut Receiver) {
+        if let Some((_, lifetime)) = &mut arg.reference {
+            self.visit_opt_lifetime(lifetime);
+        }
+    }
+
+    fn visit_type_reference_mut(&mut self, ty: &mut TypeReference) {
+        self.visit_opt_lifetime(&mut ty.lifetime);
+        visit_mut::visit_type_reference_mut(self, ty);
+    }
+
+    fn visit_generic_argument_mut(&mut self, gen: &mut GenericArgument) {
+        if let GenericArgument::Lifetime(lifetime) = gen {
+            self.visit_lifetime(lifetime);
+        }
+        visit_mut::visit_generic_argument_mut(self, gen);
+    }
+}
+
+fn positional_arg(i: usize, pat: &Pat) -> Ident {
+    format_ident!("__arg{}", i, span = pat.span())
+}
+
+fn mut_pat(pat: &mut Pat) -> Option<Token![mut]> {
+    let mut visitor = HasMutPat(None);
+    visitor.visit_pat_mut(pat);
+    visitor.0
+}
+
+fn has_self_in_sig(sig: &mut Signature) -> bool {
+    let mut visitor = HasSelf(false);
+    visitor.visit_signature_mut(sig);
+    visitor.0
+}
+
+fn has_self_in_token_stream(tokens: TokenStream) -> bool {
+    tokens.into_iter().any(|tt| match tt {
+        TokenTree::Ident(ident) => ident == "Self",
+        TokenTree::Group(group) => has_self_in_token_stream(group.stream()),
+        _ => false,
+    })
+}
+
+struct HasMutPat(Option<Token![mut]>);
+
+impl VisitMut for HasMutPat {
+    fn visit_pat_ident_mut(&mut self, i: &mut PatIdent) {
+        if let Some(m) = i.mutability {
+            self.0 = Some(m);
+        } else {
+            visit_mut::visit_pat_ident_mut(self, i);
+        }
+    }
+}
+
+struct HasSelf(bool);
+
+impl VisitMut for HasSelf {
+    fn visit_expr_path_mut(&mut self, expr: &mut ExprPath) {
+        self.0 |= expr.path.segments[0].ident == "Self";
+        visit_mut::visit_expr_path_mut(self, expr);
+    }
+
+    fn visit_pat_path_mut(&mut self, pat: &mut PatPath) {
+        self.0 |= pat.path.segments[0].ident == "Self";
+        visit_mut::visit_pat_path_mut(self, pat);
+    }
+
+    fn visit_type_path_mut(&mut self, ty: &mut TypePath) {
+        self.0 |= ty.path.segments[0].ident == "Self";
+        visit_mut::visit_type_path_mut(self, ty);
+    }
+
+    fn visit_receiver_mut(&mut self, _arg: &mut Receiver) {
+        self.0 = true;
+    }
+
+    fn visit_item_mut(&mut self, _: &mut Item) {
+        // Do not recurse into nested items.
+    }
+
+    fn visit_macro_mut(&mut self, mac: &mut Macro) {
+        if !contains_fn(mac.tokens.clone()) {
+            self.0 |= has_self_in_token_stream(mac.tokens.clone());
+        }
+    }
+}
+
+fn contains_fn(tokens: TokenStream) -> bool {
+    tokens.into_iter().any(|tt| match tt {
+        TokenTree::Ident(ident) => ident == "fn",
+        TokenTree::Group(group) => contains_fn(group.stream()),
+        _ => false,
+    })
+}
+
+fn where_clause_or_default(clause: &mut Option<WhereClause>) -> &mut WhereClause {
+    clause.get_or_insert_with(|| WhereClause {
+        where_token: Default::default(),
+        predicates: Punctuated::new(),
+    })
+}
+
 enum AsyncTraitKind<'a> {
     // old construction. Contains the function
     Function(&'a ItemFn),
@@ -186,7 +435,7 @@ enum AsyncTraitKind<'a> {
 
 struct AsyncTraitInfo<'a> {
     // statement that must be patched
-    source_stmt: &'a Stmt,
+    _source_stmt: &'a Stmt,
     kind: AsyncTraitKind<'a>,
 }
 
@@ -264,7 +513,7 @@ fn get_async_trait_info(block: &Block, block_is_async: bool) -> Option<AsyncTrai
         async_expr.capture?;
 
         return Some(AsyncTraitInfo {
-            source_stmt: last_expr_stmt,
+            _source_stmt: last_expr_stmt,
             kind: AsyncTraitKind::Async(async_expr),
         });
     }
@@ -288,7 +537,7 @@ fn get_async_trait_info(block: &Block, block_is_async: bool) -> Option<AsyncTrai
         .find(|(_, fun)| fun.sig.ident == func_name)?;
 
     Some(AsyncTraitInfo {
-        source_stmt: stmt_func_declaration,
+        _source_stmt: stmt_func_declaration,
         kind: AsyncTraitKind::Function(func),
     })
 }

@@ -1,18 +1,12 @@
 // Copyright 2021 TiKV Project Authors. Licensed under Apache-2.0.
 
-pub(crate) mod acquirer;
+//! Collector and the collected spans.
 
-use crossbeam::channel::Receiver;
+pub(crate) mod global_collector;
 
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Arc;
-use std::time::Duration;
+use crate::local::span_id::SpanId;
 
-use minstant::Anchor;
-
-use crate::collector::acquirer::SpanCollection;
-use crate::local::raw_span::RawSpan;
-
+/// A span records been collected.
 #[derive(Clone, Debug, Default)]
 pub struct SpanRecord {
     pub id: u32,
@@ -23,147 +17,88 @@ pub struct SpanRecord {
     pub properties: Vec<(&'static str, String)>,
 }
 
-impl SpanRecord {
-    #[inline]
-    pub(crate) fn from_raw_span(raw_span: RawSpan, anchor: &Anchor) -> SpanRecord {
-        let begin_unix_time_ns = raw_span.begin_instant.as_unix_nanos(anchor);
-        let end_unix_time_ns = raw_span.end_instant.as_unix_nanos(anchor);
-        SpanRecord {
-            id: raw_span.id.0,
-            parent_id: raw_span.parent_id.0,
-            begin_unix_time_ns,
-            duration_ns: end_unix_time_ns - begin_unix_time_ns,
-            event: raw_span.event,
-            properties: raw_span.properties,
-        }
-    }
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct ParentSpan {
+    pub(crate) span_id: SpanId,
+    pub(crate) collect_id: u32,
 }
 
+/// The collector for collecting all spans of a request.
+///
+/// A [`Collector`] is be provided when statring a root [`Span`](crate::Span) by calling [`Span::root()`](crate::Span::root).
+///
+/// In order to extremely eliminate the overhead of tracing, the heavy computation and thread synchronization work are moved to a background thread,
+/// and thus, we have to wait for the background thread to send the result back.
+///
+/// # Examples
+///
+/// ```
+/// use minitrace::prelude::*;
+/// use futures::executor::block_on;
+///
+/// let (root, collector) = Span::root("root");
+/// drop(root);
+///
+/// let records: Vec<SpanRecord> = block_on(collector.collect());
+/// ```
 pub struct Collector {
-    receiver: Receiver<SpanCollection>,
-    closed: Arc<AtomicBool>,
+    collect_id: u32,
 }
 
 impl Collector {
-    pub(crate) fn new(receiver: Receiver<SpanCollection>, closed: Arc<AtomicBool>) -> Self {
-        Collector { receiver, closed }
+    pub(crate) fn start_collect(args: CollectArgs) -> (Self, u32) {
+        let collect_id = global_collector::start_collect(args);
+
+        (Collector { collect_id }, collect_id)
     }
 
-    pub fn collect(self) -> Vec<SpanRecord> {
-        self.collect_with_args(CollectArgs {
-            sync: false,
-            duration_threshold: None,
-        })
-    }
-
-    /// Collects spans from traced routines.
+    /// Stop the trace and collect all span been recorded.
     ///
-    /// If passing `duration_threshold`, all spans will be reserved only when duration of the root
-    /// span exceeds `duration_threshold`, otherwise only one span, the root span, will be returned.
-    pub fn collect_with_args(
-        self,
-        CollectArgs {
-            sync,
-            duration_threshold,
-        }: CollectArgs,
-    ) -> Vec<SpanRecord> {
-        let span_collections: Vec<_> = if sync {
-            self.receiver.iter().collect()
-        } else {
-            self.receiver.try_iter().collect()
-        };
-        self.closed.store(true, Ordering::SeqCst);
+    /// To extremely eliminate the overhead of tracing, the heavy computation and thread synchronization
+    /// work are moved to a background thread, and thus, we have to wait for the background thread to send
+    /// the result back.
+    pub async fn collect(self) -> Vec<SpanRecord> {
+        let (tx, rx) = futures::channel::oneshot::channel();
+        global_collector::commit_collect(self.collect_id, tx);
 
-        let anchor = Anchor::new();
-        if let Some(duration) = duration_threshold {
-            // find the root span and check its duration
-            if let Some(root_span) = span_collections.iter().find_map(|s| match s {
-                SpanCollection::Span(s) if s.parent_id.0 == 0 => Some(s),
-                _ => None,
-            }) {
-                let root_span = SpanRecord::from_raw_span(root_span.clone(), &anchor);
-                if root_span.duration_ns < duration.as_nanos() as _ {
-                    return vec![root_span];
-                }
-            }
-        }
+        // Because the collect is committed, don't drop the collect.
+        std::mem::forget(self);
 
-        Self::amend(span_collections, &anchor)
+        rx.await.unwrap_or_else(|_| Vec::new())
     }
 }
 
-impl Collector {
-    #[inline]
-    fn amend(span_collections: Vec<SpanCollection>, anchor: &Anchor) -> Vec<SpanRecord> {
-        let capacity = span_collections
-            .iter()
-            .map(|sc| match sc {
-                SpanCollection::LocalSpans {
-                    local_spans: raw_spans,
-                    ..
-                } => raw_spans.spans.len(),
-                SpanCollection::Span(_) => 1,
-            })
-            .sum();
-
-        let mut spans = Vec::with_capacity(capacity);
-
-        for span_collection in span_collections {
-            match span_collection {
-                SpanCollection::LocalSpans {
-                    local_spans: raw_spans,
-                    parent_id_of_root: span_id,
-                } => {
-                    for span in &raw_spans.spans {
-                        let begin_unix_time_ns = span.begin_instant.as_unix_nanos(anchor);
-                        let end_unix_time_ns = if span.end_instant == span.begin_instant {
-                            raw_spans.end_time.as_unix_nanos(anchor)
-                        } else {
-                            span.end_instant.as_unix_nanos(anchor)
-                        };
-                        let parent_id = if span.parent_id.0 == 0 {
-                            span_id.0
-                        } else {
-                            span.parent_id.0
-                        };
-                        spans.push(SpanRecord {
-                            id: span.id.0,
-                            parent_id,
-                            begin_unix_time_ns,
-                            duration_ns: end_unix_time_ns - begin_unix_time_ns,
-                            event: span.event,
-                            properties: span.properties.clone(),
-                        });
-                    }
-                }
-                SpanCollection::Span(span) => spans.push(SpanRecord::from_raw_span(span, anchor)),
-            }
-        }
-
-        spans
+impl Drop for Collector {
+    fn drop(&mut self) {
+        global_collector::drop_collect(self.collect_id);
     }
 }
 
+/// Arguments for the collector.
+///
+/// Provide customized collection behavior through [`Span::root_with_args()`](crate::Span::root_with_args).
 #[must_use]
 #[derive(Default, Debug)]
 pub struct CollectArgs {
-    sync: bool,
-    duration_threshold: Option<Duration>,
+    pub(crate) max_span_count: Option<usize>,
 }
 
 impl CollectArgs {
-    #[must_use]
-    #[allow(clippy::double_must_use)]
-    pub fn sync(self, sync: bool) -> Self {
-        Self { sync, ..self }
-    }
-
-    #[must_use]
-    #[allow(clippy::double_must_use)]
-    pub fn duration_threshold(self, duration_threshold: Duration) -> Self {
-        Self {
-            duration_threshold: Some(duration_threshold),
-            ..self
-        }
+    /// A soft limit for the span collection in background, usually used to avoid out-of-memory.
+    ///
+    /// # Notice
+    ///
+    /// Root span will always be collected. The eventually collected spans may exceed the limit.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use minitrace::prelude::*;
+    ///
+    /// let args = CollectArgs::default().max_span_count(Some(100));
+    /// let (root, collector) = Span::root_with_args("root", args);
+    /// ```
+    pub fn max_span_count(self, max_span_count: Option<usize>) -> Self {
+        Self { max_span_count }
     }
 }

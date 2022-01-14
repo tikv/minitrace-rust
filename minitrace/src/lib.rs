@@ -4,20 +4,22 @@
 //!
 //! ## Span
 //!
-//!   A [`SpanRecord`] represents an individual unit of work done. It contains:
+//!   A [`SpanRecord`] represents an individual unit of work. It contains:
 //!   - An operation name
 //!   - A start timestamp and duration
 //!   - A set of key-value properties
 //!   - A reference to a parent `Span`
 //!
-//!   To record such a span record, we create a [`Span`] and drop it to stop clocking.
+//!   To record such a span record, we create a [`Span`] to start clocking and drop it to stop recording.
 //!
-//!   A new [`Span`] can be started via [`Span::root`], [`Span::enter_with_parent`]. The span started by the latter method will be the child span of parent.
+//!   A new `Span` can be started via [`Span::root()`], [`Span::enter_with_parent()`]. The span started by the
+//!   latter method will be the child span of parent.
 //!
-//!   [`Span`] is thread-safe and can be sent across threads.
+//!   `Span` is thread-safe and can be sent across threads.
 //!
-//!   ```rust
+//!   ```
 //!   use minitrace::prelude::*;
+//!   use futures::executor::block_on;
 //!
 //!   let (root, collector) = Span::root("root");
 //!
@@ -27,33 +29,41 @@
 //!   }
 //!
 //!   drop(root);
-//!   let records: Vec<SpanRecord> = collector.collect();
-//!   ```
+//!   let records: Vec<SpanRecord> = block_on(collector.collect());
 //!
-//!
-//! ## Collector
-//!
-//!   A [`Collector`] will be provided when statring a root [`Span`]. Use it to collect all spans related to a request.
-//!
-//!   ```rust
-//!   use minitrace::prelude::*;
-//!
-//!   let (root, collector) = Span::root("root");
-//!   drop(root);
-//!
-//!   let records: Vec<SpanRecord> = collector.collect();
+//!   println!("{:#?}", records);
+//!   // [
+//!   //     SpanRecord {
+//!   //         id: 1,
+//!   //         parent_id: 0,
+//!   //         begin_unix_time_ns: 1642166520139678013,
+//!   //         duration_ns: 16008,
+//!   //         event: "root",
+//!   //         properties: [],
+//!   //     },
+//!   //     SpanRecord {
+//!   //         id: 2,
+//!   //         parent_id: 1,
+//!   //         begin_unix_time_ns: 1642166520139692070,
+//!   //         duration_ns: 634,
+//!   //         event: "a child span",
+//!   //         properties: [],
+//!   //     },
+//!   // ]
 //!   ```
 //!
 //!
 //! ## Local Span
 //!
-//!   A [`Span`] can be optimized into [`LocalSpan`], if the span is not supposed to sent to other thread, to greatly reduces the overhead.
+//!   A `Span` can be optimized into [`LocalSpan`], if the span is not supposed to be sent to other threads,
+//!   which can greatly reduce the overhead.
 //!
-//!   Before starting a [`LocalSpan`], a scope where the parent span can be inferred from thread-local should be set using [`Span::set_local_parent`]. And then [`LocalSpan::enter_with_local_parent`] will start a [`LocalSpan`] and set it as the new local parent.
+//!   Before starting a `LocalSpan`, a scope of parent span should be set using [`Span::set_local_parent()`].
+//!   Use [`LocalSpan::enter_with_local_parent()`] to start a `LocalSpan`, and then, it will become the new local parent.
 //!
-//!   If the local parent is not set, [`LocalSpan`] will do nothing.
+//!   If no local parent is set, the `enter_with_local_parent()` will do nothing.
 //!
-//!   ```rust
+//!   ```
 //!   use minitrace::prelude::*;
 //!
 //!   let (root, collector) = Span::root("root");
@@ -64,9 +74,7 @@
 //!       // The parent of this span is `root`.
 //!       let _span1 = LocalSpan::enter_with_local_parent("a child span");
 //!
-//!       {
-//!           foo();
-//!       }
+//!       foo();
 //!   }
 //!
 //!   fn foo() {
@@ -80,158 +88,202 @@
 //!
 //!   Property is an arbitrary custom kev-value pair associated to a span.
 //!
-//!   ```rust
+//!   ```
 //!   use minitrace::prelude::*;
+//!   use futures::executor::block_on;
 //!
 //!   let (mut root, collector) = Span::root("root");
 //!   root.with_property(|| ("key", "value".to_owned()));
 //!
-//!   let _guard = root.set_local_parent();
+//!   {
+//!       let _guard = root.set_local_parent();
 //!
-//!   let _span1 = LocalSpan::enter_with_local_parent("a child span")
-//!       .with_property(|| ("key", "value".to_owned()));
+//!       let _span1 = LocalSpan::enter_with_local_parent("a child span")
+//!           .with_property(|| ("key", "value".to_owned()));
+//!   }
+//!
+//!   drop(root);
+//!   let records: Vec<SpanRecord> = block_on(collector.collect());
+//!
+//!   println!("{:#?}", records);
+//!   // [
+//!   //     SpanRecord {
+//!   //         id: 1,
+//!   //         parent_id: 0,
+//!   //         begin_unix_time_ns: 1642166791041022255,
+//!   //         duration_ns: 121705,
+//!   //         event: "root",
+//!   //         properties: [
+//!   //             (
+//!   //                 "key",
+//!   //                 "value",
+//!   //             ),
+//!   //         ],
+//!   //     },
+//!   //     SpanRecord {
+//!   //         id: 2,
+//!   //         parent_id: 1,
+//!   //         begin_unix_time_ns: 1642166791041132550,
+//!   //         duration_ns: 7724,
+//!   //         event: "a child span",
+//!   //         properties: [
+//!   //             (
+//!   //                 "key",
+//!   //                 "value",
+//!   //             ),
+//!   //         ],
+//!   //     },
+//!   // ]
 //!   ```
-//!
-//!
-//! ## Futures
-//!
-//!   minitrace provides [`FutureExt`] which extends [`Future`] with two methods:
-//!
-//!   - [`in_span`]: Bind a [`Span`] to the [`Future`] that keeps clocking until the future drops. Besides, it will set the span as the local parent at every poll so that `LocalSpan` becomes available inside the future.
-//!   - [`enter_on_poll`]: Start a [`LocalSpan`] at every [`Future::poll`]. This will create multiple _short_ spans if the future get polled multiple times.
-//!
-//!   The outmost future must use [`in_span`] instead of [`enter_on_poll`]. Otherwise, [`enter_on_poll`] won't find a local parent at poll and thus will record nothing.
-//!
-//!   ```rust
-//!   use minitrace::prelude::*;
-//!
-//!   let collector = {
-//!       let (root, collector) = Span::root("root");
-//!
-//!       // To trace a task
-//!       let task = async {
-//!           async {
-//!               // some work
-//!           }.enter_on_poll("future is polled").await;
-//!       }
-//!       .in_span(Span::enter_with_parent("task", &root));
-//!
-//!       # let runtime = tokio::runtime::Runtime::new().unwrap();
-//!       runtime.spawn(task);
-//!   };
-//!   ```
-//!
 //!
 //! ## Macro
 //!
-//!   A attribute-macro [\#\[trace\]] is provided to help get rid of boilerplate.
+//!   An attribute-macro [`trace`] can help get rid of boilerplate. The macro always requires a local
+//!   parent in the context, otherwise, no span will be recorded.
 //!
-//!   For example:
-//!
-//!   ```rust
-//!   use minitrace::prelude::*;
-//!
-//!   #[trace("foo")]
-//!   fn foo() {
-//!       // some work
-//!   }
-//!
-//!   #[trace("bar")]
-//!   async fn bar() {
-//!       // some work
-//!   }
-//!
-//!   #[trace("qux", enter_on_poll = true)]
-//!   async fn qux() {
-//!       // some work
-//!   }
 //!   ```
-//!
-//!   will be translated into
-//!
-//!   ```rust
-//!   # use minitrace::prelude::*;
-//!   fn foo() {
-//!       let _span1 = LocalSpan::enter_with_local_parent("foo");
-//!       // some work
-//!   }
-//!
-//!   async fn bar() {
-//!       async {
-//!           // some work
-//!       }
-//!       .in_span(Span::enter_with_local_parent("bar"))
-//!       .await
-//!   }
-//!
-//!   async fn qux() {
-//!       async {
-//!           // some work
-//!       }
-//!       .enter_on_poll("qux")
-//!       .await
-//!   }
-//!   ```
-//!
-//!   Note that [\#\[trace\]] always require an local parent in the context. For synchronous functions, make sure that the caller is within the scope of [`Span::set_local_parent`]; and for asynchronous fuctions, make sure that the caller is within a future instrumented by [`in_span`].
-//!
-//!
-//! ## Local Collector (Advanced)
-//!
-//!   [`LocalCollector`] allows manully collect [`LocalSpan`] without a local parent, and the collected [`LocalSpan`] can be
-//!   linked to a parent later.
-//!
-//!   At most time, [`Span`] and [`LocalSpan`] are sufficient. Use [`LocalCollector`] when the span may start before the parent
-//!   span. Sometimes it is useful to trace the preceding task that is blocking the current request.
-//!
-//!   ```rust
 //!   use minitrace::prelude::*;
-//!   use minitrace::local::LocalCollector;
-//!   use std::sync::Arc;
+//!   use futures::executor::block_on;
 //!
-//!   // Collect local spans in advance without parent
-//!   let collector = LocalCollector::start();
-//!   let _span1 = LocalSpan::enter_with_local_parent("a child span");
-//!   drop(_span1);
-//!   let local_spans = Arc::new(collector.collect());
+//!   #[trace("do_something")]
+//!   fn do_something(i: u64) {
+//!       std::thread::sleep(std::time::Duration::from_millis(i));
+//!   }
 //!
-//!   // Link the local spans to a parent
+//!   #[trace("do_something_async")]
+//!   async fn do_something_async(i: u64) {
+//!       futures_timer::Delay::new(std::time::Duration::from_millis(i)).await;
+//!   }
+//!
 //!   let (root, collector) = Span::root("root");
-//!   root.push_child_spans(local_spans);
-//!   drop(root);
 //!
-//!   let records: Vec<SpanRecord> = collector.collect();
+//!   {
+//!       let _g = root.set_local_parent();
+//!       do_something(100);
+//!       block_on(do_something_async(100));
+//!   }
+//!
+//!   drop(root);
+//!   let records: Vec<SpanRecord> = block_on(collector.collect());
+//!
+//!   println!("{:#?}", records);
+//!   // [
+//!   //     SpanRecord {
+//!   //         id: 1,
+//!   //         parent_id: 0,
+//!   //         begin_unix_time_ns: 1642167988459480418,
+//!   //         duration_ns: 200741472,
+//!   //         event: "root",
+//!   //         properties: [],
+//!   //     },
+//!   //     SpanRecord {
+//!   //         id: 2,
+//!   //         parent_id: 1,
+//!   //         begin_unix_time_ns: 1642167988459571971,
+//!   //         duration_ns: 100084126,
+//!   //         event: "do_something",
+//!   //         properties: [],
+//!   //     },
+//!   //     SpanRecord {
+//!   //         id: 3,
+//!   //         parent_id: 1,
+//!   //         begin_unix_time_ns: 1642167988559887219,
+//!   //         duration_ns: 100306947,
+//!   //         event: "do_something_async",
+//!   //         properties: [],
+//!   //     },
+//!   // ]
 //!   ```
 //!
-//! [`Span`]: crate::prelude::Span
-//! [`LocalSpan`]: crate::prelude::LocalSpan
-//! [`Collector`]: crate::prelude::Collector
-//! [`SpanRecord`]: crate::prelude::SpanRecord
-//! [`FutureExt`]: crate::prelude::FutureExt
-//! [\#\[trace\]]: crate::prelude::trace
+//! [`Span`]: crate::Span
+//! [`LocalSpan`]: crate::local::LocalSpan
+//! [`SpanRecord`]: crate::collector::SpanRecord
+//! [`FutureExt`]: crate::future::FutureExt
+//! [`trace`]: crate::trace
 //! [`LocalCollector`]: crate::local::LocalCollector
-//! [`Future`]: std::future::Future
-//! [`Future::poll`]: std::future::Future::poll
-//! [`Span::root`]: crate::prelude::Span::root
-//! [`Span::enter_with_parent`]: crate::prelude::Span::enter_with_parent
-//! [`Span::set_local_parent`]: crate::prelude::Span::set_local_parent
-//! [`LocalSpan::enter_with_local_parent`]: crate::prelude::LocalSpan::enter_with_local_parent
-//! [`in_span`]: crate::prelude::FutureExt::in_span
-//! [`enter_on_poll`]: crate::prelude::FutureExt::enter_on_poll
+//! [`Span::root()`]: crate::Span::root
+//! [`Span::enter_with_parent()`]: crate::Span::enter_with_parent
+//! [`Span::set_local_parent()`]: crate::Span::set_local_parent
+//! [`LocalSpan::enter_with_local_parent()`]: crate::local::LocalSpan::enter_with_local_parent
 
 pub mod collector;
 pub mod future;
 pub mod local;
-pub mod span;
+mod span;
+#[doc(hidden)]
+pub mod util;
+
+pub use crate::span::Span;
+/// An attribute-macro to help get rid of boilerplate.
+///
+/// [`trace`] always require an local parent in the context. For synchronous functions, make sure that
+/// the caller is within the scope of [`Span::set_local_parent()`]; and for asynchronous fuctions, make sure that
+/// the caller is within a future instrumented by [`in_span()`].
+///
+/// # Examples
+///
+/// ```
+/// use minitrace::prelude::*;
+///
+/// #[trace("foo")]
+/// fn foo() {
+///     // some work
+/// }
+///
+/// #[trace("bar")]
+/// async fn bar() {
+///     // some work
+/// }
+///
+/// #[trace("qux", enter_on_poll = true)]
+/// async fn qux() {
+///     // some work
+/// }
+/// ```
+///
+/// The examples above will be translated into:
+///
+/// ```
+/// # use minitrace::prelude::*;
+/// # use minitrace::local::LocalSpan;
+/// fn foo() {
+///     let __guard = LocalSpan::enter_with_local_parent("foo");
+///     // some work
+/// }
+///
+/// fn bar() -> impl core::future::Future<Output = ()> {
+///     async {
+///         // some work
+///     }
+///     .in_span(Span::enter_with_local_parent("bar"))
+/// }
+///
+/// fn qux() -> impl core::future::Future<Output = ()> {
+///     async {
+///         // some work
+///     }
+///     .enter_on_poll("qux")
+/// }
+/// ```
+///
+/// [`in_span()`]: crate::future::FutureExt::in_span
+pub use minitrace_macro::trace;
 
 pub mod prelude {
+    //! A “prelude” for crates using the `minitrace` crate.
+    #[doc(no_inline)]
     pub use crate::collector::{CollectArgs, Collector, SpanRecord};
+    #[doc(no_inline)]
     pub use crate::future::FutureExt as _;
+    #[doc(no_inline)]
     pub use crate::local::LocalSpan;
+    #[doc(no_inline)]
     pub use crate::span::Span;
-    pub use minitrace_macro::trace;
+    #[doc(no_inline)]
+    pub use crate::trace;
 }
 
+/// Test README
 #[cfg(doctest)]
 mod test_readme {
     macro_rules! external_doc_test {

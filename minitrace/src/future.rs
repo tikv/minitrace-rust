@@ -1,20 +1,51 @@
 // Copyright 2020 TiKV Project Authors. Licensed under Apache-2.0.
 
+//! Tools to trace a `Future`.
+//!
+//! [`FutureExt`] extends `Future` with two methods: [`in_span()`] and [`enter_on_poll()`].
+//! The outmost future must use `in_span()`, otherwise, the tracing inside the future will be lost.
+//!
+//! # Example
+//!
+//! ```
+//! use minitrace::prelude::*;
+//!
+//! let collector = {
+//!     let (root, collector) = Span::root("root");
+//!
+//!     // To trace a task
+//!     let task = async {
+//!         async {
+//!             // some work
+//!         }.enter_on_poll("future is polled").await;
+//!     }
+//!     .in_span(Span::enter_with_parent("task", &root));
+//!
+//!     # let runtime = tokio::runtime::Runtime::new().unwrap();
+//!     runtime.spawn(task);
+//! };
+//! ```
+//!
+//! [`in_span()`]:(FutureExt::in_span)
+//! [`enter_on_poll()`]:(FutureExt::enter_on_poll)
+
 use std::task::Poll;
 
 use crate::local::LocalSpan;
-use crate::span::Span;
+use crate::Span;
 
 impl<T: std::future::Future> FutureExt for T {}
 
+/// An extension trait for `Futures` that provides tracing instrument adapters.
 pub trait FutureExt: Sized {
-    /// Bind a `span` to the future to record the entire lifetime of the future. This is usually used on the outmost async block.
+    /// Bind a [`Span`] to the [`Future`] that keeps clocking until the future drops.
     ///
-    /// It'll call [`Span::set_local_parent`](Span::set_local_parent) when the executor [`poll`](std::future::Future::poll) it.
+    /// Besides, it will set the span as the local parent at every poll so that `LocalSpan` becomes available inside the future.
+    /// Under the hood, it call [`Span::set_local_parent`](Span::set_local_parent) when the executor [`poll`](std::future::Future::poll) it.
     ///
     /// # Examples
     ///
-    /// ```rust
+    /// ```
     /// # #[tokio::main]
     /// # async fn main() {
     /// use minitrace::prelude::*;
@@ -28,6 +59,8 @@ pub trait FutureExt: Sized {
     /// tokio::spawn(task);
     /// # }
     /// ```
+    ///
+    /// [`Future`]:(std::future::Future)
     #[inline]
     fn in_span(self, span: Span) -> InSpan<Self> {
         InSpan {
@@ -36,12 +69,11 @@ pub trait FutureExt: Sized {
         }
     }
 
-    /// A span will be generated at every single poll call. Internally it will call [`LocalSpan::enter_with_local_parent`](LocalSpan::enter_with_local_parent) at the beginning of [`poll`](std::future::Future::poll).
-    /// Note that polling on a future may return [`Poll::Pending`](Poll::Pending), so it can produce more than 1 span for the future.
+    /// Start a [`LocalSpan`] at every [`Future::poll()`]. It will create multiple _short_ spans if the future get polled multiple times.
     ///
     /// # Examples
     ///
-    /// ```rust
+    /// ```
     /// # #[tokio::main]
     /// # async fn main() {
     /// use minitrace::prelude::*;
@@ -61,12 +93,14 @@ pub trait FutureExt: Sized {
     /// # }
     /// ```
     ///
+    /// [`Future::poll()`]:(std::future::Future::poll)
     #[inline]
     fn enter_on_poll(self, event: &'static str) -> EnterOnPoll<Self> {
         EnterOnPoll { inner: self, event }
     }
 }
 
+/// Adapter for [`FutureExt::in_span()`](FutureExt::in_span).
 #[pin_project::pin_project]
 pub struct InSpan<T> {
     #[pin]
@@ -93,6 +127,7 @@ impl<T: std::future::Future> std::future::Future for InSpan<T> {
     }
 }
 
+/// Adapter for [`FutureExt::enter_on_poll()`](FutureExt::enter_on_poll).
 #[pin_project::pin_project]
 pub struct EnterOnPoll<T> {
     #[pin]

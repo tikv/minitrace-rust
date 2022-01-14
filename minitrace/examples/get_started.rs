@@ -1,3 +1,6 @@
+// Copyright 2022 TiKV Project Authors. Licensed under Apache-2.0.
+
+use futures::executor::block_on;
 use minitrace::prelude::*;
 use std::net::SocketAddr;
 
@@ -12,7 +15,7 @@ fn main() {
         collector
     };
 
-    let spans: Vec<SpanRecord> = collector.collect();
+    let spans: Vec<SpanRecord> = block_on(collector.collect());
 
     let socket = SocketAddr::new("127.0.0.1".parse().unwrap(), 6831);
 

@@ -1,5 +1,7 @@
 // Copyright 2020 TiKV Project Authors. Licensed under Apache-2.0.
 
+//! Non thread-safe tracing utils with low overhead.
+
 pub(crate) mod local_collector;
 pub(crate) mod local_parent_guard;
 pub(crate) mod local_span;

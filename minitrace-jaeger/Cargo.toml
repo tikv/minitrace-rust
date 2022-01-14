@@ -1,6 +1,6 @@
 [package]
 name = "minitrace-jaeger"
-version = "0.2.0"
+version = "0.3.0"
 authors = ["The TiKV Project Authors"]
 license = "Apache-2.0"
 edition = "2018"
@@ -14,3 +14,6 @@ keywords = ["tracing", "span", "datadog", "jaeger", "opentracing"]
 [dependencies]
 minitrace = { path = "../minitrace" }
 thrift_codec = "0.1"
+
+[dev-dependencies]
+futures = "0.3"

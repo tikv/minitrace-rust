@@ -10,12 +10,13 @@
 //!
 //! ## Report to Jaeger
 //!
-//! ```rust,no_run
+//! ```no_run
 //! use std::net::SocketAddr;
+//! use futures::executor::block_on;
 //! use minitrace::prelude::*;
 //!
 //! let (_, collector) = Span::root("root");
-//! let spans: Vec<SpanRecord> = collector.collect();
+//! let spans: Vec<SpanRecord> = block_on(collector.collect());
 //!
 //! let socket = SocketAddr::new("127.0.0.1".parse().unwrap(), 6831);
 //!

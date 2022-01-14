@@ -11,12 +11,13 @@ A high-performance and ergonomic timeline tracing library for Rust. Builtin supp
 
 ```toml
 [dependencies]
-minitrace = "0.2"
-minitrace-jaeger = "0.2"
+minitrace = "0.3"
+minitrace-jaeger = "0.3"
 ```
 
 ```rust
 use minitrace::prelude::*;
+use futures::executor::block_on;
 
 let (root, collector) = Span::root("root");
 
@@ -26,7 +27,7 @@ let (root, collector) = Span::root("root");
 }
 
 drop(root);
-let records: Vec<SpanRecord> = collector.collect();
+let records: Vec<SpanRecord> = block_on(collector.collect());
 ```
 
 ## Examples
@@ -62,9 +63,9 @@ Benchmark platform is `Intel(R) Xeon(R) CPU E5-2630 v4 @ 2.20GHz` on CentOS 7.
 ```sh
 > cargo criterion
 
-100 spans/Tokio Tracing   time:   [152.47 us 153.10 us 153.91 us]
-100 spans/Rustracing      time:   [36.523 us 37.078 us 37.809 us]
-100 spans/minitrace       time:   [8.2892 us 8.4474 us 8.6355 us]
+100 spans/Tokio Tracing   time:   [147.64 us 148.80 us 150.25 us]
+100 spans/Rustracing      time:   [36.486 us 36.690 us 36.941 us]
+100 spans/minitrace       time:   [3.7514 us 3.7564 us 3.7689 us]
 ```
 
 ![Benchmark](img/benchmark.jpeg)

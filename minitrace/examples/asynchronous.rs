@@ -49,7 +49,7 @@ async fn main() {
 
     tokio::spawn(f).await.unwrap();
 
-    let spans = collector.collect_with_args(CollectArgs::default().sync(true));
+    let spans = collector.collect().await;
 
     // Report to Jaeger
     let bytes =
