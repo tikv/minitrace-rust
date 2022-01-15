@@ -71,7 +71,9 @@ pub fn trace(
         match internal_fun.kind {
             // async-trait <= 0.1.43
             AsyncTraitKind::Function(_) => {
-                unimplemented!("Please upgrade crate `async-trait` to a version higher than 0.1.44")
+                unimplemented!(
+                    "Please upgrade the crate `async-trait` to a version higher than 0.1.44"
+                )
             }
             // async-trait >= 0.1.44
             AsyncTraitKind::Async(async_expr) => {

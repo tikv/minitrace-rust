@@ -1,6 +1,6 @@
 // Copyright 2020 TiKV Project Authors. Licensed under Apache-2.0.
 
-//! Bulitin tracing reporter for Jaeger.
+//! Builtin tracing reporter for Jaeger.
 //!
 //! ## Setup Jaeger
 //!
@@ -39,7 +39,7 @@ mod thrift;
 
 use minitrace::prelude::*;
 use std::error::Error;
-use std::net::{SocketAddr, UdpSocket};
+use std::net::SocketAddr;
 use thrift_codec::message::Message;
 use thrift_codec::CompactEncode;
 
@@ -105,7 +105,7 @@ pub fn encode(
     Ok(bytes)
 }
 
-pub fn report(
+pub async fn report(
     agent: SocketAddr,
     bytes: &[u8],
 ) -> Result<(), Box<dyn Error + Send + Sync + 'static>> {
@@ -117,7 +117,25 @@ pub fn report(
     .parse()
     .unwrap();
 
-    let udp = UdpSocket::bind(local_addr)?;
+    let udp = async_std::net::UdpSocket::bind(local_addr).await?;
+    udp.send_to(bytes, agent).await?;
+
+    Ok(())
+}
+
+pub fn report_blocking(
+    agent: SocketAddr,
+    bytes: &[u8],
+) -> Result<(), Box<dyn Error + Send + Sync + 'static>> {
+    let local_addr: SocketAddr = if agent.is_ipv4() {
+        "0.0.0.0:0"
+    } else {
+        "[::]:0"
+    }
+    .parse()
+    .unwrap();
+
+    let udp = std::net::UdpSocket::bind(local_addr)?;
     udp.send_to(bytes, agent)?;
 
     Ok(())

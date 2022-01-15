@@ -25,10 +25,7 @@ pub(crate) struct ParentSpan {
 
 /// The collector for collecting all spans of a request.
 ///
-/// A [`Collector`] is be provided when statring a root [`Span`](crate::Span) by calling [`Span::root()`](crate::Span::root).
-///
-/// In order to extremely eliminate the overhead of tracing, the heavy computation and thread synchronization work are moved to a background thread,
-/// and thus, we have to wait for the background thread to send the result back.
+/// A [`Collector`] is provided when starting a root [`Span`](crate::Span) by calling [`Span::root()`](crate::Span::root).
 ///
 /// # Examples
 ///
@@ -56,7 +53,8 @@ impl Collector {
     ///
     /// To extremely eliminate the overhead of tracing, the heavy computation and thread synchronization
     /// work are moved to a background thread, and thus, we have to wait for the background thread to send
-    /// the result back.
+    /// the result back. It usually takes 10 milliseconds because the background thread wakes up and processes
+    /// messages every 10 millisecnods.
     pub async fn collect(self) -> Vec<SpanRecord> {
         let (tx, rx) = futures::channel::oneshot::channel();
         global_collector::commit_collect(self.collect_id, tx);
@@ -76,7 +74,7 @@ impl Drop for Collector {
 
 /// Arguments for the collector.
 ///
-/// Provide customized collection behavior through [`Span::root_with_args()`](crate::Span::root_with_args).
+/// Customize collection behavior through [`Span::root_with_args()`](crate::Span::root_with_args).
 #[must_use]
 #[derive(Default, Debug)]
 pub struct CollectArgs {

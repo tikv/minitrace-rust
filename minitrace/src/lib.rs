@@ -216,9 +216,8 @@ pub mod util;
 pub use crate::span::Span;
 /// An attribute-macro to help get rid of boilerplate.
 ///
-/// [`trace`] always require an local parent in the context. For synchronous functions, make sure that
-/// the caller is within the scope of [`Span::set_local_parent()`]; and for asynchronous fuctions, make sure that
-/// the caller is within a future instrumented by [`in_span()`].
+/// [`trace`] always require an local parent in the context. Make sure that the caller
+/// is within the scope of [`Span::set_local_parent()`].
 ///
 /// # Examples
 ///

@@ -34,7 +34,7 @@ fn main() {
     // Report to Jaeger
     let bytes =
         minitrace_jaeger::encode("synchronous".to_owned(), rand::random(), 0, 0, &spans).unwrap();
-    minitrace_jaeger::report("127.0.0.1:6831".parse().unwrap(), &bytes).ok();
+    minitrace_jaeger::report_blocking("127.0.0.1:6831".parse().unwrap(), &bytes).ok();
 
     // Report to Datadog
     let bytes = minitrace_datadog::encode(
