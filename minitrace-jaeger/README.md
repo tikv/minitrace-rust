@@ -4,7 +4,7 @@
 [![Crates.io](https://img.shields.io/crates/v/minitrace-jaeger.svg)](https://crates.io/crates/minitrace-jaeger)
 [![LICENSE](https://img.shields.io/github/license/tikv/minitrace-rust.svg)](https://github.com/tikv/minitrace-rust/blob/master/LICENSE)
 
-Builtin Jaeger reporter for minitrace.
+Builtin [Jaeger](https://www.jaegertracing.io/) reporter for minitrace.
 
 ## Dependencies
 
