@@ -269,7 +269,7 @@ pub use crate::span::Span;
 pub use minitrace_macro::trace;
 
 pub mod prelude {
-    //! A “prelude” for crates using the `minitrace` crate.
+    //! A "prelude" for crates using the `minitrace` crate.
     #[doc(no_inline)]
     pub use crate::collector::{CollectArgs, Collector, SpanRecord};
     #[doc(no_inline)]

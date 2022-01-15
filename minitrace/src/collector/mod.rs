@@ -54,7 +54,7 @@ impl Collector {
     /// To extremely eliminate the overhead of tracing, the heavy computation and thread synchronization
     /// work are moved to a background thread, and thus, we have to wait for the background thread to send
     /// the result back. It usually takes 10 milliseconds because the background thread wakes up and processes
-    /// messages every 10 millisecnods.
+    /// messages every 10 milliseconds.
     pub async fn collect(self) -> Vec<SpanRecord> {
         let (tx, rx) = futures::channel::oneshot::channel();
         global_collector::commit_collect(self.collect_id, tx);

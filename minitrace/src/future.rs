@@ -3,7 +3,7 @@
 //! Tools to trace a `Future`.
 //!
 //! [`FutureExt`] extends `Future` with two methods: [`in_span()`] and [`enter_on_poll()`].
-//! The outmost future must use `in_span()`, otherwise, the tracing inside the future will be lost.
+//! The out-most future must use `in_span()`, otherwise, the tracing inside the future will be lost.
 //!
 //! # Example
 //!
