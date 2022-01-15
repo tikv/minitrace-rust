@@ -70,33 +70,36 @@ async fn qux() {
 // }
 ```
 
-> ℹ️ `trace` always require a local parent in the context. Make sure that the caller is within the scope of `Span::set_local_parent()`.
-> ```rust
-> use minitrace::prelude::*;
-> 
-> #[trace("foo")]
-> fn foo() {}
-> 
-> #[trace("bar")]
-> async fn bar() {}
->
-> let (root, collector) = Span::root("root");
-> 
-> {
->     foo(); // This `foo` won't be traced.
-> }
-> 
-> {
->     let _g = root.set_local_parent();
->     foo(); // This `foo` will be traced.
-> }
-> 
-> {
->     runtime::spawn(bar()); // This `bar` won't be traced.
-> }
-> 
-> {
->     let _g = root.set_local_parent();
->     runtime::spawn(bar()); // This `bar` will be traced.
-> }
-> ```
+### ⚠️ Local Parent Needed 
+
+A function instrumented by `trace` always require a local parent in the context. Make sure that the caller is within the scope of `Span::set_local_parent()`.
+
+```rust
+use minitrace::prelude::*;
+
+#[trace("foo")]
+fn foo() {}
+
+#[trace("bar")]
+async fn bar() {}
+
+let (root, collector) = Span::root("root");
+
+{
+    foo(); // This `foo` will __not__ be traced.
+}
+
+{
+    let _g = root.set_local_parent();
+    foo(); // This `foo` will be traced.
+}
+
+{
+    runtime::spawn(bar()); // This `bar` will __not__ be traced.
+}
+
+{
+    let _g = root.set_local_parent();
+    runtime::spawn(bar()); // This `bar` will be traced.
+}
+```

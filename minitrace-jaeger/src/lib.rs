@@ -32,7 +32,7 @@
 //! )
 //! .expect("encode error");
 //!
-//! minitrace_jaeger::report(socket, &bytes).expect("report error");
+//! minitrace_jaeger::report_blocking(socket, &bytes).expect("report error");
 //! ```
 
 mod thrift;
