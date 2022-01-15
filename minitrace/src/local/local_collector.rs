@@ -9,9 +9,9 @@ use crate::{
     util::{ParentSpans, RawSpans},
 };
 
-/// A Collector to collect [`LocalSpan`].
+/// A collector to collect [`LocalSpan`].
 ///
-/// [`LocalCollector`] allows collect [`LocalSpan`] manully without a local parent. The collected [`LocalSpan`] can later be
+/// [`LocalCollector`] allows to collect [`LocalSpan`] manually without a local parent. The collected [`LocalSpan`] can later be
 /// mounted to a parent.
 ///
 /// At most time, [`Span`] and [`LocalSpan`] are sufficient. Use [`LocalCollector`] when the span may start before the parent

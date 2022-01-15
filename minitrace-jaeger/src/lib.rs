@@ -1,25 +1,31 @@
 // Copyright 2020 TiKV Project Authors. Licensed under Apache-2.0.
 
-//! Bulitin tracing reporter for Jaeger.
+//! Builtin [Jaeger](https://www.jaegertracing.io/) reporter for minitrace.
 //!
-//! ## Setup Jaeger
+//! ## Setup Jaeger Agent
 //!
 //! ```sh
 //! docker run --rm -d -p6831:6831/udp -p16686:16686 --name jaeger jaegertracing/all-in-one:latest
 //! ```
 //!
-//! ## Report to Jaeger
+//! ## Report to Jaeger Agent
 //!
 //! ```no_run
 //! use std::net::SocketAddr;
+//!
 //! use futures::executor::block_on;
 //! use minitrace::prelude::*;
 //!
-//! let (_, collector) = Span::root("root");
-//! let spans: Vec<SpanRecord> = block_on(collector.collect());
+//! // start trace
+//! let (root_span, collector) = Span::root("root");
 //!
-//! let socket = SocketAddr::new("127.0.0.1".parse().unwrap(), 6831);
+//! // finish trace
+//! drop(root_span);
 //!
+//! // collect spans
+//! let spans = block_on(collector.collect());
+//!
+//! // encode trace
 //! const TRACE_ID: u64 = 42;
 //! const SPAN_ID_PREFIX: u32 = 42;
 //! const ROOT_PARENT_SPAN_ID: u64 = 0;
@@ -32,14 +38,16 @@
 //! )
 //! .expect("encode error");
 //!
-//! minitrace_jaeger::report(socket, &bytes).expect("report error");
+//! // report trace
+//! let socket = SocketAddr::new("127.0.0.1".parse().unwrap(), 6831);
+//! minitrace_jaeger::report_blocking(socket, &bytes).expect("report error");
 //! ```
 
 mod thrift;
 
 use minitrace::prelude::*;
 use std::error::Error;
-use std::net::{SocketAddr, UdpSocket};
+use std::net::SocketAddr;
 use thrift_codec::message::Message;
 use thrift_codec::CompactEncode;
 
@@ -105,7 +113,7 @@ pub fn encode(
     Ok(bytes)
 }
 
-pub fn report(
+pub async fn report(
     agent: SocketAddr,
     bytes: &[u8],
 ) -> Result<(), Box<dyn Error + Send + Sync + 'static>> {
@@ -117,7 +125,25 @@ pub fn report(
     .parse()
     .unwrap();
 
-    let udp = UdpSocket::bind(local_addr)?;
+    let udp = async_std::net::UdpSocket::bind(local_addr).await?;
+    udp.send_to(bytes, agent).await?;
+
+    Ok(())
+}
+
+pub fn report_blocking(
+    agent: SocketAddr,
+    bytes: &[u8],
+) -> Result<(), Box<dyn Error + Send + Sync + 'static>> {
+    let local_addr: SocketAddr = if agent.is_ipv4() {
+        "0.0.0.0:0"
+    } else {
+        "[::]:0"
+    }
+    .parse()
+    .unwrap();
+
+    let udp = std::net::UdpSocket::bind(local_addr)?;
     udp.send_to(bytes, agent)?;
 
     Ok(())

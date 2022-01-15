@@ -1,13 +1,13 @@
 [package]
 name = "minitrace-macro"
-version = "0.3.0"
+version = "0.3.1"
 authors = ["The TiKV Project Authors"]
 license = "Apache-2.0"
 edition = "2018"
 description = "Attribute procedural macro for minitrace-rust"
 homepage = "https://github.com/tikv/minitrace-rust"
 repository = "https://github.com/tikv/minitrace-rust"
-documentation = "https://docs.rs/minitrace"
+documentation = "https://docs.rs/minitrace-macro"
 readme = "README.md"
 keywords = ["tracing", "span", "datadog", "jaeger", "opentracing"]
 
@@ -15,7 +15,7 @@ keywords = ["tracing", "span", "datadog", "jaeger", "opentracing"]
 proc-macro = true
 
 [dependencies]
-syn = { version = ">=1.0.84", features = ["full", "parsing", "extra-traits", "proc-macro", "visit-mut"] }
+syn = { version = "1.0.84", features = ["full", "parsing", "extra-traits", "proc-macro", "visit-mut"] }
 quote = "1"
 proc-macro2 = "1"
 proc-macro-error = "1"

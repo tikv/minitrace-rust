@@ -34,7 +34,7 @@ impl LocalSpanGuard {
     #[inline]
     #[must_use]
     #[allow(clippy::double_must_use)]
-    pub fn with_property<F>(self, property: F) -> Self
+    pub fn with_property<F>(&mut self, property: F) -> &mut Self
     where
         F: FnOnce() -> (&'static str, String),
     {
@@ -44,7 +44,7 @@ impl LocalSpanGuard {
     #[inline]
     #[must_use]
     #[allow(clippy::double_must_use)]
-    pub fn with_properties<I, F>(self, properties: F) -> Self
+    pub fn with_properties<I, F>(&mut self, properties: F) -> &mut Self
     where
         I: IntoIterator<Item = (&'static str, String)>,
         F: FnOnce() -> I,

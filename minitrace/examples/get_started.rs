@@ -15,9 +15,7 @@ fn main() {
         collector
     };
 
-    let spans: Vec<SpanRecord> = block_on(collector.collect());
-
-    let socket = SocketAddr::new("127.0.0.1".parse().unwrap(), 6831);
+    let spans = block_on(collector.collect());
 
     const TRACE_ID: u64 = 42;
     const SPAN_ID_PREFIX: u32 = 42;
@@ -30,5 +28,7 @@ fn main() {
         &spans,
     )
     .expect("encode error");
-    minitrace_jaeger::report(socket, &bytes).expect("report error");
+
+    let socket = SocketAddr::new("127.0.0.1".parse().unwrap(), 6831);
+    minitrace_jaeger::report_blocking(socket, &bytes).expect("report error");
 }

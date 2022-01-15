@@ -94,7 +94,7 @@ impl From<Log> for Struct {
 /// Span reference kind.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum SpanRefKind {
-    ChildOf = 0,
+    // ChildOf = 0,
     FollowsFrom = 1,
 }
 
@@ -116,10 +116,10 @@ impl From<SpanRef> for Struct {
 /// `Span` represents a named unit of work performed by a service.
 #[derive(Debug, Clone)]
 pub struct Span {
-    /// The least significant 64 bits of a traceID.
+    /// The least significant 64 bits of a trace id.
     pub trace_id_low: i64,
 
-    /// The most significant 64 bits of a traceID; 0 when only 64bit IDs are used.
+    /// The most significant 64 bits of a trace id; 0 when only 64 bit IDs are used.
     pub trace_id_high: i64,
 
     /// Unique span id (only unique within a given trace).
