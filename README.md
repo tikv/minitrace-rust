@@ -30,6 +30,8 @@ drop(root);
 let records: Vec<SpanRecord> = block_on(collector.collect());
 ```
 
+Read the [docs](https://docs.rs/minitrace/) for more details. 
+
 ## Examples
 
 ### Setup Jaeger
