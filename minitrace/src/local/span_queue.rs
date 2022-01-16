@@ -6,7 +6,7 @@ use crate::util::{alloc_raw_spans, RawSpans};
 
 use minstant::Instant;
 
-const DEFAULT_SPAN_QUEUE_SIZE: usize = 4096;
+const DEFAULT_SPAN_QUEUE_SIZE: usize = 10240;
 
 #[derive(Debug)]
 pub(crate) struct SpanQueue {
@@ -82,5 +82,144 @@ impl SpanQueue {
     #[inline]
     pub fn take_queue(self) -> RawSpans {
         self.span_queue
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn span_queue_basic() {
+        let mut queue = SpanQueue::with_capacity(16);
+        let span1 = queue.start_span("span1").unwrap();
+        let span2 = queue.start_span("span2").unwrap();
+        let span3 = queue.start_span("span3").unwrap();
+        queue.finish_span(span3);
+        queue.finish_span(span2);
+        queue.finish_span(span1);
+        let mut raw_spans = queue.take_queue().into_inner().1;
+        raw_spans.sort_unstable_by(|a, b| a.id.0.cmp(&b.id.0));
+        assert_eq!(raw_spans.len(), 3);
+        assert_eq!(raw_spans[0].event, "span1");
+        assert_eq!(raw_spans[0].parent_id, SpanId(0));
+        assert_eq!(raw_spans[1].event, "span2");
+        assert_eq!(raw_spans[1].parent_id, raw_spans[0].id);
+        assert_eq!(raw_spans[2].event, "span3");
+        assert_eq!(raw_spans[2].parent_id, raw_spans[1].id);
+    }
+
+    #[test]
+    fn span_add_properties() {
+        let mut queue = SpanQueue::with_capacity(16);
+        let span1 = queue.start_span("span1").unwrap();
+        let span2 = queue.start_span("span2").unwrap();
+        queue.add_properties(
+            &span1,
+            vec![("k1", "v1".to_owned()), ("k2", "v2".to_owned())].into_iter(),
+        );
+        queue.add_properties(&span2, vec![("k1", "v1".to_owned())].into_iter());
+        let mut raw_spans = queue.take_queue().into_inner().1;
+        raw_spans.sort_unstable_by(|a, b| a.id.0.cmp(&b.id.0));
+        assert_eq!(raw_spans.len(), 2);
+        assert_eq!(raw_spans[0].event, "span1");
+        assert_eq!(
+            raw_spans[0].properties,
+            vec![("k1", "v1".to_owned()), ("k2", "v2".to_owned())]
+        );
+        assert_eq!(raw_spans[1].event, "span2");
+        assert_eq!(raw_spans[1].properties, vec![("k1", "v1".to_owned())]);
+    }
+
+    #[test]
+    fn span_not_finished() {
+        let mut queue = SpanQueue::with_capacity(16);
+        {
+            let _span1 = queue.start_span("span1").unwrap();
+            let _span2 = queue.start_span("span2").unwrap();
+            let _span3 = queue.start_span("span3").unwrap();
+        }
+        let mut raw_spans = queue.take_queue().into_inner().1;
+        raw_spans.sort_unstable_by(|a, b| a.id.0.cmp(&b.id.0));
+        assert_eq!(raw_spans.len(), 3);
+        assert_eq!(raw_spans[0].event, "span1");
+        assert_eq!(raw_spans[0].parent_id, SpanId(0));
+        assert_eq!(raw_spans[1].event, "span2");
+        assert_eq!(raw_spans[1].parent_id, raw_spans[0].id);
+        assert_eq!(raw_spans[2].event, "span3");
+        assert_eq!(raw_spans[2].parent_id, raw_spans[1].id);
+    }
+
+    #[test]
+    #[should_panic]
+    fn finish_span_out_of_order() {
+        let mut queue = SpanQueue::with_capacity(16);
+        let span1 = queue.start_span("span1").unwrap();
+        let span2 = queue.start_span("span2").unwrap();
+        queue.finish_span(span1);
+        queue.finish_span(span2);
+    }
+
+    #[test]
+    fn span_queue_out_of_size() {
+        let mut queue = SpanQueue::with_capacity(4);
+        let span1 = queue.start_span("span1").unwrap();
+        let span2 = queue.start_span("span2").unwrap();
+        let span3 = queue.start_span("span3").unwrap();
+        let span4 = queue.start_span("span4").unwrap();
+        assert!(queue.start_span("span5").is_none());
+        queue.finish_span(span4);
+        assert!(queue.start_span("span5").is_none());
+        queue.finish_span(span3);
+        assert!(queue.start_span("span5").is_none());
+        queue.finish_span(span2);
+        queue.finish_span(span1);
+        let mut raw_spans = queue.take_queue().into_inner().1;
+        raw_spans.sort_unstable_by(|a, b| a.id.0.cmp(&b.id.0));
+        assert_eq!(raw_spans.len(), 4);
+        assert_eq!(raw_spans[0].event, "span1");
+        assert_eq!(raw_spans[0].parent_id, SpanId(0));
+        assert_eq!(raw_spans[1].event, "span2");
+        assert_eq!(raw_spans[1].parent_id, raw_spans[0].id);
+        assert_eq!(raw_spans[2].event, "span3");
+        assert_eq!(raw_spans[2].parent_id, raw_spans[1].id);
+        assert_eq!(raw_spans[3].event, "span4");
+        assert_eq!(raw_spans[3].parent_id, raw_spans[2].id);
+    }
+
+    #[test]
+    fn complicated_relationship() {
+        let mut queue = SpanQueue::with_capacity(16);
+        let span1 = queue.start_span("span1").unwrap();
+        queue.finish_span(span1);
+        let span2 = queue.start_span("span2").unwrap();
+        let span3 = queue.start_span("span3").unwrap();
+        queue.finish_span(span3);
+        let span4 = queue.start_span("span4").unwrap();
+        let span5 = queue.start_span("span5").unwrap();
+        let span6 = queue.start_span("span6").unwrap();
+        queue.finish_span(span6);
+        queue.finish_span(span5);
+        queue.finish_span(span4);
+        queue.finish_span(span2);
+        let span7 = queue.start_span("span7").unwrap();
+        queue.finish_span(span7);
+        let mut raw_spans = queue.take_queue().into_inner().1;
+        raw_spans.sort_unstable_by(|a, b| a.id.0.cmp(&b.id.0));
+        assert_eq!(raw_spans.len(), 7);
+        assert_eq!(raw_spans[0].event, "span1");
+        assert_eq!(raw_spans[0].parent_id, SpanId(0));
+        assert_eq!(raw_spans[1].event, "span2");
+        assert_eq!(raw_spans[1].parent_id, SpanId(0));
+        assert_eq!(raw_spans[2].event, "span3");
+        assert_eq!(raw_spans[2].parent_id, raw_spans[1].id);
+        assert_eq!(raw_spans[3].event, "span4");
+        assert_eq!(raw_spans[3].parent_id, raw_spans[1].id);
+        assert_eq!(raw_spans[4].event, "span5");
+        assert_eq!(raw_spans[4].parent_id, raw_spans[3].id);
+        assert_eq!(raw_spans[5].event, "span6");
+        assert_eq!(raw_spans[5].parent_id, raw_spans[4].id);
+        assert_eq!(raw_spans[6].event, "span7");
+        assert_eq!(raw_spans[6].parent_id, SpanId(0));
     }
 }

@@ -16,12 +16,12 @@ static PARENT_SPANS_POOL: Lazy<Pool<Vec<ParentSpan>>> =
     Lazy::new(|| Pool::new(Vec::new, Vec::clear));
 
 thread_local! {
-    static RAW_SPANS_PULLER: RefCell<Puller<'static,Vec<RawSpan>>> = RefCell::new(RAW_SPANS_POOL.puller(512));
-    static PARENT_SPANS_PULLER: RefCell<Puller< 'static,Vec<ParentSpan>>>  = RefCell::new(PARENT_SPANS_POOL.puller(512));
+    static RAW_SPANS_PULLER: RefCell<Puller<'static, Vec<RawSpan>>> = RefCell::new(RAW_SPANS_POOL.puller(512));
+    static PARENT_SPANS_PULLER: RefCell<Puller<'static, Vec<ParentSpan>>>  = RefCell::new(PARENT_SPANS_POOL.puller(512));
 }
 
-pub(crate) type RawSpans = Reusable<'static, Vec<RawSpan>>;
-pub(crate) type ParentSpans = Reusable<'static, Vec<ParentSpan>>;
+pub type RawSpans = Reusable<'static, Vec<RawSpan>>;
+pub type ParentSpans = Reusable<'static, Vec<ParentSpan>>;
 
 pub(crate) fn alloc_raw_spans() -> RawSpans {
     RAW_SPANS_PULLER.with(|puller| puller.borrow_mut().pull())

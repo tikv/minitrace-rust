@@ -31,6 +31,8 @@
 
 use std::task::Poll;
 
+use crate::collector::global_collector::Global;
+use crate::collector::Collect;
 use crate::local::LocalSpan;
 use crate::Span;
 
@@ -63,10 +65,7 @@ pub trait FutureExt: Sized {
     /// [`Future`]:(std::future::Future)
     #[inline]
     fn in_span(self, span: Span) -> InSpan<Self> {
-        InSpan {
-            inner: self,
-            span: Some(span),
-        }
+        Self::_in_span(self, span)
     }
 
     /// Start a [`LocalSpan`] at every [`Future::poll()`]. It will create multiple _short_ spans if the future get polled multiple times.
@@ -98,17 +97,25 @@ pub trait FutureExt: Sized {
     fn enter_on_poll(self, event: &'static str) -> EnterOnPoll<Self> {
         EnterOnPoll { inner: self, event }
     }
+
+    #[inline]
+    fn _in_span<C: Collect>(self, span: Span<C>) -> InSpan<Self, C> {
+        InSpan {
+            inner: self,
+            span: Some(span),
+        }
+    }
 }
 
 /// Adapter for [`FutureExt::in_span()`](FutureExt::in_span).
 #[pin_project::pin_project]
-pub struct InSpan<T> {
+pub struct InSpan<T, C: Collect = Global> {
     #[pin]
     inner: T,
-    span: Option<Span>,
+    span: Option<Span<C>>,
 }
 
-impl<T: std::future::Future> std::future::Future for InSpan<T> {
+impl<T: std::future::Future, C: Collect> std::future::Future for InSpan<T, C> {
     type Output = T::Output;
 
     fn poll(self: std::pin::Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> Poll<Self::Output> {

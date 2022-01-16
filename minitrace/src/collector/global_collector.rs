@@ -10,7 +10,7 @@ use once_cell::sync::Lazy;
 use parking_lot::Mutex;
 use retain_mut::RetainMut;
 
-use crate::collector::{CollectArgs, SpanRecord};
+use crate::collector::{Collect, CollectArgs, SpanRecord, SpanSet};
 use crate::local::raw_span::RawSpan;
 use crate::local::span_id::SpanId;
 use crate::local::LocalSpans;
@@ -31,31 +31,37 @@ thread_local! {
     };
 }
 
-pub(crate) fn start_collect(collect_args: CollectArgs) -> u32 {
-    let collect_id = NEXT_COLLECT_ID.fetch_add(1, Ordering::AcqRel);
-    send_command(CollectCommand::StartCollect(StartCollect {
-        collect_id,
-        collect_args,
-    }));
-    collect_id
-}
+#[derive(Default)]
+pub struct Global;
 
-pub(crate) fn drop_collect(collect_id: u32) {
-    force_send_command(CollectCommand::DropCollect(DropCollect { collect_id }));
-}
+impl Collect for Global {
+    fn start_collect(&self, collect_args: CollectArgs) -> u32 {
+        let collect_id = NEXT_COLLECT_ID.fetch_add(1, Ordering::AcqRel);
+        send_command(CollectCommand::StartCollect(StartCollect {
+            collect_id,
+            collect_args,
+        }));
+        collect_id
+    }
 
-pub(crate) fn commit_collect(
-    collect_id: u32,
-    tx: futures::channel::oneshot::Sender<Vec<SpanRecord>>,
-) {
-    force_send_command(CollectCommand::CommitCollect(CommitCollect {
-        collect_id,
-        tx,
-    }));
-}
+    fn commit_collect(
+        &self,
+        collect_id: u32,
+        tx: futures::channel::oneshot::Sender<Vec<SpanRecord>>,
+    ) {
+        force_send_command(CollectCommand::CommitCollect(CommitCollect {
+            collect_id,
+            tx,
+        }));
+    }
 
-pub(crate) fn submit_spans(spans: SpanSet, parents: ParentSpans) {
-    send_command(CollectCommand::SubmitSpans(SubmitSpans { spans, parents }));
+    fn drop_collect(&self, collect_id: u32) {
+        force_send_command(CollectCommand::DropCollect(DropCollect { collect_id }));
+    }
+
+    fn submit_spans(&self, spans: SpanSet, parents: ParentSpans) {
+        send_command(CollectCommand::SubmitSpans(SubmitSpans { spans, parents }));
+    }
 }
 
 fn send_command(cmd: CollectCommand) {
@@ -64,13 +70,6 @@ fn send_command(cmd: CollectCommand) {
 
 fn force_send_command(cmd: CollectCommand) {
     COMMAND_SENDER.with(|sender| sender.force_send(cmd));
-}
-
-#[derive(Debug)]
-pub(crate) enum SpanSet {
-    Span(RawSpan),
-    LocalSpans(LocalSpans),
-    SharedLocalSpans(Arc<LocalSpans>),
 }
 
 #[derive(Debug)]

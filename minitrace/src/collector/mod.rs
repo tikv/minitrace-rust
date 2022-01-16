@@ -3,8 +3,34 @@
 //! Collector and the collected spans.
 
 pub(crate) mod global_collector;
+#[cfg(test)]
+pub mod mock_collector;
 
+use crate::local::raw_span::RawSpan;
 use crate::local::span_id::SpanId;
+use crate::local::LocalSpans;
+use crate::util::ParentSpans;
+
+use crate::collector::global_collector::Global;
+use std::sync::Arc;
+
+pub trait Collect: Default + 'static {
+    fn start_collect(&self, collect_args: CollectArgs) -> u32;
+    fn commit_collect(
+        &self,
+        collect_id: u32,
+        tx: futures::channel::oneshot::Sender<Vec<SpanRecord>>,
+    );
+    fn drop_collect(&self, collect_id: u32);
+    fn submit_spans(&self, spans: SpanSet, parents: ParentSpans);
+}
+
+#[derive(Debug)]
+pub enum SpanSet {
+    Span(RawSpan),
+    LocalSpans(LocalSpans),
+    SharedLocalSpans(Arc<LocalSpans>),
+}
 
 /// A span record been collected.
 #[derive(Clone, Debug, Default)]
@@ -18,9 +44,9 @@ pub struct SpanRecord {
 }
 
 #[derive(Debug, Clone, Copy)]
-pub(crate) struct ParentSpan {
-    pub(crate) span_id: SpanId,
-    pub(crate) collect_id: u32,
+pub struct ParentSpan {
+    pub span_id: SpanId,
+    pub collect_id: u32,
 }
 
 /// The collector for collecting all spans of a request.
@@ -38,15 +64,23 @@ pub(crate) struct ParentSpan {
 ///
 /// let records: Vec<SpanRecord> = block_on(collector.collect());
 /// ```
-pub struct Collector {
+pub struct Collector<C: Collect = Global> {
     collect_id: u32,
+    collect: C,
 }
 
-impl Collector {
+impl<C: Collect> Collector<C> {
     pub(crate) fn start_collect(args: CollectArgs) -> (Self, u32) {
-        let collect_id = global_collector::start_collect(args);
+        let collect = C::default();
+        let collect_id = collect.start_collect(args);
 
-        (Collector { collect_id }, collect_id)
+        (
+            Collector {
+                collect_id,
+                collect,
+            },
+            collect_id,
+        )
     }
 
     /// Stop the trace and collect all span been recorded.
@@ -57,7 +91,7 @@ impl Collector {
     /// messages every 10 milliseconds.
     pub async fn collect(self) -> Vec<SpanRecord> {
         let (tx, rx) = futures::channel::oneshot::channel();
-        global_collector::commit_collect(self.collect_id, tx);
+        self.collect.commit_collect(self.collect_id, tx);
 
         // Because the collect is committed, don't drop the collect.
         std::mem::forget(self);
@@ -66,9 +100,9 @@ impl Collector {
     }
 }
 
-impl Drop for Collector {
+impl<C: Collect> Drop for Collector<C> {
     fn drop(&mut self) {
-        global_collector::drop_collect(self.collect_id);
+        self.collect.drop_collect(self.collect_id);
     }
 }
 

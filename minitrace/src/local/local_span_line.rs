@@ -27,7 +27,7 @@ pub(crate) struct SpanLine {
 }
 
 pub(crate) struct LocalSpanHandle {
-    local_collector_epoch: usize,
+    span_line_epoch: usize,
     span_handle: SpanHandle,
 }
 
@@ -52,19 +52,16 @@ impl LocalSpanStack {
 
         Some(LocalSpanHandle {
             span_handle,
-            local_collector_epoch: span_line.span_line_epoch,
+            span_line_epoch: span_line.span_line_epoch,
         })
     }
 
     #[inline]
     pub fn exit_span(&mut self, local_span_handle: LocalSpanHandle) {
         if let Some(span_line) = self.current_span_line() {
-            debug_assert_eq!(
-                span_line.span_line_epoch,
-                local_span_handle.local_collector_epoch
-            );
+            debug_assert_eq!(span_line.span_line_epoch, local_span_handle.span_line_epoch);
 
-            if span_line.span_line_epoch == local_span_handle.local_collector_epoch {
+            if span_line.span_line_epoch == local_span_handle.span_line_epoch {
                 span_line
                     .span_queue
                     .finish_span(local_span_handle.span_handle);
@@ -74,12 +71,12 @@ impl LocalSpanStack {
 
     /// Register a new span line to the span stack. If succeed, return a span line epoch which can
     /// be used to unregister the span line via [`LocalSpanStack::unregister_and_collect`]. If
-    /// current size of the span stack is greater than the `capacity`, registration will be failed
+    /// the size of the span stack is greater than the `capacity`, registration will fail
     /// and a `None` will be returned.
     ///
     /// [`LocalSpanStack::unregister_and_collect`](LocalSpanStack::unregister_and_collect)
     #[inline]
-    pub fn register_span_line(&mut self, parents: Option<ParentSpans>) -> Option<usize> {
+    pub(crate) fn register_span_line(&mut self, parents: Option<ParentSpans>) -> Option<usize> {
         if self.span_lines.len() >= self.span_lines.capacity() {
             return None;
         }
@@ -121,12 +118,9 @@ impl LocalSpanStack {
         debug_assert!(self.current_span_line().is_some());
 
         if let Some(span_line) = self.current_span_line() {
-            debug_assert_eq!(
-                span_line.span_line_epoch,
-                local_span_handle.local_collector_epoch
-            );
+            debug_assert_eq!(span_line.span_line_epoch, local_span_handle.span_line_epoch);
 
-            if span_line.span_line_epoch == local_span_handle.local_collector_epoch {
+            if span_line.span_line_epoch == local_span_handle.span_line_epoch {
                 span_line
                     .span_queue
                     .add_properties(&local_span_handle.span_handle, properties());

@@ -5,7 +5,7 @@ use minstant::Instant;
 use crate::local::span_id::SpanId;
 
 #[derive(Clone, Debug)]
-pub(crate) struct RawSpan {
+pub struct RawSpan {
     pub id: SpanId,
     pub parent_id: SpanId,
     pub begin_instant: Instant,
