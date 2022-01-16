@@ -2,17 +2,17 @@
 
 ## [Next version]
 
-- `LocalSpanGuard` is removed and merged into `LocalSpan`.
+- Remove `LocalSpanGuard` and merge it into `LocalSpan`.
 
 ## v0.3.1
 
-- Add a async varient of jaeger reporting.
+- Add a async varient of jaeger reporting function `minitrace::report()`.
 - `LocalSpan::with_property` now no longer takes `self` but `&mut self` instead.
 
 ## v0.3.0
 
-- `Collector::collect()` becomes an async function because span collection is moved to a background thread to extremely reduce the performance overhead on the code being tracing.
-- Macro `#[trace]` on async function becomes able to automatically extract the local parent in the caller's context. Previously, the caller must manually call `in_span()`.
+- `Collector::collect()` becomes an async function because the span collection work is moved to a background thread to extremely reduce the performance overhead on the code being tracing.
+- Attribute macro `#[trace]` on async function becomes able to automatically extract the local parent in the caller's context. Previously, the caller must manually call `in_span()`.
 
 ## v0.2.0
 
