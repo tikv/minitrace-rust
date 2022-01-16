@@ -1,28 +1,28 @@
 // Copyright 2020 TiKV Project Authors. Licensed under Apache-2.0.
 
 use std::cell::RefCell;
+use std::rc::Rc;
 
-use minstant::Instant;
-
-use crate::collector::global_collector::SpanSet;
-use crate::collector::{global_collector, ParentSpan};
-use crate::local::local_collector::LocalCollector;
+use crate::collector::ParentSpan;
 use crate::local::span_queue::{SpanHandle, SpanQueue};
-use crate::local::LocalSpans;
 use crate::util::{alloc_parent_spans, ParentSpans, RawSpans};
 
+const DEFAULT_SPAN_STACK_SIZE: usize = 4096;
+
 thread_local! {
-    pub(crate) static LOCAL_SPAN_STACK: RefCell<LocalSpanStack> = RefCell::new(LocalSpanStack::new());
+    pub(crate) static LOCAL_SPAN_STACK: Rc<RefCell<LocalSpanStack>> = Rc::new(RefCell::new(LocalSpanStack::with_capacity(DEFAULT_SPAN_STACK_SIZE)));
 }
 
+#[derive(Debug)]
 pub(crate) struct LocalSpanStack {
     span_lines: Vec<SpanLine>,
-    next_local_collector_epoch: usize,
+    next_span_line_epoch: usize,
 }
 
+#[derive(Debug)]
 pub(crate) struct SpanLine {
     span_queue: SpanQueue,
-    local_collector_epoch: usize,
+    span_line_epoch: usize,
     parents: Option<ParentSpans>,
 }
 
@@ -33,10 +33,10 @@ pub(crate) struct LocalSpanHandle {
 
 impl LocalSpanStack {
     #[inline]
-    pub fn new() -> Self {
+    pub fn with_capacity(capacity: usize) -> Self {
         Self {
-            span_lines: Vec::new(),
-            next_local_collector_epoch: 0,
+            span_lines: Vec::with_capacity(capacity),
+            next_span_line_epoch: 0,
         }
     }
 
@@ -48,10 +48,11 @@ impl LocalSpanStack {
     #[inline]
     pub fn enter_span(&mut self, event: &'static str) -> Option<LocalSpanHandle> {
         let span_line = self.current_span_line()?;
+        let span_handle = span_line.span_queue.start_span(event)?;
 
         Some(LocalSpanHandle {
-            span_handle: span_line.span_queue.start_span(event),
-            local_collector_epoch: span_line.local_collector_epoch,
+            span_handle,
+            local_collector_epoch: span_line.span_line_epoch,
         })
     }
 
@@ -59,11 +60,11 @@ impl LocalSpanStack {
     pub fn exit_span(&mut self, local_span_handle: LocalSpanHandle) {
         if let Some(span_line) = self.current_span_line() {
             debug_assert_eq!(
-                span_line.local_collector_epoch,
+                span_line.span_line_epoch,
                 local_span_handle.local_collector_epoch
             );
 
-            if span_line.local_collector_epoch == local_span_handle.local_collector_epoch {
+            if span_line.span_line_epoch == local_span_handle.local_collector_epoch {
                 span_line
                     .span_queue
                     .finish_span(local_span_handle.span_handle);
@@ -71,50 +72,44 @@ impl LocalSpanStack {
         }
     }
 
+    /// Register a new span line to the span stack. If succeed, return a span line epoch which can
+    /// be used to unregister the span line via [`LocalSpanStack::unregister_and_collect`]. If
+    /// current size of the span stack is greater than the `capacity`, registration will be failed
+    /// and a `None` will be returned.
+    ///
+    /// [`LocalSpanStack::unregister_and_collect`](LocalSpanStack::unregister_and_collect)
     #[inline]
-    pub fn register_local_collector(&mut self, parents: Option<ParentSpans>) -> LocalCollector {
-        let epoch = self.next_local_collector_epoch;
-        self.next_local_collector_epoch = self.next_local_collector_epoch.wrapping_add(1);
+    pub fn register_span_line(&mut self, parents: Option<ParentSpans>) -> Option<usize> {
+        if self.span_lines.len() >= self.span_lines.capacity() {
+            return None;
+        }
+
+        let epoch = self.next_span_line_epoch;
+        self.next_span_line_epoch = self.next_span_line_epoch.wrapping_add(1);
 
         let span_line = SpanLine {
             span_queue: SpanQueue::new(),
-            local_collector_epoch: epoch,
+            span_line_epoch: epoch,
             parents,
         };
 
         self.span_lines.push(span_line);
-
-        LocalCollector::new(epoch)
+        Some(epoch)
     }
 
-    // Raw spans will be sent to acquirers directly and return None if parent span exists.
-    pub fn unregister_and_collect(&mut self, local_collector: &LocalCollector) -> Option<RawSpans> {
+    pub(crate) fn unregister_and_collect(
+        &mut self,
+        span_line_epoch: usize,
+    ) -> Option<(RawSpans, Option<ParentSpans>)> {
         debug_assert_eq!(
             self.current_span_line()
-                .map(|span_line| span_line.local_collector_epoch),
-            Some(local_collector.local_collector_epoch)
+                .map(|span_line| span_line.span_line_epoch),
+            Some(span_line_epoch)
         );
 
-        let mut span_line = self.span_lines.pop()?;
-        if span_line.local_collector_epoch == local_collector.local_collector_epoch {
-            let raw_spans = span_line.span_queue.take_queue();
-
-            if let Some(parents) = span_line.parents.take() {
-                if !raw_spans.is_empty() {
-                    let local_spans = LocalSpans {
-                        spans: raw_spans,
-                        end_time: Instant::now(),
-                    };
-
-                    global_collector::submit_spans(SpanSet::LocalSpans(local_spans), parents);
-                }
-                None
-            } else {
-                Some(raw_spans)
-            }
-        } else {
-            None
-        }
+        let span_line = self.span_lines.pop()?;
+        (span_line.span_line_epoch == span_line_epoch)
+            .then(move || (span_line.span_queue.take_queue(), span_line.parents))
     }
 
     #[inline]
@@ -127,11 +122,11 @@ impl LocalSpanStack {
 
         if let Some(span_line) = self.current_span_line() {
             debug_assert_eq!(
-                span_line.local_collector_epoch,
+                span_line.span_line_epoch,
                 local_span_handle.local_collector_epoch
             );
 
-            if span_line.local_collector_epoch == local_span_handle.local_collector_epoch {
+            if span_line.span_line_epoch == local_span_handle.local_collector_epoch {
                 span_line
                     .span_queue
                     .add_properties(&local_span_handle.span_handle, properties());

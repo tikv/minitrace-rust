@@ -1,13 +1,14 @@
 // Copyright 2021 TiKV Project Authors. Licensed under Apache-2.0.
 
-use std::marker::PhantomData;
+use crate::collector::global_collector;
+use crate::collector::global_collector::SpanSet;
+use crate::local::local_span_line::{LocalSpanStack, LOCAL_SPAN_STACK};
+use crate::util::{alloc_raw_spans, ParentSpans, RawSpans};
+
+use std::cell::RefCell;
+use std::rc::Rc;
 
 use minstant::Instant;
-
-use crate::{
-    local::local_span_line::LOCAL_SPAN_STACK,
-    util::{ParentSpans, RawSpans},
-};
 
 /// A collector to collect [`LocalSpan`].
 ///
@@ -42,19 +43,15 @@ use crate::{
 /// [`Span`]: crate::Span
 /// [`LocalSpan`]: crate::local::LocalSpan
 #[must_use]
-#[derive(Debug, Ord, PartialOrd, Eq, PartialEq)]
+#[derive(Debug, Default)]
 pub struct LocalCollector {
-    pub(crate) collected: bool,
-    pub(crate) local_collector_epoch: usize,
+    inner: Option<LocalCollectorInner>,
+}
 
-    // Identical to
-    // ```
-    // impl !Sync for LocalCollector {}
-    // impl !Send for LocalCollector {}
-    // ```
-    //
-    // TODO: Replace it once feature `negative_impls` is stable.
-    _p: PhantomData<*const ()>,
+#[derive(Debug)]
+struct LocalCollectorInner {
+    stack: Rc<RefCell<LocalSpanStack>>,
+    span_line_epoch: usize,
 }
 
 #[derive(Debug)]
@@ -64,49 +61,74 @@ pub struct LocalSpans {
 }
 
 impl LocalCollector {
-    pub(crate) fn new(local_collector_epoch: usize) -> Self {
-        Self {
-            collected: false,
-            local_collector_epoch,
-            _p: Default::default(),
-        }
-    }
-
     pub fn start() -> Self {
-        LOCAL_SPAN_STACK.with(|span_line| {
-            let s = &mut *span_line.borrow_mut();
-            s.register_local_collector(None)
-        })
+        let stack = LOCAL_SPAN_STACK.with(Rc::clone);
+        Self::new(stack, None)
     }
 
-    pub(crate) fn start_with_parent(parent: ParentSpans) -> Self {
-        LOCAL_SPAN_STACK.with(|span_line| {
-            let s = &mut *span_line.borrow_mut();
-            s.register_local_collector(Some(parent))
-        })
+    pub(crate) fn start_with_parent(parents: ParentSpans) -> Self {
+        let stack = LOCAL_SPAN_STACK.with(Rc::clone);
+        Self::new(stack, Some(parents))
     }
 
     pub fn collect(mut self) -> LocalSpans {
-        LOCAL_SPAN_STACK.with(|span_line| {
-            let s = &mut *span_line.borrow_mut();
-            self.collected = true;
-            LocalSpans {
-                // This will panic if `LocalCollector` is started by `start_with_parent_span`
-                spans: s.unregister_and_collect(&self).unwrap(),
-                end_time: Instant::now(),
-            }
-        })
+        let spans = self
+            .inner
+            .take()
+            .map(
+                |LocalCollectorInner {
+                     stack,
+                     span_line_epoch,
+                     ..
+                 }| {
+                    let s = &mut (*stack).borrow_mut();
+                    s.unregister_and_collect(span_line_epoch)
+                        .map(|(spans, _)| spans)
+                },
+            )
+            .flatten()
+            .unwrap_or_else(alloc_raw_spans);
+
+        LocalSpans {
+            spans,
+            end_time: Instant::now(),
+        }
+    }
+}
+
+impl LocalCollector {
+    pub(crate) fn new(stack: Rc<RefCell<LocalSpanStack>>, parents: Option<ParentSpans>) -> Self {
+        let span_line_epoch = {
+            let stack = &mut (*stack).borrow_mut();
+            stack.register_span_line(parents)
+        };
+
+        Self {
+            inner: span_line_epoch.map(move |span_line_epoch| LocalCollectorInner {
+                stack,
+                span_line_epoch,
+            }),
+        }
     }
 }
 
 impl Drop for LocalCollector {
     fn drop(&mut self) {
-        if !self.collected {
-            self.collected = true;
-            LOCAL_SPAN_STACK.with(|span_line| {
-                let s = &mut *span_line.borrow_mut();
-                s.unregister_and_collect(self);
-            })
+        if let Some(LocalCollectorInner {
+            stack,
+            span_line_epoch,
+        }) = self.inner.take()
+        {
+            let s = &mut (*stack).borrow_mut();
+            if let Some((spans, Some(parents))) = s.unregister_and_collect(span_line_epoch) {
+                global_collector::submit_spans(
+                    SpanSet::LocalSpans(LocalSpans {
+                        spans,
+                        end_time: Instant::now(),
+                    }),
+                    parents,
+                )
+            }
         }
     }
 }

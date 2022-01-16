@@ -1,13 +1,17 @@
 // Copyright 2020 TiKV Project Authors. Licensed under Apache-2.0.
 
-use minstant::Instant;
-
 use crate::local::raw_span::RawSpan;
 use crate::local::span_id::{DefaultIdGenerator, SpanId};
 use crate::util::{alloc_raw_spans, RawSpans};
 
+use minstant::Instant;
+
+const DEFAULT_SPAN_QUEUE_SIZE: usize = 4096;
+
+#[derive(Debug)]
 pub(crate) struct SpanQueue {
     span_queue: RawSpans,
+    capacity: usize,
     pub(crate) next_parent_id: Option<SpanId>,
 }
 
@@ -17,15 +21,24 @@ pub(crate) struct SpanHandle {
 
 impl SpanQueue {
     pub fn new() -> Self {
+        Self::with_capacity(DEFAULT_SPAN_QUEUE_SIZE)
+    }
+
+    pub(crate) fn with_capacity(capacity: usize) -> Self {
         let span_queue = alloc_raw_spans();
         Self {
             span_queue,
+            capacity,
             next_parent_id: None,
         }
     }
 
     #[inline]
-    pub fn start_span(&mut self, event: &'static str) -> SpanHandle {
+    pub fn start_span(&mut self, event: &'static str) -> Option<SpanHandle> {
+        if self.span_queue.len() >= self.capacity {
+            return None;
+        }
+
         let span = RawSpan::begin_with(
             DefaultIdGenerator::next_id(),
             self.next_parent_id.unwrap_or(SpanId(0)),
@@ -37,7 +50,7 @@ impl SpanQueue {
         let index = self.span_queue.len();
         self.span_queue.push(span);
 
-        SpanHandle { index }
+        Some(SpanHandle { index })
     }
 
     #[inline]
