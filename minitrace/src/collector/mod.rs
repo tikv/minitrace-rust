@@ -6,7 +6,7 @@ pub(crate) mod global_collector;
 
 use crate::local::span_id::SpanId;
 
-/// A span records been collected.
+/// A span record been collected.
 #[derive(Clone, Debug, Default)]
 pub struct SpanRecord {
     pub id: u32,
