@@ -12,11 +12,11 @@ pub struct LocalParentGuard<C: Collect = Global> {
 }
 
 impl<C: Collect> LocalParentGuard<C> {
-    pub(crate) fn new(span: &Span<C>) -> Self {
+    pub(crate) fn new(span: &Span<C>, collect: C) -> Self {
         let local_collector = span.inner.as_ref().map(|inner| {
             let mut parents = alloc_parent_spans();
             parents.extend(inner.as_parent());
-            LocalCollector::<C>::start_with_parent(parents)
+            LocalCollector::start_with_parent(parents, collect)
         });
 
         Self {

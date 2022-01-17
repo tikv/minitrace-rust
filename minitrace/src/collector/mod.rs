@@ -14,7 +14,7 @@ use crate::util::ParentSpans;
 use crate::collector::global_collector::Global;
 use std::sync::Arc;
 
-pub trait Collect: Default + 'static {
+pub trait Collect: 'static + Clone {
     fn start_collect(&self, collect_args: CollectArgs) -> u32;
     fn commit_collect(
         &self,
@@ -70,8 +70,7 @@ pub struct Collector<C: Collect = Global> {
 }
 
 impl<C: Collect> Collector<C> {
-    pub(crate) fn start_collect(args: CollectArgs) -> (Self, u32) {
-        let collect = C::default();
+    pub(crate) fn start_collect(args: CollectArgs, collect: C) -> (Self, u32) {
         let collect_id = collect.start_collect(args);
 
         (

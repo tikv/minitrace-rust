@@ -31,7 +31,7 @@ thread_local! {
     };
 }
 
-#[derive(Default)]
+#[derive(Default, Copy, Clone)]
 pub struct Global;
 
 impl Collect for Global {

@@ -63,7 +63,7 @@ pub struct LocalSpans {
 
 impl LocalCollector {
     pub fn start() -> Self {
-        Self::_start()
+        Self::_start(Global)
     }
 }
 
@@ -113,14 +113,14 @@ impl<C: Collect> LocalCollector<C> {
         }
     }
 
-    pub fn _start() -> Self {
+    pub fn _start(collect: C) -> Self {
         let stack = LOCAL_SPAN_STACK.with(Rc::clone);
-        Self::new(stack, None, C::default())
+        Self::new(stack, None, collect)
     }
 
-    pub(crate) fn start_with_parent(parents: ParentSpans) -> Self {
+    pub(crate) fn start_with_parent(parents: ParentSpans, collect: C) -> Self {
         let stack = LOCAL_SPAN_STACK.with(Rc::clone);
-        Self::new(stack, Some(parents), C::default())
+        Self::new(stack, Some(parents), collect)
     }
 }
 
