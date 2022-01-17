@@ -10,6 +10,9 @@ use once_cell::sync::Lazy;
 use parking_lot::Mutex;
 use retain_mut::RetainMut;
 
+use crate::collector::command::{
+    CollectCommand, CommitCollect, DropCollect, StartCollect, SubmitSpans,
+};
 use crate::collector::{Collect, CollectArgs, SpanRecord, SpanSet};
 use crate::local::raw_span::RawSpan;
 use crate::local::span_id::SpanId;
@@ -82,37 +85,6 @@ enum SpanCollection {
         spans: Arc<SpanSet>,
         parent_id: SpanId,
     },
-}
-
-#[derive(Debug)]
-enum CollectCommand {
-    StartCollect(StartCollect),
-    DropCollect(DropCollect),
-    CommitCollect(CommitCollect),
-    SubmitSpans(SubmitSpans),
-}
-
-#[derive(Debug)]
-struct StartCollect {
-    collect_id: u32,
-    collect_args: CollectArgs,
-}
-
-#[derive(Debug)]
-struct DropCollect {
-    collect_id: u32,
-}
-
-#[derive(Debug)]
-struct CommitCollect {
-    collect_id: u32,
-    tx: futures::channel::oneshot::Sender<Vec<SpanRecord>>,
-}
-
-#[derive(Debug)]
-struct SubmitSpans {
-    spans: SpanSet,
-    parents: ParentSpans,
 }
 
 pub(crate) struct GlobalCollector {

@@ -2,7 +2,9 @@
 
 //! Collector and the collected spans.
 
+pub(crate) mod command;
 pub(crate) mod global_collector;
+
 #[cfg(test)]
 pub mod mock_collector;
 

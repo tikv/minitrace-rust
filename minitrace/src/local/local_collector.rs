@@ -26,7 +26,7 @@ use minstant::Instant;
 /// use futures::executor::block_on;
 /// use std::sync::Arc;
 ///
-/// // Collect local spans manully without a parent
+/// // Collect local spans manually without a parent
 /// let collector = LocalCollector::start();
 /// let _span1 = LocalSpan::enter_with_local_parent("a child span");
 /// drop(_span1);
