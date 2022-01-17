@@ -63,33 +63,8 @@ pub struct LocalSpans {
 
 impl LocalCollector {
     pub fn start() -> Self {
-        Self::_start(Global)
-    }
-}
-
-impl<C: Collect> LocalCollector<C> {
-    pub fn collect(mut self) -> LocalSpans {
-        let spans = self
-            .inner
-            .take()
-            .map(
-                |LocalCollectorInner {
-                     stack,
-                     span_line_epoch,
-                     ..
-                 }| {
-                    let s = &mut (*stack).borrow_mut();
-                    s.unregister_and_collect(span_line_epoch)
-                        .map(|(spans, _)| spans)
-                },
-            )
-            .flatten()
-            .unwrap_or_else(alloc_raw_spans);
-
-        LocalSpans {
-            spans,
-            end_time: Instant::now(),
-        }
+        let stack = LOCAL_SPAN_STACK.with(Rc::clone);
+        Self::new(stack, None, Global)
     }
 }
 
@@ -113,14 +88,28 @@ impl<C: Collect> LocalCollector<C> {
         }
     }
 
-    pub fn _start(collect: C) -> Self {
-        let stack = LOCAL_SPAN_STACK.with(Rc::clone);
-        Self::new(stack, None, collect)
-    }
+    pub fn collect(mut self) -> LocalSpans {
+        let spans = self
+            .inner
+            .take()
+            .map(
+                |LocalCollectorInner {
+                     stack,
+                     span_line_epoch,
+                     ..
+                 }| {
+                    let s = &mut (*stack).borrow_mut();
+                    s.unregister_and_collect(span_line_epoch)
+                        .map(|(spans, _)| spans)
+                },
+            )
+            .flatten()
+            .unwrap_or_else(alloc_raw_spans);
 
-    pub(crate) fn start_with_parent(parents: ParentSpans, collect: C) -> Self {
-        let stack = LOCAL_SPAN_STACK.with(Rc::clone);
-        Self::new(stack, Some(parents), collect)
+        LocalSpans {
+            spans,
+            end_time: Instant::now(),
+        }
     }
 }
 

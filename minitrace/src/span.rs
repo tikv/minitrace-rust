@@ -1,16 +1,18 @@
 // Copyright 2020 TiKV Project Authors. Licensed under Apache-2.0.
 
-use std::sync::Arc;
-
-use minstant::Instant;
-
 use crate::collector::global_collector::Global;
 use crate::collector::{Collect, CollectArgs, Collector, ParentSpan, SpanSet};
-use crate::local::local_span_line::LOCAL_SPAN_STACK;
+use crate::local::local_span_line::{LocalSpanStack, LOCAL_SPAN_STACK};
 use crate::local::raw_span::RawSpan;
 use crate::local::span_id::{DefaultIdGenerator, SpanId};
 use crate::local::{LocalParentGuard, LocalSpans};
 use crate::util::{alloc_parent_spans, ParentSpans};
+
+use std::cell::RefCell;
+use std::rc::Rc;
+use std::sync::Arc;
+
+use minstant::Instant;
 
 /// A thread-safe span.
 #[must_use]
@@ -30,20 +32,22 @@ impl Span {
     /// Create a place-holder span that never starts recording.
     #[inline]
     pub fn new_noop() -> Self {
-        Self::_new_noop(Global)
+        Self::new_noop_with_collect(Global)
     }
 
+    #[inline]
     pub fn root(event: &'static str) -> (Self, Collector) {
-        Self::_root(event, Global)
+        Self::root_with_args_collect(event, CollectArgs::default(), Global)
     }
 
+    #[inline]
     pub fn root_with_args(event: &'static str, args: CollectArgs) -> (Self, Collector) {
-        Self::_root_with_args(event, args, Global)
+        Self::root_with_args_collect(event, args, Global)
     }
 
     #[inline]
     pub fn enter_with_parent(event: &'static str, parent: &Span) -> Self {
-        Self::_enter_with_parent(event, parent, Global)
+        Self::enter_with_parents_collect(event, [parent], Global)
     }
 
     #[inline]
@@ -51,12 +55,13 @@ impl Span {
         event: &'static str,
         parents: impl IntoIterator<Item = &'a Span>,
     ) -> Self {
-        Self::_enter_with_parents(event, parents, Global)
+        Self::enter_with_parents_collect(event, parents, Global)
     }
 
     #[inline]
     pub fn enter_with_local_parent(event: &'static str) -> Self {
-        Self::_enter_with_local_parent(event, Global)
+        let stack = LOCAL_SPAN_STACK.with(Rc::clone);
+        Self::enter_with_stack_collect(event, stack, Global)
     }
 }
 
@@ -124,18 +129,14 @@ impl SpanInner {
 
 impl<C: Collect> Span<C> {
     #[inline]
-    pub(crate) fn _new_noop(collect: C) -> Self {
+    pub(crate) fn new_noop_with_collect(collect: C) -> Self {
         Self {
             inner: None,
             collect,
         }
     }
 
-    pub(crate) fn _root(event: &'static str, collect: C) -> (Self, Collector<C>) {
-        Self::_root_with_args(event, CollectArgs::default(), collect)
-    }
-
-    pub(crate) fn _root_with_args(
+    pub(crate) fn root_with_args_collect(
         event: &'static str,
         args: CollectArgs,
         collect: C,
@@ -152,13 +153,7 @@ impl<C: Collect> Span<C> {
         (span, collector)
     }
 
-    #[inline]
-    pub(crate) fn _enter_with_parent(event: &'static str, parent: &Span<C>, collect: C) -> Self {
-        Self::_enter_with_parents(event, [parent], collect)
-    }
-
-    #[inline]
-    pub(crate) fn _enter_with_parents<'a>(
+    pub(crate) fn enter_with_parents_collect<'a>(
         event: &'static str,
         parents: impl IntoIterator<Item = &'a Span<C>>,
         collect: C,
@@ -174,15 +169,23 @@ impl<C: Collect> Span<C> {
         Self::new(parents_spans, event, collect)
     }
 
-    #[inline]
-    pub(crate) fn _enter_with_local_parent(event: &'static str, collect: C) -> Self {
-        LOCAL_SPAN_STACK
-            .with(|span_stack| {
-                let mut span_stack = span_stack.borrow_mut();
-                let parents = span_stack.current_span_line()?.current_parents()?;
-                Some(Span::new(parents, event, collect.clone()))
-            })
-            .unwrap_or_else(move || Self::_new_noop(collect))
+    pub(crate) fn enter_with_stack_collect(
+        event: &'static str,
+        stack: Rc<RefCell<LocalSpanStack>>,
+        collect: C,
+    ) -> Self {
+        let parents = {
+            let span_stack = &mut *stack.borrow_mut();
+            span_stack
+                .current_span_line()
+                .map(|span_line| span_line.current_parents())
+                .flatten()
+        };
+
+        match parents {
+            Some(parents) => Span::new(parents, event, collect),
+            None => Self::new_noop_with_collect(collect),
+        }
     }
 }
 
