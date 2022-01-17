@@ -69,10 +69,10 @@ impl Span {
 impl<C: Collect> Span<C> {
     #[inline]
     pub fn set_local_parent(&self) -> Option<Guard<impl FnOnce()>> {
-        let stack = LOCAL_SPAN_STACK.with(Rc::clone);
-        self.inner
-            .as_ref()
-            .map(move |inner| inner.capture_local_spans(stack))
+        self.inner.as_ref().map(move |inner| {
+            let stack = LOCAL_SPAN_STACK.with(Rc::clone);
+            inner.capture_local_spans(stack)
+        })
     }
 
     #[inline]
