@@ -55,8 +55,8 @@ impl LocalSpan {
         stack: Rc<RefCell<LocalSpanStack>>,
     ) -> Self {
         let span_handle = {
-            let mut span_line = stack.borrow_mut();
-            span_line.enter_span(event)
+            let mut stack = stack.borrow_mut();
+            stack.enter_span(event)
         };
 
         let inner = span_handle.map(|span_handle| LocalSpanInner { stack, span_handle });

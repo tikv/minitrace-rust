@@ -120,13 +120,10 @@ mod tests {
         let mut queue = SpanQueue::with_capacity(16);
         {
             let span1 = queue.start_span("span1").unwrap();
-            queue.add_properties(
-                &span1,
-                vec![("k1", "v1".to_owned()), ("k2", "v2".to_owned())].into_iter(),
-            );
+            queue.add_properties(&span1, [("k1", "v1".to_owned()), ("k2", "v2".to_owned())]);
             {
                 let span2 = queue.start_span("span2").unwrap();
-                queue.add_properties(&span2, vec![("k1", "v1".to_owned())].into_iter());
+                queue.add_properties(&span2, [("k1", "v1".to_owned())]);
                 queue.finish_span(span2);
             }
             queue.finish_span(span1);
