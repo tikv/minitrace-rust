@@ -5,7 +5,7 @@ use crate::collector::{Collect, CollectArgs, Collector, ParentSpan, SpanSet};
 use crate::local::local_span_line::{LocalSpanStack, LOCAL_SPAN_STACK};
 use crate::local::raw_span::RawSpan;
 use crate::local::span_id::{DefaultIdGenerator, SpanId};
-use crate::local::{LocalParentGuard, LocalSpans};
+use crate::local::{LocalCollector, LocalSpans};
 use crate::util::{alloc_parent_spans, ParentSpans};
 
 use std::cell::RefCell;
@@ -100,24 +100,34 @@ impl<C: Collect> Span<C> {
     }
 
     #[inline]
-    pub fn set_local_parent(&self) -> LocalParentGuard<C> {
-        LocalParentGuard::new(self, self.collect.clone())
+    pub fn set_local_parent(&self) -> Option<LocalCollector<C>> {
+        self.as_parents().map(|parents| {
+            let stack = LOCAL_SPAN_STACK.with(Rc::clone);
+            LocalCollector::new(stack, Some(parents), self.collect.clone())
+        })
     }
 
     #[inline]
     pub fn push_child_spans(&self, local_spans: Arc<LocalSpans>) {
-        if let Some(inner) = &self.inner {
-            let mut parents = alloc_parent_spans();
-            parents.extend(inner.as_parent());
+        if let Some(parents) = self.as_parents() {
             self.collect
                 .submit_spans(SpanSet::SharedLocalSpans(local_spans), parents);
         }
+    }
+
+    #[inline]
+    pub(crate) fn as_parents(&self) -> Option<ParentSpans> {
+        self.inner.as_ref().map(|inner| {
+            let mut parents = alloc_parent_spans();
+            parents.extend(inner.as_parents());
+            parents
+        })
     }
 }
 
 impl SpanInner {
     #[inline]
-    pub(crate) fn as_parent(&self) -> impl Iterator<Item = ParentSpan> + '_ {
+    pub(crate) fn as_parents(&self) -> impl Iterator<Item = ParentSpan> + '_ {
         self.parents
             .iter()
             .map(move |ParentSpan { collect_id, .. }| ParentSpan {
@@ -163,7 +173,7 @@ impl<C: Collect> Span<C> {
             parents
                 .into_iter()
                 .filter_map(|span| span.inner.as_ref())
-                .flat_map(|inner| inner.as_parent()),
+                .flat_map(|inner| inner.as_parents()),
         );
 
         Self::new(parents_spans, event, collect)
