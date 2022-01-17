@@ -6,6 +6,7 @@ use crate::local::local_span_line::{LocalSpanStack, LOCAL_SPAN_STACK};
 use crate::local::raw_span::RawSpan;
 use crate::local::span_id::{DefaultIdGenerator, SpanId};
 use crate::local::{LocalCollector, LocalSpans};
+use crate::util::guard::Guard;
 use crate::util::{alloc_parent_spans, ParentSpans};
 
 use std::cell::RefCell;
@@ -18,30 +19,30 @@ use minstant::Instant;
 #[must_use]
 #[derive(Debug)]
 pub struct Span<C: Collect = Global> {
-    pub(crate) inner: Option<SpanInner>,
-    collect: C,
+    pub(crate) inner: Option<SpanInner<C>>,
 }
 
 #[derive(Debug)]
-pub(crate) struct SpanInner {
+pub(crate) struct SpanInner<C: Collect> {
     pub(crate) raw_span: RawSpan,
     pub(crate) parents: ParentSpans,
+    collect: C,
 }
 
 impl Span {
     /// Create a place-holder span that never starts recording.
     #[inline]
     pub fn new_noop() -> Self {
-        Self::new_noop_with_collect(Global)
+        Self::new_noop_with_collect()
     }
 
     #[inline]
-    pub fn root(event: &'static str) -> (Self, Collector) {
+    pub fn root(event: &'static str) -> (Self, Collector<Global>) {
         Self::root_with_args_collect(event, CollectArgs::default(), Global)
     }
 
     #[inline]
-    pub fn root_with_args(event: &'static str, args: CollectArgs) -> (Self, Collector) {
+    pub fn root_with_args(event: &'static str, args: CollectArgs) -> (Self, Collector<Global>) {
         Self::root_with_args_collect(event, args, Global)
     }
 
@@ -67,15 +68,11 @@ impl Span {
 
 impl<C: Collect> Span<C> {
     #[inline]
-    pub(crate) fn new(parents: ParentSpans, event: &'static str, collect: C) -> Self {
-        let span_id = DefaultIdGenerator::next_id();
-        let begin_instant = Instant::now();
-        let raw_span = RawSpan::begin_with(span_id, SpanId::new(0), begin_instant, event);
-
-        Self {
-            inner: Some(SpanInner { raw_span, parents }),
-            collect,
-        }
+    pub fn set_local_parent(&self) -> Option<Guard<impl FnOnce()>> {
+        let stack = LOCAL_SPAN_STACK.with(Rc::clone);
+        self.inner
+            .as_ref()
+            .map(move |inner| inner.capture_local_spans(stack))
     }
 
     #[inline]
@@ -83,7 +80,7 @@ impl<C: Collect> Span<C> {
     where
         F: FnOnce() -> (&'static str, String),
     {
-        self.with_properties(|| [property()]);
+        self.with_properties(move || [property()]);
     }
 
     #[inline]
@@ -92,42 +89,79 @@ impl<C: Collect> Span<C> {
         I: IntoIterator<Item = (&'static str, String)>,
         F: FnOnce() -> I,
     {
-        if let Some(inner) = &mut self.inner {
-            for prop in properties() {
-                inner.raw_span.properties.push(prop);
-            }
+        if let Some(inner) = self.inner.as_mut() {
+            inner.with_properties(properties);
         }
-    }
-
-    #[inline]
-    pub fn set_local_parent(&self) -> Option<LocalCollector<C>> {
-        self.as_parents().map(|parents| {
-            let stack = LOCAL_SPAN_STACK.with(Rc::clone);
-            LocalCollector::new(stack, Some(parents), self.collect.clone())
-        })
     }
 
     #[inline]
     pub fn push_child_spans(&self, local_spans: Arc<LocalSpans>) {
-        if let Some(parents) = self.as_parents() {
-            self.collect
-                .submit_spans(SpanSet::SharedLocalSpans(local_spans), parents);
+        if let Some(inner) = self.inner.as_ref() {
+            inner.push_child_spans(local_spans)
+        }
+    }
+}
+
+impl<C: Collect> Span<C> {
+    #[inline]
+    fn new(parents: ParentSpans, event: &'static str, collect: C) -> Self {
+        let span_id = DefaultIdGenerator::next_id();
+        let begin_instant = Instant::now();
+        let raw_span = RawSpan::begin_with(span_id, SpanId::new(0), begin_instant, event);
+
+        Self {
+            inner: Some(SpanInner {
+                raw_span,
+                parents,
+                collect,
+            }),
+        }
+    }
+}
+
+impl<C: Collect> SpanInner<C> {
+    #[inline]
+    fn with_properties<I, F>(&mut self, properties: F)
+    where
+        I: IntoIterator<Item = (&'static str, String)>,
+        F: FnOnce() -> I,
+    {
+        for prop in properties() {
+            self.raw_span.properties.push(prop);
         }
     }
 
     #[inline]
-    pub(crate) fn as_parents(&self) -> Option<ParentSpans> {
-        self.inner.as_ref().map(|inner| {
-            let mut parents = alloc_parent_spans();
-            parents.extend(inner.as_parents());
-            parents
+    fn capture_local_spans(&self, stack: Rc<RefCell<LocalSpanStack>>) -> Guard<impl FnOnce()> {
+        let collector = self.register_local_collector(stack);
+        let collect = self.collect.clone();
+        Guard::new(move || {
+            let (spans, parents) = collector.collect_with_parents();
+            debug_assert!(parents.is_some());
+            let parents = parents.unwrap_or_else(alloc_parent_spans);
+            collect.submit_spans(SpanSet::LocalSpans(spans), parents);
         })
     }
-}
 
-impl SpanInner {
     #[inline]
-    pub(crate) fn as_parents(&self) -> impl Iterator<Item = ParentSpan> + '_ {
+    fn register_local_collector(&self, stack: Rc<RefCell<LocalSpanStack>>) -> LocalCollector {
+        let parents = self.as_parents();
+        let mut parent_spans = alloc_parent_spans();
+        parent_spans.extend(parents);
+        LocalCollector::new(Some(parent_spans), stack)
+    }
+
+    #[inline]
+    fn push_child_spans(&self, local_spans: Arc<LocalSpans>) {
+        let parents = self.as_parents();
+        let mut parent_spans = alloc_parent_spans();
+        parent_spans.extend(parents);
+        self.collect
+            .submit_spans(SpanSet::SharedLocalSpans(local_spans), parent_spans);
+    }
+
+    #[inline]
+    fn as_parents(&self) -> impl Iterator<Item = ParentSpan> + '_ {
         self.parents
             .iter()
             .map(move |ParentSpan { collect_id, .. }| ParentSpan {
@@ -139,11 +173,8 @@ impl SpanInner {
 
 impl<C: Collect> Span<C> {
     #[inline]
-    pub(crate) fn new_noop_with_collect(collect: C) -> Self {
-        Self {
-            inner: None,
-            collect,
-        }
+    pub(crate) fn new_noop_with_collect() -> Self {
+        Self { inner: None }
     }
 
     pub(crate) fn root_with_args_collect(
@@ -194,18 +225,22 @@ impl<C: Collect> Span<C> {
 
         match parents {
             Some(parents) => Span::new(parents, event, collect),
-            None => Self::new_noop_with_collect(collect),
+            None => Self::new_noop_with_collect(),
         }
     }
 }
 
 impl<C: Collect> Drop for Span<C> {
     fn drop(&mut self) {
-        if let Some(mut inner) = self.inner.take() {
+        if let Some(SpanInner {
+            mut raw_span,
+            parents,
+            collect,
+        }) = self.inner.take()
+        {
             let end_instant = Instant::now();
-            inner.raw_span.end_with(end_instant);
-            self.collect
-                .submit_spans(SpanSet::Span(inner.raw_span), inner.parents);
+            raw_span.end_with(end_instant);
+            collect.submit_spans(SpanSet::Span(raw_span), parents);
         }
     }
 }

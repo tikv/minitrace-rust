@@ -31,7 +31,6 @@
 
 use std::task::Poll;
 
-use crate::collector::global_collector::Global;
 use crate::collector::Collect;
 use crate::local::LocalSpan;
 use crate::Span;
@@ -39,7 +38,7 @@ use crate::Span;
 impl<T: std::future::Future> FutureExt for T {}
 
 /// An extension trait for `Futures` that provides tracing instrument adapters.
-pub trait FutureExt: Sized {
+pub trait FutureExt: std::future::Future + Sized {
     /// Bind a [`Span`] to the [`Future`] that keeps clocking until the future drops.
     ///
     /// Besides, it will set the span as the local parent at every poll so that `LocalSpan` becomes available inside the future.
@@ -64,8 +63,8 @@ pub trait FutureExt: Sized {
     ///
     /// [`Future`]:(std::future::Future)
     #[inline]
-    fn in_span(self, span: Span) -> InSpan<Self> {
-        Self::_in_span(self, span)
+    fn in_span<C: Collect>(self, span: Span<C>) -> InSpan<Self, C> {
+        InSpan::new(self, span)
     }
 
     /// Start a [`LocalSpan`] at every [`Future::poll()`]. It will create multiple _short_ spans if the future get polled multiple times.
@@ -97,22 +96,23 @@ pub trait FutureExt: Sized {
     fn enter_on_poll(self, event: &'static str) -> EnterOnPoll<Self> {
         EnterOnPoll { inner: self, event }
     }
-
-    #[inline]
-    fn _in_span<C: Collect>(self, span: Span<C>) -> InSpan<Self, C> {
-        InSpan {
-            inner: self,
-            span: Some(span),
-        }
-    }
 }
 
 /// Adapter for [`FutureExt::in_span()`](FutureExt::in_span).
 #[pin_project::pin_project]
-pub struct InSpan<T, C: Collect = Global> {
+pub struct InSpan<T, C: Collect> {
     #[pin]
     inner: T,
     span: Option<Span<C>>,
+}
+
+impl<T: std::future::Future, C: Collect> InSpan<T, C> {
+    pub(crate) fn new(f: T, span: Span<C>) -> Self {
+        Self {
+            inner: f,
+            span: Some(span),
+        }
+    }
 }
 
 impl<T: std::future::Future, C: Collect> std::future::Future for InSpan<T, C> {

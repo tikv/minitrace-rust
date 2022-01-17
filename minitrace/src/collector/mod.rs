@@ -13,7 +13,6 @@ use crate::local::span_id::SpanId;
 use crate::local::LocalSpans;
 use crate::util::ParentSpans;
 
-use crate::collector::global_collector::Global;
 use std::sync::Arc;
 
 pub trait Collect: 'static + Clone {
@@ -66,7 +65,7 @@ pub struct ParentSpan {
 ///
 /// let records: Vec<SpanRecord> = block_on(collector.collect());
 /// ```
-pub struct Collector<C: Collect = Global> {
+pub struct Collector<C: Collect> {
     collect_id: u32,
     collect: C,
 }
