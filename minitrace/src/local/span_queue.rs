@@ -6,8 +6,6 @@ use crate::util::{alloc_raw_spans, RawSpans};
 
 use minstant::Instant;
 
-const DEFAULT_SPAN_QUEUE_SIZE: usize = 10240;
-
 #[derive(Debug)]
 pub(crate) struct SpanQueue {
     span_queue: RawSpans,
@@ -15,15 +13,12 @@ pub(crate) struct SpanQueue {
     pub(crate) next_parent_id: Option<SpanId>,
 }
 
+#[derive(Debug)]
 pub(crate) struct SpanHandle {
     pub(crate) index: usize,
 }
 
 impl SpanQueue {
-    pub fn new() -> Self {
-        Self::with_capacity(DEFAULT_SPAN_QUEUE_SIZE)
-    }
-
     pub(crate) fn with_capacity(capacity: usize) -> Self {
         let span_queue = alloc_raw_spans();
         Self {
@@ -82,6 +77,16 @@ impl SpanQueue {
     #[inline]
     pub fn take_queue(self) -> RawSpans {
         self.span_queue
+    }
+
+    #[inline]
+    pub fn last_span_id(&self) -> Option<SpanId> {
+        self.next_parent_id
+    }
+
+    #[cfg(test)]
+    pub fn span_id(&self, handle: &SpanHandle) -> SpanId {
+        self.span_queue[handle.index].id
     }
 }
 
@@ -212,35 +217,51 @@ mod tests {
     }
 
     #[test]
-    fn complicated_relationship() {
+    fn last_span_id() {
         let mut queue = SpanQueue::with_capacity(16);
+
+        assert_eq!(queue.last_span_id(), None);
         {
             let span1 = queue.start_span("span1").unwrap();
+            assert_eq!(queue.last_span_id().unwrap(), queue.span_id(&span1));
             queue.finish_span(span1);
+            assert_eq!(queue.last_span_id(), None);
         }
         {
             let span2 = queue.start_span("span2").unwrap();
+            assert_eq!(queue.last_span_id().unwrap(), queue.span_id(&span2));
             {
                 let span3 = queue.start_span("span3").unwrap();
+                assert_eq!(queue.last_span_id().unwrap(), queue.span_id(&span3));
                 queue.finish_span(span3);
+                assert_eq!(queue.last_span_id().unwrap(), queue.span_id(&span2));
             }
             {
                 let span4 = queue.start_span("span4").unwrap();
+                assert_eq!(queue.last_span_id().unwrap(), queue.span_id(&span4));
                 {
                     let span5 = queue.start_span("span5").unwrap();
+                    assert_eq!(queue.last_span_id().unwrap(), queue.span_id(&span5));
                     {
                         let span6 = queue.start_span("span6").unwrap();
+                        assert_eq!(queue.last_span_id().unwrap(), queue.span_id(&span6));
                         queue.finish_span(span6);
+                        assert_eq!(queue.last_span_id().unwrap(), queue.span_id(&span5));
                     }
                     queue.finish_span(span5);
+                    assert_eq!(queue.last_span_id().unwrap(), queue.span_id(&span4));
                 }
                 queue.finish_span(span4);
+                assert_eq!(queue.last_span_id().unwrap(), queue.span_id(&span2));
             }
             queue.finish_span(span2);
+            assert_eq!(queue.last_span_id(), None);
         }
         {
             let span7 = queue.start_span("span7").unwrap();
+            assert_eq!(queue.last_span_id().unwrap(), queue.span_id(&span7));
             queue.finish_span(span7);
+            assert_eq!(queue.last_span_id(), None);
         }
         let mut raw_spans = queue.take_queue().into_inner().1;
         raw_spans.sort_unstable_by(|a, b| a.id.0.cmp(&b.id.0));

@@ -2,7 +2,7 @@
 
 use crate::collector::global_collector::Global;
 use crate::collector::{Collect, CollectArgs, Collector, ParentSpan, SpanSet};
-use crate::local::local_span_line::{LocalSpanStack, LOCAL_SPAN_STACK};
+use crate::local::local_span_stack::{LocalSpanStack, LOCAL_SPAN_STACK};
 use crate::local::raw_span::RawSpan;
 use crate::local::span_id::{DefaultIdGenerator, SpanId};
 use crate::local::{LocalCollector, LocalSpans};
@@ -145,17 +145,15 @@ impl<C: Collect> SpanInner<C> {
 
     #[inline]
     fn register_local_collector(&self, stack: Rc<RefCell<LocalSpanStack>>) -> LocalCollector {
-        let parents = self.as_parents();
         let mut parent_spans = alloc_parent_spans();
-        parent_spans.extend(parents);
+        parent_spans.extend(self.as_parents());
         LocalCollector::new(Some(parent_spans), stack)
     }
 
     #[inline]
     fn push_child_spans(&self, local_spans: Arc<LocalSpans>) {
-        let parents = self.as_parents();
         let mut parent_spans = alloc_parent_spans();
-        parent_spans.extend(parents);
+        parent_spans.extend(self.as_parents());
         self.collect
             .submit_spans(SpanSet::SharedLocalSpans(local_spans), parent_spans);
     }
@@ -217,10 +215,7 @@ impl<C: Collect> Span<C> {
     ) -> Self {
         let parents = {
             let span_stack = &mut *stack.borrow_mut();
-            span_stack
-                .current_span_line()
-                .map(|span_line| span_line.current_parents())
-                .flatten()
+            span_stack.current_parents()
         };
 
         match parents {

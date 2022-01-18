@@ -1,6 +1,6 @@
 // Copyright 2021 TiKV Project Authors. Licensed under Apache-2.0.
 
-use crate::local::local_span_line::{LocalSpanStack, LOCAL_SPAN_STACK};
+use crate::local::local_span_stack::{LocalSpanStack, SpanLineHandle, LOCAL_SPAN_STACK};
 use crate::util::{alloc_raw_spans, ParentSpans, RawSpans};
 
 use std::cell::RefCell;
@@ -49,7 +49,7 @@ pub struct LocalCollector {
 #[derive(Debug)]
 struct LocalCollectorInner {
     stack: Rc<RefCell<LocalSpanStack>>,
-    span_line_epoch: usize,
+    span_line_handle: SpanLineHandle,
 }
 
 #[derive(Debug)]
@@ -73,9 +73,9 @@ impl LocalCollector {
         };
 
         Self {
-            inner: span_line_epoch.map(move |span_line_epoch| LocalCollectorInner {
+            inner: span_line_epoch.map(move |span_line_handle| LocalCollectorInner {
                 stack,
-                span_line_epoch,
+                span_line_handle,
             }),
         }
     }
@@ -91,10 +91,10 @@ impl LocalCollector {
             .map(
                 |LocalCollectorInner {
                      stack,
-                     span_line_epoch,
+                     span_line_handle,
                  }| {
                     let s = &mut (*stack).borrow_mut();
-                    s.unregister_and_collect(span_line_epoch)
+                    s.unregister_and_collect(span_line_handle)
                 },
             )
             .flatten()
@@ -114,11 +114,11 @@ impl Drop for LocalCollector {
     fn drop(&mut self) {
         if let Some(LocalCollectorInner {
             stack,
-            span_line_epoch,
+            span_line_handle,
         }) = self.inner.take()
         {
             let s = &mut (*stack).borrow_mut();
-            let _ = s.unregister_and_collect(span_line_epoch);
+            let _ = s.unregister_and_collect(span_line_handle);
         }
     }
 }

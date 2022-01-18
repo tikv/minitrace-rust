@@ -44,7 +44,7 @@ pub struct SpanRecord {
     pub properties: Vec<(&'static str, String)>,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
 pub struct ParentSpan {
     pub span_id: SpanId,
     pub collect_id: u32,
