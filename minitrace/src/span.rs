@@ -7,7 +7,7 @@ use crate::local::raw_span::RawSpan;
 use crate::local::span_id::{DefaultIdGenerator, SpanId};
 use crate::local::{LocalCollector, LocalSpans};
 use crate::util::guard::Guard;
-use crate::util::{alloc_collect_token, CollectToken};
+use crate::util::{new_collect_token, CollectToken};
 
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -133,33 +133,26 @@ impl<C: Collect> SpanInner<C> {
 
     #[inline]
     fn capture_local_spans(&self, stack: Rc<RefCell<LocalSpanStack>>) -> Guard<impl FnOnce()> {
-        let collector = self.register_local_collector(stack);
+        let token = new_collect_token(self.issue_collect_token());
+        let collector = LocalCollector::new(Some(token), stack);
         let collect = self.collect.clone();
         Guard::new(move || {
             let (spans, token) = collector.collect_with_token();
             debug_assert!(token.is_some());
-            let token = token.unwrap_or_else(alloc_collect_token);
+            let token = token.unwrap_or_else(|| new_collect_token([]));
             collect.submit_spans(SpanSet::LocalSpans(spans), token);
         })
     }
 
     #[inline]
-    fn register_local_collector(&self, stack: Rc<RefCell<LocalSpanStack>>) -> LocalCollector {
-        let mut token = alloc_collect_token();
-        token.extend(self.as_collect_token());
-        LocalCollector::new(Some(token), stack)
-    }
-
-    #[inline]
     fn push_child_spans(&self, local_spans: Arc<LocalSpans>) {
-        let mut token = alloc_collect_token();
-        token.extend(self.as_collect_token());
+        let token = new_collect_token(self.issue_collect_token());
         self.collect
             .submit_spans(SpanSet::SharedLocalSpans(local_spans), token);
     }
 
     #[inline]
-    fn as_collect_token(&self) -> impl Iterator<Item = CollectTokenItem> + '_ {
+    fn issue_collect_token(&self) -> impl Iterator<Item = CollectTokenItem> + '_ {
         self.collect_token.iter().map(
             move |CollectTokenItem { collect_id, .. }| CollectTokenItem {
                 parent_id_of_roots: self.raw_span.id,
@@ -180,15 +173,8 @@ impl<C: Collect> Span<C> {
         args: CollectArgs,
         collect: C,
     ) -> (Self, Collector<C>) {
-        let (collector, collect_id) = Collector::start_collect(args, collect.clone());
-        let root_collect_token = CollectTokenItem {
-            parent_id_of_roots: SpanId::default(),
-            collect_id,
-        };
-        let mut token = alloc_collect_token();
-        token.push(root_collect_token);
+        let (collector, token) = Collector::start_collect(args, collect.clone());
         let span = Self::new(token, event, collect);
-
         (span, collector)
     }
 
@@ -197,14 +183,12 @@ impl<C: Collect> Span<C> {
         parents: impl IntoIterator<Item = &'a Span<C>>,
         collect: C,
     ) -> Self {
-        let mut token = alloc_collect_token();
-        token.extend(
+        let token = new_collect_token(
             parents
                 .into_iter()
                 .filter_map(|span| span.inner.as_ref())
-                .flat_map(|inner| inner.as_collect_token()),
+                .flat_map(|inner| inner.issue_collect_token()),
         );
-
         Self::new(token, event, collect)
     }
 

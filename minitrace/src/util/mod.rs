@@ -28,6 +28,8 @@ pub(crate) fn alloc_raw_spans() -> RawSpans {
     RAW_SPANS_PULLER.with(|puller| puller.borrow_mut().pull())
 }
 
-pub(crate) fn alloc_collect_token() -> CollectToken {
-    COLLECT_TOKEN_ITEMS_PULLER.with(|puller| puller.borrow_mut().pull())
+pub(crate) fn new_collect_token(items: impl IntoIterator<Item = CollectTokenItem>) -> CollectToken {
+    let mut token = COLLECT_TOKEN_ITEMS_PULLER.with(|puller| puller.borrow_mut().pull());
+    token.extend(items);
+    token
 }

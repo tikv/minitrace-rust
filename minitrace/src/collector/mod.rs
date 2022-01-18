@@ -11,7 +11,7 @@ pub mod mock_collector;
 use crate::local::raw_span::RawSpan;
 use crate::local::span_id::SpanId;
 use crate::local::LocalSpans;
-use crate::util::CollectToken;
+use crate::util::{new_collect_token, CollectToken};
 
 use std::sync::Arc;
 
@@ -71,7 +71,7 @@ pub struct Collector<C: Collect> {
 }
 
 impl<C: Collect> Collector<C> {
-    pub(crate) fn start_collect(args: CollectArgs, collect: C) -> (Self, u32) {
+    pub(crate) fn start_collect(args: CollectArgs, collect: C) -> (Self, CollectToken) {
         let collect_id = collect.start_collect(args);
 
         (
@@ -79,7 +79,10 @@ impl<C: Collect> Collector<C> {
                 collect_id,
                 collect,
             },
-            collect_id,
+            new_collect_token([CollectTokenItem {
+                parent_id_of_roots: SpanId::default(),
+                collect_id,
+            }]),
         )
     }
 
