@@ -11,7 +11,7 @@ pub mod mock_collector;
 use crate::local::raw_span::RawSpan;
 use crate::local::span_id::SpanId;
 use crate::local::LocalSpans;
-use crate::util::ParentSpans;
+use crate::util::CollectToken;
 
 use std::sync::Arc;
 
@@ -23,7 +23,7 @@ pub trait Collect: 'static + Clone {
         tx: futures::channel::oneshot::Sender<Vec<SpanRecord>>,
     );
     fn drop_collect(&self, collect_id: u32);
-    fn submit_spans(&self, spans: SpanSet, parents: ParentSpans);
+    fn submit_spans(&self, spans: SpanSet, collect_token: CollectToken);
 }
 
 #[derive(Debug)]
@@ -45,8 +45,8 @@ pub struct SpanRecord {
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
-pub struct ParentSpan {
-    pub span_id: SpanId,
+pub struct CollectTokenItem {
+    pub parent_id_of_roots: SpanId,
     pub collect_id: u32,
 }
 

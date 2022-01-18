@@ -1,8 +1,8 @@
 // Copyright 2022 TiKV Project Authors. Licensed under Apache-2.0.
 
-use crate::collector::{Collect, CollectArgs, ParentSpan, SpanRecord, SpanSet};
+use crate::collector::{Collect, CollectArgs, CollectTokenItem, SpanRecord, SpanSet};
 use crate::local::span_id::SpanId;
-use crate::util::ParentSpans;
+use crate::util::CollectToken;
 
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicU32, Ordering};
@@ -46,22 +46,22 @@ impl Collect for MockCollect {
         collects.remove(&collect_id).unwrap();
     }
 
-    fn submit_spans(&self, spans: SpanSet, parents: ParentSpans) {
+    fn submit_spans(&self, spans: SpanSet, collect_token: CollectToken) {
         let collects = &mut *self.inner.active_collects.lock().unwrap();
 
         match spans {
             s @ SpanSet::Span(_) | s @ SpanSet::LocalSpans(_) => {
-                assert_eq!(parents.len(), 1);
+                assert_eq!(collect_token.len(), 1);
                 collects
-                    .get_mut(&parents[0].collect_id)
+                    .get_mut(&collect_token[0].collect_id)
                     .unwrap()
-                    .push((s, parents[0].span_id));
+                    .push((s, collect_token[0].parent_id_of_roots));
             }
             SpanSet::SharedLocalSpans(spans) => {
-                for ParentSpan {
-                    span_id,
+                for CollectTokenItem {
+                    parent_id_of_roots: span_id,
                     collect_id,
-                } in parents.iter()
+                } in collect_token.iter()
                 {
                     let v = collects.get_mut(&collect_id).unwrap();
                     v.push((SpanSet::SharedLocalSpans(spans.clone()), *span_id));

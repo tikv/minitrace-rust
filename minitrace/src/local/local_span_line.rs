@@ -1,22 +1,26 @@
 // Copyright 2020 TiKV Project Authors. Licensed under Apache-2.0.
 
-use crate::collector::ParentSpan;
+use crate::collector::CollectTokenItem;
 use crate::local::span_queue::{SpanHandle, SpanQueue};
-use crate::util::{alloc_parent_spans, ParentSpans, RawSpans};
+use crate::util::{alloc_collect_token, CollectToken, RawSpans};
 
 #[derive(Debug)]
 pub struct SpanLine {
     span_queue: SpanQueue,
     epoch: usize,
-    parents: Option<ParentSpans>,
+    collect_token: Option<CollectToken>,
 }
 
 impl SpanLine {
-    pub fn new(capacity: usize, span_line_epoch: usize, parents: Option<ParentSpans>) -> Self {
+    pub fn new(
+        capacity: usize,
+        span_line_epoch: usize,
+        collect_token: Option<CollectToken>,
+    ) -> Self {
         Self {
             span_queue: SpanQueue::with_capacity(capacity),
             epoch: span_line_epoch,
-            parents,
+            collect_token,
         }
     }
 
@@ -53,20 +57,26 @@ impl SpanLine {
     }
 
     #[inline]
-    pub fn current_parents(&self) -> Option<ParentSpans> {
-        self.parents.as_ref().map(|parents| {
-            let mut parents_spans = alloc_parent_spans();
-            parents_spans.extend(parents.iter().map(|parent| ParentSpan {
-                span_id: self.span_queue.current_span_id().unwrap_or(parent.span_id),
-                collect_id: parent.collect_id,
+    pub fn current_collect_token(&self) -> Option<CollectToken> {
+        self.collect_token.as_ref().map(|collect_token| {
+            let mut new_token = alloc_collect_token();
+            new_token.extend(collect_token.iter().map(|item| {
+                CollectTokenItem {
+                    parent_id_of_roots: self
+                        .span_queue
+                        .current_span_id()
+                        .unwrap_or(item.parent_id_of_roots),
+                    collect_id: item.collect_id,
+                }
             }));
-            parents_spans
+            new_token
         })
     }
 
     #[inline]
-    pub fn collect(self, span_line_epoch: usize) -> Option<(RawSpans, Option<ParentSpans>)> {
-        (self.epoch == span_line_epoch).then(move || (self.span_queue.take_queue(), self.parents))
+    pub fn collect(self, span_line_epoch: usize) -> Option<(RawSpans, Option<CollectToken>)> {
+        (self.epoch == span_line_epoch)
+            .then(move || (self.span_queue.take_queue(), self.collect_token))
     }
 }
 
@@ -97,8 +107,8 @@ mod tests {
             }
             span_line.finish_span(span1);
         }
-        let (spans, collect_parents) = span_line.collect(1).unwrap();
-        assert!(collect_parents.is_none());
+        let (spans, collect_token) = span_line.collect(1).unwrap();
+        assert!(collect_token.is_none());
 
         let mut raw_spans = spans.into_inner().1;
         raw_spans.sort_unstable_by(|a, b| a.id.0.cmp(&b.id.0));
@@ -110,53 +120,53 @@ mod tests {
     }
 
     #[test]
-    fn current_parents() {
-        let mut parents = alloc_parent_spans();
-        let parent1 = ParentSpan {
-            span_id: SpanId::new(9527),
+    fn current_collect_token() {
+        let mut token = alloc_collect_token();
+        let token1 = CollectTokenItem {
+            parent_id_of_roots: SpanId::new(9527),
             collect_id: 42,
         };
-        let parent2 = ParentSpan {
-            span_id: SpanId::new(9528),
+        let token2 = CollectTokenItem {
+            parent_id_of_roots: SpanId::new(9528),
             collect_id: 43,
         };
-        parents.extend([parent1, parent2]);
-        let mut span_line = SpanLine::new(16, 1, Some(parents));
+        token.extend([token1, token2]);
+        let mut span_line = SpanLine::new(16, 1, Some(token));
 
-        let current_parents = span_line.current_parents().unwrap();
-        assert_eq!(current_parents.len(), 2);
-        assert_eq!(current_parents[0], parent1);
-        assert_eq!(current_parents[1], parent2);
+        let current_token = span_line.current_collect_token().unwrap();
+        assert_eq!(current_token.len(), 2);
+        assert_eq!(current_token[0], token1);
+        assert_eq!(current_token[1], token2);
 
         let span = span_line.start_span("span").unwrap();
-        let current_parents = span_line.current_parents().unwrap();
-        assert_eq!(current_parents.len(), 2);
+        let current_token = span_line.current_collect_token().unwrap();
+        assert_eq!(current_token.len(), 2);
         assert_eq!(
-            current_parents[0],
-            ParentSpan {
-                span_id: span_line.span_queue.current_span_id().unwrap(),
+            current_token[0],
+            CollectTokenItem {
+                parent_id_of_roots: span_line.span_queue.current_span_id().unwrap(),
                 collect_id: 42
             }
         );
         assert_eq!(
-            current_parents[1],
-            ParentSpan {
-                span_id: span_line.span_queue.current_span_id().unwrap(),
+            current_token[1],
+            CollectTokenItem {
+                parent_id_of_roots: span_line.span_queue.current_span_id().unwrap(),
                 collect_id: 43
             }
         );
         span_line.finish_span(span);
 
-        let current_parents = span_line.current_parents().unwrap();
-        assert_eq!(current_parents.len(), 2);
-        assert_eq!(current_parents[0], parent1);
-        assert_eq!(current_parents[1], parent2);
+        let current_token = span_line.current_collect_token().unwrap();
+        assert_eq!(current_token.len(), 2);
+        assert_eq!(current_token[0], token1);
+        assert_eq!(current_token[1], token2);
 
-        let (spans, collect_parents) = span_line.collect(1).unwrap();
-        let collect_parents = collect_parents.unwrap();
-        assert_eq!(collect_parents.len(), 2);
-        assert_eq!(collect_parents[0], parent1);
-        assert_eq!(collect_parents[1], parent2);
+        let (spans, collect_token) = span_line.collect(1).unwrap();
+        let collect_token = collect_token.unwrap();
+        assert_eq!(collect_token.len(), 2);
+        assert_eq!(collect_token[0], token1);
+        assert_eq!(collect_token[1], token2);
         assert_eq!(spans.into_inner().1.len(), 1);
     }
 
@@ -181,33 +191,33 @@ mod tests {
 
     #[test]
     fn unmatched_epoch_finish_span() {
-        let mut parents1 = alloc_parent_spans();
-        let parent = ParentSpan {
-            span_id: SpanId::default(),
+        let mut token = alloc_collect_token();
+        let parent = CollectTokenItem {
+            parent_id_of_roots: SpanId::default(),
             collect_id: 42,
         };
-        parents1.push(parent);
-        let mut span_line1 = SpanLine::new(16, 1, Some(parents1));
+        token.push(parent);
+        let mut span_line1 = SpanLine::new(16, 1, Some(token));
         let mut span_line2 = SpanLine::new(16, 2, None);
         assert_eq!(span_line1.span_line_epoch(), 1);
         assert_eq!(span_line2.span_line_epoch(), 2);
 
         let span = span_line1.start_span("span").unwrap();
-        let parents_before_finish = span_line1.current_parents().unwrap();
-        assert_eq!(parents_before_finish.len(), 1);
+        let token_before_finish = span_line1.current_collect_token().unwrap();
+        assert_eq!(token_before_finish.len(), 1);
         span_line2.finish_span(span);
 
-        let parents_after_finish = span_line1.current_parents().unwrap();
-        assert_eq!(parents_after_finish.len(), 1);
-        assert_eq!(parents_before_finish[0], parents_after_finish[0]);
+        let token_after_finish = span_line1.current_collect_token().unwrap();
+        assert_eq!(token_after_finish.len(), 1);
+        assert_eq!(token_before_finish[0], token_after_finish[0]);
 
-        let (spans, collect_parents) = span_line1.collect(1).unwrap();
-        let collect_parents = collect_parents.unwrap();
-        assert_eq!(collect_parents.len(), 1);
-        assert_eq!(collect_parents[0], parent);
+        let (spans, collect_token) = span_line1.collect(1).unwrap();
+        let collect_token = collect_token.unwrap();
+        assert_eq!(collect_token.len(), 1);
+        assert_eq!(collect_token[0], parent);
         assert_eq!(spans.into_inner().1.len(), 1);
-        let (spans, collect_parents) = span_line2.collect(2).unwrap();
-        assert!(collect_parents.is_none());
+        let (spans, collect_token) = span_line2.collect(2).unwrap();
+        assert!(collect_token.is_none());
         assert!(spans.into_inner().1.is_empty());
     }
 

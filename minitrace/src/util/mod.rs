@@ -8,26 +8,26 @@ use std::cell::RefCell;
 
 use once_cell::sync::Lazy;
 
-use crate::collector::ParentSpan;
+use crate::collector::CollectTokenItem;
 use crate::local::raw_span::RawSpan;
 use crate::util::object_pool::{Pool, Puller, Reusable};
 
 static RAW_SPANS_POOL: Lazy<Pool<Vec<RawSpan>>> = Lazy::new(|| Pool::new(Vec::new, Vec::clear));
-static PARENT_SPANS_POOL: Lazy<Pool<Vec<ParentSpan>>> =
+static COLLECT_TOKEN_ITEMS_POOL: Lazy<Pool<Vec<CollectTokenItem>>> =
     Lazy::new(|| Pool::new(Vec::new, Vec::clear));
 
 thread_local! {
     static RAW_SPANS_PULLER: RefCell<Puller<'static, Vec<RawSpan>>> = RefCell::new(RAW_SPANS_POOL.puller(512));
-    static PARENT_SPANS_PULLER: RefCell<Puller<'static, Vec<ParentSpan>>>  = RefCell::new(PARENT_SPANS_POOL.puller(512));
+    static COLLECT_TOKEN_ITEMS_PULLER: RefCell<Puller<'static, Vec<CollectTokenItem>>>  = RefCell::new(COLLECT_TOKEN_ITEMS_POOL.puller(512));
 }
 
 pub type RawSpans = Reusable<'static, Vec<RawSpan>>;
-pub type ParentSpans = Reusable<'static, Vec<ParentSpan>>;
+pub type CollectToken = Reusable<'static, Vec<CollectTokenItem>>;
 
 pub(crate) fn alloc_raw_spans() -> RawSpans {
     RAW_SPANS_PULLER.with(|puller| puller.borrow_mut().pull())
 }
 
-pub(crate) fn alloc_parent_spans() -> ParentSpans {
-    PARENT_SPANS_PULLER.with(|puller| puller.borrow_mut().pull())
+pub(crate) fn alloc_collect_token() -> CollectToken {
+    COLLECT_TOKEN_ITEMS_PULLER.with(|puller| puller.borrow_mut().pull())
 }

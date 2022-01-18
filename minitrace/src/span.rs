@@ -1,13 +1,13 @@
 // Copyright 2020 TiKV Project Authors. Licensed under Apache-2.0.
 
 use crate::collector::global_collector::Global;
-use crate::collector::{Collect, CollectArgs, Collector, ParentSpan, SpanSet};
+use crate::collector::{Collect, CollectArgs, CollectTokenItem, Collector, SpanSet};
 use crate::local::local_span_stack::{LocalSpanStack, LOCAL_SPAN_STACK};
 use crate::local::raw_span::RawSpan;
 use crate::local::span_id::{DefaultIdGenerator, SpanId};
 use crate::local::{LocalCollector, LocalSpans};
 use crate::util::guard::Guard;
-use crate::util::{alloc_parent_spans, ParentSpans};
+use crate::util::{alloc_collect_token, CollectToken};
 
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -25,7 +25,7 @@ pub struct Span<C: Collect = Global> {
 #[derive(Debug)]
 pub(crate) struct SpanInner<C: Collect> {
     pub(crate) raw_span: RawSpan,
-    pub(crate) parents: ParentSpans,
+    pub(crate) collect_token: CollectToken,
     collect: C,
 }
 
@@ -104,15 +104,15 @@ impl<C: Collect> Span<C> {
 
 impl<C: Collect> Span<C> {
     #[inline]
-    fn new(parents: ParentSpans, event: &'static str, collect: C) -> Self {
+    fn new(collect_token: CollectToken, event: &'static str, collect: C) -> Self {
         let span_id = DefaultIdGenerator::next_id();
         let begin_instant = Instant::now();
-        let raw_span = RawSpan::begin_with(span_id, SpanId::new(0), begin_instant, event);
+        let raw_span = RawSpan::begin_with(span_id, SpanId::default(), begin_instant, event);
 
         Self {
             inner: Some(SpanInner {
                 raw_span,
-                parents,
+                collect_token,
                 collect,
             }),
         }
@@ -136,36 +136,36 @@ impl<C: Collect> SpanInner<C> {
         let collector = self.register_local_collector(stack);
         let collect = self.collect.clone();
         Guard::new(move || {
-            let (spans, parents) = collector.collect_with_parents();
-            debug_assert!(parents.is_some());
-            let parents = parents.unwrap_or_else(alloc_parent_spans);
-            collect.submit_spans(SpanSet::LocalSpans(spans), parents);
+            let (spans, token) = collector.collect_with_token();
+            debug_assert!(token.is_some());
+            let token = token.unwrap_or_else(alloc_collect_token);
+            collect.submit_spans(SpanSet::LocalSpans(spans), token);
         })
     }
 
     #[inline]
     fn register_local_collector(&self, stack: Rc<RefCell<LocalSpanStack>>) -> LocalCollector {
-        let mut parent_spans = alloc_parent_spans();
-        parent_spans.extend(self.as_parents());
-        LocalCollector::new(Some(parent_spans), stack)
+        let mut token = alloc_collect_token();
+        token.extend(self.as_collect_token());
+        LocalCollector::new(Some(token), stack)
     }
 
     #[inline]
     fn push_child_spans(&self, local_spans: Arc<LocalSpans>) {
-        let mut parent_spans = alloc_parent_spans();
-        parent_spans.extend(self.as_parents());
+        let mut token = alloc_collect_token();
+        token.extend(self.as_collect_token());
         self.collect
-            .submit_spans(SpanSet::SharedLocalSpans(local_spans), parent_spans);
+            .submit_spans(SpanSet::SharedLocalSpans(local_spans), token);
     }
 
     #[inline]
-    fn as_parents(&self) -> impl Iterator<Item = ParentSpan> + '_ {
-        self.parents
-            .iter()
-            .map(move |ParentSpan { collect_id, .. }| ParentSpan {
-                span_id: self.raw_span.id,
+    fn as_collect_token(&self) -> impl Iterator<Item = CollectTokenItem> + '_ {
+        self.collect_token.iter().map(
+            move |CollectTokenItem { collect_id, .. }| CollectTokenItem {
+                parent_id_of_roots: self.raw_span.id,
                 collect_id: *collect_id,
-            })
+            },
+        )
     }
 }
 
@@ -181,13 +181,13 @@ impl<C: Collect> Span<C> {
         collect: C,
     ) -> (Self, Collector<C>) {
         let (collector, collect_id) = Collector::start_collect(args, collect.clone());
-        let parent = ParentSpan {
-            span_id: SpanId::new(0),
+        let root_collect_token = CollectTokenItem {
+            parent_id_of_roots: SpanId::default(),
             collect_id,
         };
-        let mut parents = alloc_parent_spans();
-        parents.push(parent);
-        let span = Self::new(parents, event, collect);
+        let mut token = alloc_collect_token();
+        token.push(root_collect_token);
+        let span = Self::new(token, event, collect);
 
         (span, collector)
     }
@@ -197,15 +197,15 @@ impl<C: Collect> Span<C> {
         parents: impl IntoIterator<Item = &'a Span<C>>,
         collect: C,
     ) -> Self {
-        let mut parents_spans = alloc_parent_spans();
-        parents_spans.extend(
+        let mut token = alloc_collect_token();
+        token.extend(
             parents
                 .into_iter()
                 .filter_map(|span| span.inner.as_ref())
-                .flat_map(|inner| inner.as_parents()),
+                .flat_map(|inner| inner.as_collect_token()),
         );
 
-        Self::new(parents_spans, event, collect)
+        Self::new(token, event, collect)
     }
 
     pub(crate) fn enter_with_stack_collect(
@@ -213,13 +213,13 @@ impl<C: Collect> Span<C> {
         stack: Rc<RefCell<LocalSpanStack>>,
         collect: C,
     ) -> Self {
-        let parents = {
+        let token = {
             let span_stack = &mut *stack.borrow_mut();
-            span_stack.current_parents()
+            span_stack.current_collect_token()
         };
 
-        match parents {
-            Some(parents) => Span::new(parents, event, collect),
+        match token {
+            Some(token) => Span::new(token, event, collect),
             None => Self::new_noop_with_collect(),
         }
     }
@@ -229,13 +229,13 @@ impl<C: Collect> Drop for Span<C> {
     fn drop(&mut self) {
         if let Some(SpanInner {
             mut raw_span,
-            parents,
+            collect_token,
             collect,
         }) = self.inner.take()
         {
             let end_instant = Instant::now();
             raw_span.end_with(end_instant);
-            collect.submit_spans(SpanSet::Span(raw_span), parents);
+            collect.submit_spans(SpanSet::Span(raw_span), collect_token);
         }
     }
 }

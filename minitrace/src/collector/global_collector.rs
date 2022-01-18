@@ -18,7 +18,7 @@ use crate::local::raw_span::RawSpan;
 use crate::local::span_id::SpanId;
 use crate::local::LocalSpans;
 use crate::util::spsc::{self, Receiver, Sender};
-use crate::util::ParentSpans;
+use crate::util::CollectToken;
 
 const COLLECT_LOOP_INTERVAL: Duration = Duration::from_millis(10);
 
@@ -62,8 +62,11 @@ impl Collect for Global {
         force_send_command(CollectCommand::DropCollect(DropCollect { collect_id }));
     }
 
-    fn submit_spans(&self, spans: SpanSet, parents: ParentSpans) {
-        send_command(CollectCommand::SubmitSpans(SubmitSpans { spans, parents }));
+    fn submit_spans(&self, spans: SpanSet, collect_token: CollectToken) {
+        send_command(CollectCommand::SubmitSpans(SubmitSpans {
+            spans,
+            collect_token,
+        }));
     }
 }
 
@@ -88,7 +91,7 @@ enum SpanCollection {
 }
 
 pub(crate) struct GlobalCollector {
-    active_collector: HashMap<u32, (Vec<SpanCollection>, usize, CollectArgs)>,
+    active_collectors: HashMap<u32, (Vec<SpanCollection>, usize, CollectArgs)>,
     rxs: Vec<Receiver<CollectCommand>>,
 
     // Vectors to be reused by collection loops. They must be empty outside of the `handle_commands` loop.
@@ -107,7 +110,7 @@ impl GlobalCollector {
         });
 
         GlobalCollector {
-            active_collector: HashMap::new(),
+            active_collectors: HashMap::new(),
             rxs: Vec::new(),
 
             start_collects: Vec::new(),
@@ -153,45 +156,52 @@ impl GlobalCollector {
             collect_args,
         } in self.start_collects.drain(..)
         {
-            self.active_collector
+            self.active_collectors
                 .insert(collect_id, (Vec::new(), 0, collect_args));
         }
 
         for DropCollect { collect_id } in self.drop_collects.drain(..) {
-            self.active_collector.remove(&collect_id);
+            self.active_collectors.remove(&collect_id);
         }
 
-        for SubmitSpans { spans, parents } in self.submit_spans.drain(..) {
-            debug_assert!(!parents.is_empty());
+        for SubmitSpans {
+            spans,
+            collect_token,
+        } in self.submit_spans.drain(..)
+        {
+            debug_assert!(!collect_token.is_empty());
 
-            if parents.len() == 1 {
-                let parent_span = parents[0];
+            if collect_token.len() == 1 {
+                let item = collect_token[0];
                 if let Some((buf, span_count, collect_args)) =
-                    self.active_collector.get_mut(&parent_span.collect_id)
+                    self.active_collectors.get_mut(&item.collect_id)
                 {
-                    if *span_count < collect_args.max_span_count.unwrap_or(usize::MAX)
-                        || parent_span.span_id == SpanId::new(0)
-                    {
+                    if item.parent_id_of_roots == SpanId::default() {
+                        // the root span
                         *span_count += spans.len();
                         buf.push(SpanCollection::Owned {
                             spans,
-                            parent_id: parent_span.span_id,
+                            parent_id: SpanId::default(),
+                        });
+                    } else if *span_count < collect_args.max_span_count.unwrap_or(usize::MAX) {
+                        *span_count += spans.len();
+                        buf.push(SpanCollection::Owned {
+                            spans,
+                            parent_id: item.parent_id_of_roots,
                         });
                     }
                 }
             } else {
                 let spans = Arc::new(spans);
-                for parent_span in parents.iter() {
+                for item in collect_token.iter() {
                     if let Some((buf, span_count, collect_args)) =
-                        self.active_collector.get_mut(&parent_span.collect_id)
+                        self.active_collectors.get_mut(&item.collect_id)
                     {
-                        if *span_count < collect_args.max_span_count.unwrap_or(usize::MAX)
-                            || parent_span.span_id == SpanId::new(0)
-                        {
+                        if *span_count < collect_args.max_span_count.unwrap_or(usize::MAX) {
                             *span_count += spans.len();
                             buf.push(SpanCollection::Shared {
                                 spans: spans.clone(),
-                                parent_id: parent_span.span_id,
+                                parent_id: item.parent_id_of_roots,
                             });
                         }
                     }
@@ -201,7 +211,7 @@ impl GlobalCollector {
 
         for CommitCollect { collect_id, tx } in self.commit_collects.drain(..) {
             let records = self
-                .active_collector
+                .active_collectors
                 .remove(&collect_id)
                 .map(|(span_collections, span_count, _)| {
                     merge_collection(span_collections, span_count)

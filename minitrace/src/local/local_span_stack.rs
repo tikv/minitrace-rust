@@ -1,7 +1,7 @@
 // Copyright 2022 TiKV Project Authors. Licensed under Apache-2.0.
 
 use crate::local::local_span_line::{LocalSpanHandle, SpanLine};
-use crate::util::{ParentSpans, RawSpans};
+use crate::util::{CollectToken, RawSpans};
 
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -59,7 +59,10 @@ impl LocalSpanStack {
     ///
     /// [`LocalSpanStack::unregister_and_collect`](LocalSpanStack::unregister_and_collect)
     #[inline]
-    pub fn register_span_line(&mut self, parents: Option<ParentSpans>) -> Option<SpanLineHandle> {
+    pub fn register_span_line(
+        &mut self,
+        collect_token: Option<CollectToken>,
+    ) -> Option<SpanLineHandle> {
         if self.span_lines.len() >= self.capacity {
             return None;
         }
@@ -67,7 +70,7 @@ impl LocalSpanStack {
         let epoch = self.next_span_line_epoch;
         self.next_span_line_epoch = self.next_span_line_epoch.wrapping_add(1);
 
-        let span_line = SpanLine::new(DEFAULT_SPAN_QUEUE_SIZE, epoch, parents);
+        let span_line = SpanLine::new(DEFAULT_SPAN_QUEUE_SIZE, epoch, collect_token);
         self.span_lines.push(span_line);
         Some(SpanLineHandle {
             span_line_epoch: epoch,
@@ -77,7 +80,7 @@ impl LocalSpanStack {
     pub fn unregister_and_collect(
         &mut self,
         span_line_handle: SpanLineHandle,
-    ) -> Option<(RawSpans, Option<ParentSpans>)> {
+    ) -> Option<(RawSpans, Option<CollectToken>)> {
         debug_assert_eq!(
             self.current_span_line().unwrap().span_line_epoch(),
             span_line_handle.span_line_epoch,
@@ -86,9 +89,9 @@ impl LocalSpanStack {
         span_line.collect(span_line_handle.span_line_epoch)
     }
 
-    pub fn current_parents(&mut self) -> Option<ParentSpans> {
+    pub fn current_collect_token(&mut self) -> Option<CollectToken> {
         let span_line = self.current_span_line()?;
-        span_line.current_parents()
+        span_line.current_collect_token()
     }
 
     #[inline]

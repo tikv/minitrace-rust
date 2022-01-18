@@ -1,7 +1,7 @@
 // Copyright 2022 TiKV Project Authors. Licensed under Apache-2.0.
 
 use crate::collector::{CollectArgs, SpanRecord, SpanSet};
-use crate::util::ParentSpans;
+use crate::util::CollectToken;
 
 #[derive(Debug)]
 pub enum CollectCommand {
@@ -31,5 +31,5 @@ pub struct CommitCollect {
 #[derive(Debug)]
 pub struct SubmitSpans {
     pub spans: SpanSet,
-    pub parents: ParentSpans,
+    pub collect_token: CollectToken,
 }

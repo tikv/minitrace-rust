@@ -1,7 +1,7 @@
 // Copyright 2021 TiKV Project Authors. Licensed under Apache-2.0.
 
 use crate::local::local_span_stack::{LocalSpanStack, SpanLineHandle, LOCAL_SPAN_STACK};
-use crate::util::{alloc_raw_spans, ParentSpans, RawSpans};
+use crate::util::{alloc_raw_spans, CollectToken, RawSpans};
 
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -66,10 +66,13 @@ impl LocalCollector {
 }
 
 impl LocalCollector {
-    pub(crate) fn new(parents: Option<ParentSpans>, stack: Rc<RefCell<LocalSpanStack>>) -> Self {
+    pub(crate) fn new(
+        collect_token: Option<CollectToken>,
+        stack: Rc<RefCell<LocalSpanStack>>,
+    ) -> Self {
         let span_line_epoch = {
             let stack = &mut (*stack).borrow_mut();
-            stack.register_span_line(parents)
+            stack.register_span_line(collect_token)
         };
 
         Self {
@@ -81,11 +84,11 @@ impl LocalCollector {
     }
 
     pub fn collect(self) -> LocalSpans {
-        self.collect_with_parents().0
+        self.collect_with_token().0
     }
 
-    pub(crate) fn collect_with_parents(mut self) -> (LocalSpans, Option<ParentSpans>) {
-        let (spans, parents) = self
+    pub(crate) fn collect_with_token(mut self) -> (LocalSpans, Option<CollectToken>) {
+        let (spans, collect_token) = self
             .inner
             .take()
             .map(
@@ -105,7 +108,7 @@ impl LocalCollector {
                 spans,
                 end_time: Instant::now(),
             },
-            parents,
+            collect_token,
         )
     }
 }
