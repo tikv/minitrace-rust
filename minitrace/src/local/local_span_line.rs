@@ -5,7 +5,7 @@ use crate::local::span_queue::{SpanHandle, SpanQueue};
 use crate::util::{alloc_parent_spans, ParentSpans, RawSpans};
 
 #[derive(Debug)]
-pub(crate) struct SpanLine {
+pub struct SpanLine {
     span_queue: SpanQueue,
     epoch: usize,
     parents: Option<ParentSpans>,
@@ -71,7 +71,7 @@ impl SpanLine {
 }
 
 #[derive(Debug)]
-pub(crate) struct LocalSpanHandle {
+pub struct LocalSpanHandle {
     pub span_line_epoch: usize,
     span_handle: SpanHandle,
 }

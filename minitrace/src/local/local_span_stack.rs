@@ -10,11 +10,11 @@ const DEFAULT_SPAN_STACK_SIZE: usize = 4096;
 const DEFAULT_SPAN_QUEUE_SIZE: usize = 10240;
 
 thread_local! {
-    pub(crate) static LOCAL_SPAN_STACK: Rc<RefCell<LocalSpanStack>> = Rc::new(RefCell::new(LocalSpanStack::with_capacity(DEFAULT_SPAN_STACK_SIZE)));
+    pub static LOCAL_SPAN_STACK: Rc<RefCell<LocalSpanStack>> = Rc::new(RefCell::new(LocalSpanStack::with_capacity(DEFAULT_SPAN_STACK_SIZE)));
 }
 
 #[derive(Debug)]
-pub(crate) struct LocalSpanStack {
+pub struct LocalSpanStack {
     span_lines: Vec<SpanLine>,
     capacity: usize,
     next_span_line_epoch: usize,
@@ -109,6 +109,6 @@ impl LocalSpanStack {
 }
 
 #[derive(Debug)]
-pub(crate) struct SpanLineHandle {
+pub struct SpanLineHandle {
     span_line_epoch: usize,
 }

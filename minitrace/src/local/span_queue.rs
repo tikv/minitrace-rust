@@ -7,19 +7,19 @@ use crate::util::{alloc_raw_spans, RawSpans};
 use minstant::Instant;
 
 #[derive(Debug)]
-pub(crate) struct SpanQueue {
+pub struct SpanQueue {
     span_queue: RawSpans,
     capacity: usize,
-    pub(crate) next_parent_id: Option<SpanId>,
+    next_parent_id: Option<SpanId>,
 }
 
 #[derive(Debug)]
-pub(crate) struct SpanHandle {
-    pub(crate) index: usize,
+pub struct SpanHandle {
+    index: usize,
 }
 
 impl SpanQueue {
-    pub(crate) fn with_capacity(capacity: usize) -> Self {
+    pub fn with_capacity(capacity: usize) -> Self {
         let span_queue = alloc_raw_spans();
         Self {
             span_queue,
