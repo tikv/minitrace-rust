@@ -80,7 +80,7 @@ impl SpanQueue {
     }
 
     #[inline]
-    pub fn last_span_id(&self) -> Option<SpanId> {
+    pub fn current_span_id(&self) -> Option<SpanId> {
         self.next_parent_id
     }
 
@@ -220,48 +220,48 @@ mod tests {
     fn last_span_id() {
         let mut queue = SpanQueue::with_capacity(16);
 
-        assert_eq!(queue.last_span_id(), None);
+        assert_eq!(queue.current_span_id(), None);
         {
             let span1 = queue.start_span("span1").unwrap();
-            assert_eq!(queue.last_span_id().unwrap(), queue.span_id(&span1));
+            assert_eq!(queue.current_span_id().unwrap(), queue.span_id(&span1));
             queue.finish_span(span1);
-            assert_eq!(queue.last_span_id(), None);
+            assert_eq!(queue.current_span_id(), None);
         }
         {
             let span2 = queue.start_span("span2").unwrap();
-            assert_eq!(queue.last_span_id().unwrap(), queue.span_id(&span2));
+            assert_eq!(queue.current_span_id().unwrap(), queue.span_id(&span2));
             {
                 let span3 = queue.start_span("span3").unwrap();
-                assert_eq!(queue.last_span_id().unwrap(), queue.span_id(&span3));
+                assert_eq!(queue.current_span_id().unwrap(), queue.span_id(&span3));
                 queue.finish_span(span3);
-                assert_eq!(queue.last_span_id().unwrap(), queue.span_id(&span2));
+                assert_eq!(queue.current_span_id().unwrap(), queue.span_id(&span2));
             }
             {
                 let span4 = queue.start_span("span4").unwrap();
-                assert_eq!(queue.last_span_id().unwrap(), queue.span_id(&span4));
+                assert_eq!(queue.current_span_id().unwrap(), queue.span_id(&span4));
                 {
                     let span5 = queue.start_span("span5").unwrap();
-                    assert_eq!(queue.last_span_id().unwrap(), queue.span_id(&span5));
+                    assert_eq!(queue.current_span_id().unwrap(), queue.span_id(&span5));
                     {
                         let span6 = queue.start_span("span6").unwrap();
-                        assert_eq!(queue.last_span_id().unwrap(), queue.span_id(&span6));
+                        assert_eq!(queue.current_span_id().unwrap(), queue.span_id(&span6));
                         queue.finish_span(span6);
-                        assert_eq!(queue.last_span_id().unwrap(), queue.span_id(&span5));
+                        assert_eq!(queue.current_span_id().unwrap(), queue.span_id(&span5));
                     }
                     queue.finish_span(span5);
-                    assert_eq!(queue.last_span_id().unwrap(), queue.span_id(&span4));
+                    assert_eq!(queue.current_span_id().unwrap(), queue.span_id(&span4));
                 }
                 queue.finish_span(span4);
-                assert_eq!(queue.last_span_id().unwrap(), queue.span_id(&span2));
+                assert_eq!(queue.current_span_id().unwrap(), queue.span_id(&span2));
             }
             queue.finish_span(span2);
-            assert_eq!(queue.last_span_id(), None);
+            assert_eq!(queue.current_span_id(), None);
         }
         {
             let span7 = queue.start_span("span7").unwrap();
-            assert_eq!(queue.last_span_id().unwrap(), queue.span_id(&span7));
+            assert_eq!(queue.current_span_id().unwrap(), queue.span_id(&span7));
             queue.finish_span(span7);
-            assert_eq!(queue.last_span_id(), None);
+            assert_eq!(queue.current_span_id(), None);
         }
         let mut raw_spans = queue.take_queue().into_inner().1;
         raw_spans.sort_unstable_by(|a, b| a.id.0.cmp(&b.id.0));

@@ -57,7 +57,7 @@ impl SpanLine {
         self.parents.as_ref().map(|parents| {
             let mut parents_spans = alloc_parent_spans();
             parents_spans.extend(parents.iter().map(|parent| ParentSpan {
-                span_id: self.span_queue.last_span_id().unwrap_or(parent.span_id),
+                span_id: self.span_queue.current_span_id().unwrap_or(parent.span_id),
                 collect_id: parent.collect_id,
             }));
             parents_spans
@@ -134,14 +134,14 @@ mod tests {
         assert_eq!(
             current_parents[0],
             ParentSpan {
-                span_id: span_line.span_queue.last_span_id().unwrap(),
+                span_id: span_line.span_queue.current_span_id().unwrap(),
                 collect_id: 42
             }
         );
         assert_eq!(
             current_parents[1],
             ParentSpan {
-                span_id: span_line.span_queue.last_span_id().unwrap(),
+                span_id: span_line.span_queue.current_span_id().unwrap(),
                 collect_id: 43
             }
         );
