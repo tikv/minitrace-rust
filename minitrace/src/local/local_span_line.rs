@@ -131,39 +131,31 @@ mod tests {
         let mut span_line = SpanLine::new(16, 1, Some(token));
 
         let current_token = span_line.current_collect_token().unwrap();
-        assert_eq!(current_token.len(), 2);
-        assert_eq!(current_token[0], token1);
-        assert_eq!(current_token[1], token2);
+        assert_eq!(current_token.as_slice(), &[token1, token2]);
 
         let span = span_line.start_span("span").unwrap();
         let current_token = span_line.current_collect_token().unwrap();
         assert_eq!(current_token.len(), 2);
         assert_eq!(
-            current_token[0],
-            CollectTokenItem {
-                parent_id_of_roots: span_line.span_queue.current_span_id().unwrap(),
-                collect_id: 42,
-            }
-        );
-        assert_eq!(
-            current_token[1],
-            CollectTokenItem {
-                parent_id_of_roots: span_line.span_queue.current_span_id().unwrap(),
-                collect_id: 43,
-            }
+            current_token.as_slice(),
+            &[
+                CollectTokenItem {
+                    parent_id_of_roots: span_line.span_queue.current_span_id().unwrap(),
+                    collect_id: 42,
+                },
+                CollectTokenItem {
+                    parent_id_of_roots: span_line.span_queue.current_span_id().unwrap(),
+                    collect_id: 43,
+                }
+            ]
         );
         span_line.finish_span(span);
 
         let current_token = span_line.current_collect_token().unwrap();
-        assert_eq!(current_token.len(), 2);
-        assert_eq!(current_token[0], token1);
-        assert_eq!(current_token[1], token2);
+        assert_eq!(current_token.as_slice(), &[token1, token2]);
 
         let (spans, collect_token) = span_line.collect(1).unwrap();
-        let collect_token = collect_token.unwrap();
-        assert_eq!(collect_token.len(), 2);
-        assert_eq!(collect_token[0], token1);
-        assert_eq!(collect_token[1], token2);
+        assert_eq!(collect_token.unwrap().as_slice(), &[token1, token2]);
         assert_eq!(spans.into_inner().1.len(), 1);
     }
 
@@ -200,18 +192,20 @@ mod tests {
 
         let span = span_line1.start_span("span").unwrap();
         let token_before_finish = span_line1.current_collect_token().unwrap();
-        assert_eq!(token_before_finish.len(), 1);
         span_line2.finish_span(span);
 
         let token_after_finish = span_line1.current_collect_token().unwrap();
-        assert_eq!(token_after_finish.len(), 1);
-        assert_eq!(token_before_finish[0], token_after_finish[0]);
+        // the span failed to finish
+        assert_eq!(
+            token_before_finish.as_slice(),
+            token_after_finish.as_slice()
+        );
 
         let (spans, collect_token) = span_line1.collect(1).unwrap();
         let collect_token = collect_token.unwrap();
-        assert_eq!(collect_token.len(), 1);
-        assert_eq!(collect_token[0], item);
+        assert_eq!(collect_token.as_slice(), &[item]);
         assert_eq!(spans.into_inner().1.len(), 1);
+
         let (spans, collect_token) = span_line2.collect(2).unwrap();
         assert!(collect_token.is_none());
         assert!(spans.into_inner().1.is_empty());

@@ -115,3 +115,9 @@ impl LocalSpanStack {
 pub struct SpanLineHandle {
     span_line_epoch: usize,
 }
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn span_stack_basic() {}
+}
