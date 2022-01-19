@@ -15,6 +15,7 @@ use crate::util::{new_collect_token, CollectToken};
 
 use std::sync::Arc;
 
+#[doc(hidden)]
 pub trait Collect: 'static + Clone {
     fn start_collect(&self, collect_args: CollectArgs) -> u32;
     fn commit_collect(
@@ -44,6 +45,7 @@ pub struct SpanRecord {
     pub properties: Vec<(&'static str, String)>,
 }
 
+#[doc(hidden)]
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
 pub struct CollectTokenItem {
     pub parent_id_of_roots: SpanId,

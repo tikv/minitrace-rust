@@ -5,8 +5,8 @@ use crate::collector::{Collect, CollectArgs, CollectTokenItem, Collector, SpanSe
 use crate::local::local_span_stack::{LocalSpanStack, LOCAL_SPAN_STACK};
 use crate::local::raw_span::RawSpan;
 use crate::local::span_id::{DefaultIdGenerator, SpanId};
+use crate::local::Guard;
 use crate::local::{LocalCollector, LocalSpans};
-use crate::util::guard::Guard;
 use crate::util::{new_collect_token, CollectToken};
 
 use std::cell::RefCell;
