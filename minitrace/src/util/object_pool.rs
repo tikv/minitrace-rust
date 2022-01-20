@@ -1,7 +1,6 @@
 // Copyright 2022 TiKV Project Authors. Licensed under Apache-2.0.
 
 use parking_lot::Mutex;
-use std::mem::{forget, ManuallyDrop};
 use std::ops::{Deref, DerefMut};
 
 pub struct Pool<T> {
@@ -77,28 +76,18 @@ impl<'a, T> Puller<'a, T> {
 
 pub struct Reusable<'a, T> {
     pool: &'a Pool<T>,
-    obj: ManuallyDrop<T>,
+    obj: Option<T>,
 }
 
 impl<'a, T> Reusable<'a, T> {
     #[inline]
     pub fn new(pool: &'a Pool<T>, t: T) -> Self {
-        Self {
-            pool,
-            obj: ManuallyDrop::new(t),
-        }
+        Self { pool, obj: Some(t) }
     }
 
     #[inline]
-    #[allow(dead_code)]
     pub fn into_inner(mut self) -> (&'a Pool<T>, T) {
-        let ret = unsafe { (self.pool, self.take()) };
-        forget(self);
-        ret
-    }
-
-    unsafe fn take(&mut self) -> T {
-        ManuallyDrop::take(&mut self.obj)
+        (self.pool, self.obj.take().unwrap())
     }
 }
 
@@ -107,7 +96,7 @@ where
     T: std::fmt::Debug,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.obj.fmt(f)
+        self.obj.as_ref().unwrap().fmt(f)
     }
 }
 
@@ -116,20 +105,22 @@ impl<'a, T> Deref for Reusable<'a, T> {
 
     #[inline]
     fn deref(&self) -> &Self::Target {
-        &self.obj
+        self.obj.as_ref().unwrap()
     }
 }
 
 impl<'a, T> DerefMut for Reusable<'a, T> {
     #[inline]
     fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.obj
+        self.obj.as_mut().unwrap()
     }
 }
 
 impl<'a, T> Drop for Reusable<'a, T> {
     #[inline]
     fn drop(&mut self) {
-        unsafe { self.pool.recycle(self.take()) }
+        if let Some(obj) = self.obj.take() {
+            self.pool.recycle(obj);
+        }
     }
 }
