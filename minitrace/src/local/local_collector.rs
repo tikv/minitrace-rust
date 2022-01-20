@@ -91,7 +91,7 @@ impl LocalCollector {
         let (spans, collect_token) = self
             .inner
             .take()
-            .map(
+            .and_then(
                 |LocalCollectorInner {
                      stack,
                      span_line_handle,
@@ -100,7 +100,6 @@ impl LocalCollector {
                     s.unregister_and_collect(span_line_handle)
                 },
             )
-            .flatten()
             .unwrap_or_else(|| (alloc_raw_spans(), None));
 
         (

@@ -63,7 +63,7 @@ impl Collect for MockCollect {
                     collect_id,
                 } in collect_token.iter()
                 {
-                    let v = collects.get_mut(&collect_id).unwrap();
+                    let v = collects.get_mut(collect_id).unwrap();
                     v.push((SpanSet::SharedLocalSpans(spans.clone()), *span_id));
                 }
             }

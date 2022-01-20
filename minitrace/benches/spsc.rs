@@ -13,7 +13,7 @@ fn crossbeam(nmsg: usize) {
         });
 
         for _ in 0..nmsg {
-            while let Ok(_) = rx.try_recv() {}
+            while rx.try_recv().is_ok() {}
         }
     })
     .unwrap();
@@ -38,7 +38,7 @@ fn minitrace(nmsg: usize) {
         });
 
         for _ in 0..nmsg {
-            while let Some(_) = rx.try_recv().unwrap() {}
+            while rx.try_recv().unwrap().is_some() {}
         }
     })
     .unwrap();

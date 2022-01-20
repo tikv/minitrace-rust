@@ -1,5 +1,6 @@
 // Copyright 2022 TiKV Project Authors. Licensed under Apache-2.0.
 
+#[must_use]
 pub struct Guard<F: FnOnce()> {
     inner: Option<F>,
 }
