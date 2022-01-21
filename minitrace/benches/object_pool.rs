@@ -12,13 +12,13 @@ thread_local! {
     static VEC_PULLER: std::cell::RefCell<Puller< 'static,Vec<usize>>>  = RefCell::new(VEC_POOL.puller(512));
 }
 
-pub type VECS = Reusable<'static, Vec<usize>>;
+type VECS = Reusable<'static, Vec<usize>>;
 
-pub(crate) fn alloc_vecs() -> VECS {
+fn alloc_vec() -> VECS {
     VEC_PULLER.with(|puller| puller.borrow_mut().pull())
 }
 
-fn alloc_vec(c: &mut Criterion) {
+fn bench_alloc_vec(c: &mut Criterion) {
     let mut bgroup = c.benchmark_group("Vec::with_capacity(16)");
 
     bgroup.bench_function("alloc", |b| {
@@ -26,7 +26,7 @@ fn alloc_vec(c: &mut Criterion) {
     });
     bgroup.bench_function("object-pool", |b| {
         b.iter_with_large_drop(|| {
-            let mut vec = alloc_vecs();
+            let mut vec = alloc_vec();
             if vec.capacity() < 16 {
                 vec.reserve(16);
             }
@@ -37,5 +37,5 @@ fn alloc_vec(c: &mut Criterion) {
     bgroup.finish();
 }
 
-criterion_group!(benches, alloc_vec);
+criterion_group!(benches, bench_alloc_vec);
 criterion_main!(benches);
