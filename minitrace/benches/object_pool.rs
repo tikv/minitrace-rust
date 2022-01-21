@@ -6,10 +6,10 @@ use criterion::{criterion_group, criterion_main, Criterion};
 use minitrace::util::object_pool::{Pool, Puller, Reusable};
 use once_cell::sync::Lazy;
 
-static RAW_SPANS_POOL: Lazy<Pool<Vec<usize>>> = Lazy::new(|| Pool::new(Vec::new, Vec::clear));
+static VEC_POOL: Lazy<Pool<Vec<usize>>> = Lazy::new(|| Pool::new(Vec::new, Vec::clear));
 
 thread_local! {
-    static VEC_PULLER: std::cell::RefCell<Puller< 'static,Vec<usize>>>  = RefCell::new(RAW_SPANS_POOL.puller(512));
+    static VEC_PULLER: std::cell::RefCell<Puller< 'static,Vec<usize>>>  = RefCell::new(VEC_POOL.puller(512));
 }
 
 pub type VECS = Reusable<'static, Vec<usize>>;
