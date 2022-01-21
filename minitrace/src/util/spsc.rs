@@ -55,15 +55,20 @@ impl<T> Receiver<T> {
         match self.received.pop() {
             Some(val) => Ok(Some(val)),
             None => {
-                let is_disconnected = Arc::strong_count(&self.page) < 2;
                 {
                     let mut page = self.page.lock();
                     std::mem::swap(&mut *page, &mut self.received);
                 }
                 match self.received.pop() {
                     Some(val) => Ok(Some(val)),
-                    None if is_disconnected => Err(ChannelClosed),
-                    None => Ok(None),
+                    None => {
+                        let is_disconnected = Arc::strong_count(&self.page) < 2;
+                        if is_disconnected {
+                            Err(ChannelClosed)
+                        } else {
+                            Ok(None)
+                        }
+                    }
                 }
             }
         }
