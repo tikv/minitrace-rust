@@ -9,7 +9,7 @@ use once_cell::sync::Lazy;
 static VEC_POOL: Lazy<Pool<Vec<usize>>> = Lazy::new(|| Pool::new(Vec::new, Vec::clear));
 
 thread_local! {
-    static VEC_PULLER: std::cell::RefCell<Puller< 'static,Vec<usize>>>  = RefCell::new(VEC_POOL.puller(512));
+    static VEC_PULLER: std::cell::RefCell<Puller<'static ,Vec<usize>>> = RefCell::new(VEC_POOL.puller(512));
 }
 
 type VECS = Reusable<'static, Vec<usize>>;
