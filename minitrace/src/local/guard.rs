@@ -18,3 +18,18 @@ impl<F: FnOnce()> Drop for Guard<F> {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::cell::Cell;
+
+    #[test]
+    fn guard_basic() {
+        let a = Cell::new(0);
+        let guard = Guard::new(|| a.set(1));
+        assert_eq!(a.get(), 0);
+        drop(guard);
+        assert_eq!(a.get(), 1);
+    }
+}

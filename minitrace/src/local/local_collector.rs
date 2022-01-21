@@ -124,3 +124,56 @@ impl Drop for LocalCollector {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::collector::CollectTokenItem;
+    use crate::local::span_id::SpanId;
+    use crate::util::new_collect_token;
+
+    #[test]
+    fn local_collector_basic() {
+        let stack = Rc::new(RefCell::new(LocalSpanStack::with_capacity(16)));
+        let collector1 = LocalCollector::new(None, stack.clone());
+
+        let span1 = stack.borrow_mut().enter_span("span1").unwrap();
+        {
+            let token2 = CollectTokenItem {
+                parent_id_of_roots: SpanId::new(9527),
+                collect_id: 42,
+            };
+            let collector2 = LocalCollector::new(Some(new_collect_token([token2])), stack.clone());
+            let span2 = stack.borrow_mut().enter_span("span2").unwrap();
+            stack.borrow_mut().exit_span(span2);
+
+            let (spans, token) = collector2.collect_with_token();
+            assert_eq!(token.unwrap().as_slice(), &[token2]);
+            assert_eq!(spans.spans[0].event, "span2");
+        }
+        stack.borrow_mut().exit_span(span1);
+        let spans = collector1.collect();
+        assert_eq!(spans.spans[0].event, "span1");
+    }
+
+    #[test]
+    fn drop_without_collect() {
+        let stack = Rc::new(RefCell::new(LocalSpanStack::with_capacity(16)));
+        let collector1 = LocalCollector::new(None, stack.clone());
+
+        let span1 = stack.borrow_mut().enter_span("span1").unwrap();
+        {
+            let token2 = CollectTokenItem {
+                parent_id_of_roots: SpanId::new(9527),
+                collect_id: 42,
+            };
+            let collector2 = LocalCollector::new(Some(new_collect_token([token2])), stack.clone());
+            let span2 = stack.borrow_mut().enter_span("span2").unwrap();
+            stack.borrow_mut().exit_span(span2);
+            drop(collector2);
+        }
+        stack.borrow_mut().exit_span(span1);
+        let spans = collector1.collect();
+        assert_eq!(spans.spans[0].event, "span1");
+    }
+}
