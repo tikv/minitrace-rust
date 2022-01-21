@@ -24,28 +24,23 @@ impl LocalSpan {
     }
 
     #[inline]
-    #[must_use]
-    #[allow(clippy::double_must_use)]
-    pub fn with_property<F>(&mut self, property: F) -> &mut Self
+    pub fn add_property<F>(&mut self, property: F)
     where
         F: FnOnce() -> (&'static str, String),
     {
-        self.with_properties(|| [property()])
+        self.add_properties(|| [property()]);
     }
 
     #[inline]
-    #[must_use]
-    #[allow(clippy::double_must_use)]
-    pub fn with_properties<I, F>(&mut self, properties: F) -> &mut Self
+    pub fn add_properties<I, F>(&mut self, properties: F)
     where
         I: IntoIterator<Item = (&'static str, String)>,
         F: FnOnce() -> I,
     {
         if let Some(LocalSpanInner { stack, span_handle }) = &self.inner {
             let span_stack = &mut *stack.borrow_mut();
-            span_stack.add_properties(span_handle, properties)
+            span_stack.add_properties(span_handle, properties);
         }
-        self
     }
 }
 
@@ -73,5 +68,71 @@ impl Drop for LocalSpan {
             let mut span_stack = stack.borrow_mut();
             span_stack.exit_span(span_handle);
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::collector::CollectTokenItem;
+    use crate::local::local_span_stack::LocalSpanStack;
+    use crate::local::span_id::SpanId;
+    use crate::local::LocalCollector;
+
+    use crate::util::new_collect_token;
+    use std::cell::RefCell;
+    use std::rc::Rc;
+
+    #[test]
+    fn local_span_basic() {
+        let stack = Rc::new(RefCell::new(LocalSpanStack::with_capacity(16)));
+
+        let token = CollectTokenItem {
+            parent_id_of_roots: SpanId::new(9527),
+            collect_id: 42,
+        };
+        let collector = LocalCollector::new(Some(new_collect_token([token])), stack.clone());
+
+        {
+            let _g = LocalSpan::enter_with_stack("span1", stack.clone());
+            {
+                let _g = LocalSpan::enter_with_stack("span2", stack)
+                    .add_property(|| ("k1", "v1".to_owned()));
+            }
+        }
+
+        let (spans, collect_token) = collector.collect_with_token();
+        assert_eq!(collect_token.unwrap().as_slice(), &[token]);
+
+        let mut spans = spans.spans.into_inner().1;
+        spans.sort_unstable_by(|a, b| a.id.0.cmp(&b.id.0));
+        assert_eq!(spans.len(), 2);
+        assert_eq!(spans[0].event, "span1");
+        assert_eq!(spans[1].event, "span2");
+        assert_eq!(spans[1].properties.as_slice(), &[("k1", "v1".to_owned())]);
+    }
+
+    #[test]
+    #[should_panic]
+    fn drop_out_of_order() {
+        let stack = Rc::new(RefCell::new(LocalSpanStack::with_capacity(16)));
+
+        let token = CollectTokenItem {
+            parent_id_of_roots: SpanId::new(9527),
+            collect_id: 42,
+        };
+        let collector = LocalCollector::new(Some(new_collect_token([token])), stack.clone());
+
+        {
+            let span1 = LocalSpan::enter_with_stack("span1", stack.clone());
+            {
+                let mut span2 = LocalSpan::enter_with_stack("span2", stack);
+                span2.add_property(|| ("k1", "v1".to_owned()));
+
+                drop(span1);
+            }
+        }
+
+        let _ = collector.collect_with_token();
     }
 }

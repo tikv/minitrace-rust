@@ -93,13 +93,13 @@
 //!   use futures::executor::block_on;
 //!
 //!   let (mut root, collector) = Span::root("root");
-//!   root.with_property(|| ("key", "value".to_owned()));
+//!   root.add_property(|| ("key", "value".to_owned()));
 //!
 //!   {
 //!       let _guard = root.set_local_parent();
 //!
-//!       let _span1 = LocalSpan::enter_with_local_parent("a child span")
-//!           .with_property(|| ("key", "value".to_owned()));
+//!       let mut span1 = LocalSpan::enter_with_local_parent("a child span");
+//!       span1.add_property(|| ("key", "value".to_owned()));
 //!   }
 //!
 //!   drop(root);

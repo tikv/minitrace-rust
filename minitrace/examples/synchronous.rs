@@ -19,8 +19,8 @@ fn main() {
         let (span, collector) = Span::root("root");
 
         let _sg1 = span.set_local_parent();
-        let _sg2 = LocalSpan::enter_with_local_parent("a span")
-            .with_property(|| ("a property", "a value".to_owned()));
+        let mut sg2 = LocalSpan::enter_with_local_parent("a span");
+        sg2.add_property(|| ("a property", "a value".to_owned()));
 
         for i in 1..=10 {
             func1(i);

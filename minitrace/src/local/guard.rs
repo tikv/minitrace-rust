@@ -27,9 +27,10 @@ mod tests {
     #[test]
     fn guard_basic() {
         let a = Cell::new(0);
-        let guard = Guard::new(|| a.set(1));
-        assert_eq!(a.get(), 0);
-        drop(guard);
+        {
+            let _guard = Guard::new(|| a.set(1));
+            assert_eq!(a.get(), 0);
+        }
         assert_eq!(a.get(), 1);
     }
 }

@@ -12,8 +12,8 @@ fn four_spans() {
     {
         // wide
         for _ in 0..2 {
-            let _g = LocalSpan::enter_with_local_parent("iter-span")
-                .with_property(|| ("tmp_property", "tmp_value".into()));
+            let mut span = LocalSpan::enter_with_local_parent("iter-span");
+            span.add_property(|| ("tmp_property", "tmp_value".into()));
         }
     }
 

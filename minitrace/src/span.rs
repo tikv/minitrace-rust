@@ -76,21 +76,21 @@ impl<C: Collect> Span<C> {
     }
 
     #[inline]
-    pub fn with_property<F>(&mut self, property: F)
+    pub fn add_property<F>(&mut self, property: F)
     where
         F: FnOnce() -> (&'static str, String),
     {
-        self.with_properties(move || [property()]);
+        self.add_properties(move || [property()]);
     }
 
     #[inline]
-    pub fn with_properties<I, F>(&mut self, properties: F)
+    pub fn add_properties<I, F>(&mut self, properties: F)
     where
         I: IntoIterator<Item = (&'static str, String)>,
         F: FnOnce() -> I,
     {
         if let Some(inner) = self.inner.as_mut() {
-            inner.with_properties(properties);
+            inner.add_properties(properties);
         }
     }
 
@@ -121,7 +121,7 @@ impl<C: Collect> Span<C> {
 
 impl<C: Collect> SpanInner<C> {
     #[inline]
-    fn with_properties<I, F>(&mut self, properties: F)
+    fn add_properties<I, F>(&mut self, properties: F)
     where
         I: IntoIterator<Item = (&'static str, String)>,
         F: FnOnce() -> I,
