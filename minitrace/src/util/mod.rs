@@ -32,3 +32,21 @@ pub(crate) fn new_collect_token(items: impl IntoIterator<Item = CollectTokenItem
     token.extend(items);
     token
 }
+
+impl<Iter: IntoIterator<Item = CollectTokenItem>> From<Iter> for CollectToken {
+    fn from(iter: Iter) -> Self {
+        new_collect_token(iter)
+    }
+}
+
+impl From<CollectTokenItem> for CollectToken {
+    fn from(item: CollectTokenItem) -> Self {
+        new_collect_token([item])
+    }
+}
+
+impl From<CollectTokenItem> for Option<CollectToken> {
+    fn from(item: CollectTokenItem) -> Self {
+        Some(new_collect_token([item]))
+    }
+}

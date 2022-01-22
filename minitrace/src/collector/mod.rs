@@ -7,7 +7,7 @@ pub(crate) mod command;
 use crate::local::raw_span::RawSpan;
 use crate::local::span_id::SpanId;
 use crate::local::LocalSpans;
-use crate::util::{new_collect_token, CollectToken};
+use crate::util::CollectToken;
 
 use std::sync::Arc;
 
@@ -74,10 +74,11 @@ impl Collector {
                 collect_id: Some(collect_id),
                 collect,
             },
-            new_collect_token([CollectTokenItem {
+            CollectTokenItem {
                 parent_id_of_roots: SpanId::default(),
                 collect_id,
-            }]),
+            }
+            .into(),
         )
     }
 
@@ -107,7 +108,7 @@ impl Drop for Collector {
 ///
 /// Customize collection behavior through [`Span::root_with_args()`](crate::Span::root_with_args).
 #[must_use]
-#[derive(Default, Debug)]
+#[derive(Default, Debug, Copy, Clone, Eq, PartialEq)]
 pub struct CollectArgs {
     pub(crate) max_span_count: Option<usize>,
 }
@@ -146,6 +147,7 @@ mod tests {
         mock.expect_start_collect()
             .times(1)
             .in_sequence(&mut seq)
+            .with(predicate::eq(CollectArgs::default()))
             .return_const(42_u32);
         mock.expect_commit_collect()
             .times(1)

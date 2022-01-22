@@ -7,7 +7,7 @@ use crate::local::raw_span::RawSpan;
 use crate::local::span_id::{DefaultIdGenerator, SpanId};
 use crate::local::Guard;
 use crate::local::{LocalCollector, LocalSpans};
-use crate::util::{new_collect_token, CollectToken};
+use crate::util::CollectToken;
 
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -81,12 +81,11 @@ impl Span {
     ) -> Self {
         #[cfg(not(test))]
         let collect = GlobalCollect::default();
-        let token = new_collect_token(
-            parents
-                .into_iter()
-                .filter_map(|span| span.inner.as_ref())
-                .flat_map(|inner| inner.issue_collect_token()),
-        );
+        let token = parents
+            .into_iter()
+            .filter_map(|span| span.inner.as_ref())
+            .flat_map(|inner| inner.issue_collect_token())
+            .into();
         Self::new(token, event, collect)
     }
 
@@ -98,7 +97,7 @@ impl Span {
         #[cfg(not(test))]
         let collect = GlobalCollect::default();
         LOCAL_SPAN_STACK
-            .with(move |stack| Self::enter_with_stack(event, &mut *(&*stack).borrow_mut(), collect))
+            .with(move |stack| Self::enter_with_stack(event, &mut (*stack).borrow_mut(), collect))
     }
 }
 
@@ -132,6 +131,10 @@ impl Span {
 
     #[inline]
     pub fn push_child_spans(&self, local_spans: Arc<LocalSpans>) {
+        if local_spans.spans.is_empty() {
+            return;
+        }
+
         if let Some(inner) = self.inner.as_ref() {
             inner.push_child_spans(local_spans)
         }
@@ -180,22 +183,26 @@ impl SpanInner {
 
     #[inline]
     fn capture_local_spans(&self, stack: Rc<RefCell<LocalSpanStack>>) -> Guard<impl FnOnce()> {
-        let token = new_collect_token(self.issue_collect_token());
+        let token = self.issue_collect_token().into();
         let collector = LocalCollector::new(Some(token), stack);
         let collect = self.collect.clone();
         Guard::new(move || {
             let (spans, token) = collector.collect_with_token();
             debug_assert!(token.is_some());
-            let token = token.unwrap_or_else(|| new_collect_token([]));
-            collect.submit_spans(SpanSet::LocalSpans(spans), token);
+            let token = token.unwrap_or_else(|| None.into());
+
+            if !spans.spans.is_empty() {
+                collect.submit_spans(SpanSet::LocalSpans(spans), token);
+            }
         })
     }
 
     #[inline]
     fn push_child_spans(&self, local_spans: Arc<LocalSpans>) {
-        let token = new_collect_token(self.issue_collect_token());
-        self.collect
-            .submit_spans(SpanSet::SharedLocalSpans(local_spans), token);
+        self.collect.submit_spans(
+            SpanSet::SharedLocalSpans(local_spans),
+            self.issue_collect_token().into(),
+        );
     }
 
     #[inline]

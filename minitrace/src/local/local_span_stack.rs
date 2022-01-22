@@ -121,7 +121,6 @@ mod tests {
     use super::*;
     use crate::collector::CollectTokenItem;
     use crate::local::span_id::SpanId;
-    use crate::util::new_collect_token;
 
     #[test]
     fn span_stack_basic() {
@@ -131,9 +130,7 @@ mod tests {
             parent_id_of_roots: SpanId::new(9527),
             collect_id: 42,
         };
-        let span_line1 = span_stack
-            .register_span_line(Some(new_collect_token([token1])))
-            .unwrap();
+        let span_line1 = span_stack.register_span_line(token1.into()).unwrap();
         {
             {
                 let span1 = span_stack.enter_span("span1").unwrap();
@@ -148,9 +145,7 @@ mod tests {
                 parent_id_of_roots: SpanId::new(9528),
                 collect_id: 48,
             };
-            let span_line2 = span_stack
-                .register_span_line(Some(new_collect_token([token2])))
-                .unwrap();
+            let span_line2 = span_stack.register_span_line(token2.into()).unwrap();
             {
                 let span3 = span_stack.enter_span("span3").unwrap();
                 {
@@ -185,34 +180,41 @@ mod tests {
             let span_line2 = span_stack.register_span_line(None).unwrap();
             {
                 let span_line3 = span_stack
-                    .register_span_line(Some(new_collect_token([CollectTokenItem {
-                        parent_id_of_roots: SpanId::new(9527),
-                        collect_id: 42,
-                    }])))
+                    .register_span_line(
+                        CollectTokenItem {
+                            parent_id_of_roots: SpanId::new(9527),
+                            collect_id: 42,
+                        }
+                        .into(),
+                    )
                     .unwrap();
                 {
                     let span_line4 = span_stack.register_span_line(None).unwrap();
                     {
                         assert!(span_stack
-                            .register_span_line(Some(new_collect_token([CollectTokenItem {
-                                parent_id_of_roots: SpanId::new(9528),
-                                collect_id: 43
-                            }])))
+                            .register_span_line(
+                                CollectTokenItem {
+                                    parent_id_of_roots: SpanId::new(9528),
+                                    collect_id: 43
+                                }
+                                .into()
+                            )
                             .is_none());
                         assert!(span_stack.register_span_line(None).is_none());
                     }
                     let _ = span_stack.unregister_and_collect(span_line4).unwrap();
                 }
                 {
-                    let span_line5 = span_stack
-                        .register_span_line(Some(new_collect_token(None)))
-                        .unwrap();
+                    let span_line5 = span_stack.register_span_line(None).unwrap();
                     {
                         assert!(span_stack
-                            .register_span_line(Some(new_collect_token([CollectTokenItem {
-                                parent_id_of_roots: SpanId::new(9529),
-                                collect_id: 44
-                            }])))
+                            .register_span_line(
+                                CollectTokenItem {
+                                    parent_id_of_roots: SpanId::new(9529),
+                                    collect_id: 44
+                                }
+                                .into()
+                            )
                             .is_none());
                         assert!(span_stack.register_span_line(None).is_none());
                     }
@@ -233,9 +235,7 @@ mod tests {
             parent_id_of_roots: SpanId::new(1),
             collect_id: 1,
         };
-        let span_line1 = span_stack
-            .register_span_line(Some(new_collect_token([token1])))
-            .unwrap();
+        let span_line1 = span_stack.register_span_line(token1.into()).unwrap();
         assert_eq!(
             span_stack.current_collect_token().unwrap().as_slice(),
             &[token1]
@@ -248,9 +248,7 @@ mod tests {
                     parent_id_of_roots: SpanId::new(3),
                     collect_id: 3,
                 };
-                let span_line3 = span_stack
-                    .register_span_line(Some(new_collect_token([token3])))
-                    .unwrap();
+                let span_line3 = span_stack.register_span_line(token3.into()).unwrap();
                 assert_eq!(
                     span_stack.current_collect_token().unwrap().as_slice(),
                     &[token3]
@@ -264,9 +262,7 @@ mod tests {
                 parent_id_of_roots: SpanId::new(4),
                 collect_id: 4,
             };
-            let span_line4 = span_stack
-                .register_span_line(Some(new_collect_token([token4])))
-                .unwrap();
+            let span_line4 = span_stack.register_span_line(token4.into()).unwrap();
             assert_eq!(
                 span_stack.current_collect_token().unwrap().as_slice(),
                 &[token4]
@@ -289,10 +285,13 @@ mod tests {
         let span1 = span_stack.enter_span("span1").unwrap();
         {
             let span_line2 = span_stack
-                .register_span_line(Some(new_collect_token([CollectTokenItem {
-                    parent_id_of_roots: SpanId::new(9527),
-                    collect_id: 42,
-                }])))
+                .register_span_line(
+                    CollectTokenItem {
+                        parent_id_of_roots: SpanId::new(9527),
+                        collect_id: 42,
+                    }
+                    .into(),
+                )
                 .unwrap();
             span_stack.exit_span(span1);
             let _ = span_stack.unregister_and_collect(span_line2).unwrap();
@@ -308,10 +307,13 @@ mod tests {
         let span1 = span_stack.enter_span("span1").unwrap();
         {
             let span_line2 = span_stack
-                .register_span_line(Some(new_collect_token([CollectTokenItem {
-                    parent_id_of_roots: SpanId::new(9527),
-                    collect_id: 42,
-                }])))
+                .register_span_line(
+                    CollectTokenItem {
+                        parent_id_of_roots: SpanId::new(9527),
+                        collect_id: 42,
+                    }
+                    .into(),
+                )
                 .unwrap();
             span_stack.add_properties(&span1, || [("k1", "v1".to_owned())]);
             let _ = span_stack.unregister_and_collect(span_line2).unwrap();
@@ -327,10 +329,13 @@ mod tests {
         let span_line1 = span_stack.register_span_line(None).unwrap();
         {
             let span_line2 = span_stack
-                .register_span_line(Some(new_collect_token([CollectTokenItem {
-                    parent_id_of_roots: SpanId::new(9527),
-                    collect_id: 42,
-                }])))
+                .register_span_line(
+                    CollectTokenItem {
+                        parent_id_of_roots: SpanId::new(9527),
+                        collect_id: 42,
+                    }
+                    .into(),
+                )
                 .unwrap();
             let _ = span_stack.unregister_and_collect(span_line1).unwrap();
             let _ = span_stack.unregister_and_collect(span_line2).unwrap();

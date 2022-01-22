@@ -130,7 +130,6 @@ mod tests {
     use super::*;
     use crate::collector::CollectTokenItem;
     use crate::local::span_id::SpanId;
-    use crate::util::new_collect_token;
 
     #[test]
     fn local_collector_basic() {
@@ -143,7 +142,7 @@ mod tests {
                 parent_id_of_roots: SpanId::new(9527),
                 collect_id: 42,
             };
-            let collector2 = LocalCollector::new(Some(new_collect_token([token2])), stack.clone());
+            let collector2 = LocalCollector::new(token2.into(), stack.clone());
             let span2 = stack.borrow_mut().enter_span("span2").unwrap();
             stack.borrow_mut().exit_span(span2);
 
@@ -167,7 +166,7 @@ mod tests {
                 parent_id_of_roots: SpanId::new(9527),
                 collect_id: 42,
             };
-            let collector2 = LocalCollector::new(Some(new_collect_token([token2])), stack.clone());
+            let collector2 = LocalCollector::new(token2.into(), stack.clone());
             let span2 = stack.borrow_mut().enter_span("span2").unwrap();
             stack.borrow_mut().exit_span(span2);
             drop(collector2);

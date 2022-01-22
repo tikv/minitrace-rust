@@ -2,7 +2,7 @@
 
 use crate::collector::CollectTokenItem;
 use crate::local::span_queue::{SpanHandle, SpanQueue};
-use crate::util::{new_collect_token, CollectToken, RawSpans};
+use crate::util::{CollectToken, RawSpans};
 
 #[derive(Debug)]
 pub struct SpanLine {
@@ -59,15 +59,16 @@ impl SpanLine {
     #[inline]
     pub fn current_collect_token(&self) -> Option<CollectToken> {
         self.collect_token.as_ref().map(|collect_token| {
-            new_collect_token(collect_token.iter().map(|item| {
-                CollectTokenItem {
+            collect_token
+                .iter()
+                .map(|item| CollectTokenItem {
                     parent_id_of_roots: self
                         .span_queue
                         .current_span_id()
                         .unwrap_or(item.parent_id_of_roots),
                     collect_id: item.collect_id,
-                }
-            }))
+                })
+                .into()
         })
     }
 
@@ -127,7 +128,7 @@ mod tests {
             parent_id_of_roots: SpanId::new(9528),
             collect_id: 43,
         };
-        let token = new_collect_token([token1, token2]);
+        let token = [token1, token2].into();
         let mut span_line = SpanLine::new(16, 1, Some(token));
 
         let current_token = span_line.current_collect_token().unwrap();
@@ -184,8 +185,7 @@ mod tests {
             parent_id_of_roots: SpanId::default(),
             collect_id: 42,
         };
-        let token = new_collect_token([item]);
-        let mut span_line1 = SpanLine::new(16, 1, Some(token));
+        let mut span_line1 = SpanLine::new(16, 1, item.into());
         let mut span_line2 = SpanLine::new(16, 2, None);
         assert_eq!(span_line1.span_line_epoch(), 1);
         assert_eq!(span_line2.span_line_epoch(), 2);

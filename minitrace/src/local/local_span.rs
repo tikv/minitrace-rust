@@ -79,7 +79,6 @@ mod tests {
     use crate::local::span_id::SpanId;
     use crate::local::LocalCollector;
 
-    use crate::util::new_collect_token;
     use std::cell::RefCell;
     use std::rc::Rc;
 
@@ -91,7 +90,7 @@ mod tests {
             parent_id_of_roots: SpanId::new(9527),
             collect_id: 42,
         };
-        let collector = LocalCollector::new(Some(new_collect_token([token])), stack.clone());
+        let collector = LocalCollector::new(token.into(), stack.clone());
 
         {
             let _g = LocalSpan::enter_with_stack("span1", stack.clone());
@@ -121,7 +120,7 @@ mod tests {
             parent_id_of_roots: SpanId::new(9527),
             collect_id: 42,
         };
-        let collector = LocalCollector::new(Some(new_collect_token([token])), stack.clone());
+        let collector = LocalCollector::new(token.into(), stack.clone());
 
         {
             let span1 = LocalSpan::enter_with_stack("span1", stack.clone());
