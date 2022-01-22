@@ -33,36 +33,72 @@ impl Span {
     /// Create a place-holder span that never starts recording.
     #[inline]
     pub fn new_noop() -> Self {
-        Self::new_noop_with_collect()
+        Self { inner: None }
     }
 
     #[inline]
-    pub fn root(event: &'static str) -> (Self, Collector) {
-        Self::root_with_args_collect(event, CollectArgs::default(), GlobalCollect::default())
+    pub fn root(event: &'static str, #[cfg(test)] collect: GlobalCollect) -> (Self, Collector) {
+        Self::root_with_args(
+            event,
+            CollectArgs::default(),
+            #[cfg(test)]
+            collect,
+        )
     }
 
     #[inline]
-    pub fn root_with_args(event: &'static str, args: CollectArgs) -> (Self, Collector) {
-        Self::root_with_args_collect(event, args, GlobalCollect::default())
+    pub fn root_with_args(
+        event: &'static str,
+        args: CollectArgs,
+        #[cfg(test)] collect: GlobalCollect,
+    ) -> (Self, Collector) {
+        #[cfg(not(test))]
+        let collect = GlobalCollect::default();
+        let (collector, token) = Collector::start_collect(args, collect.clone());
+        let span = Self::new(token, event, collect);
+        (span, collector)
     }
 
     #[inline]
-    pub fn enter_with_parent(event: &'static str, parent: &Span) -> Self {
-        Self::enter_with_parents_collect(event, [parent], GlobalCollect::default())
+    pub fn enter_with_parent(
+        event: &'static str,
+        parent: &Span,
+        #[cfg(test)] collect: GlobalCollect,
+    ) -> Self {
+        Self::enter_with_parents(
+            event,
+            [parent],
+            #[cfg(test)]
+            collect,
+        )
     }
 
     #[inline]
     pub fn enter_with_parents<'a>(
         event: &'static str,
         parents: impl IntoIterator<Item = &'a Span>,
+        #[cfg(test)] collect: GlobalCollect,
     ) -> Self {
-        Self::enter_with_parents_collect(event, parents, GlobalCollect::default())
+        #[cfg(not(test))]
+        let collect = GlobalCollect::default();
+        let token = new_collect_token(
+            parents
+                .into_iter()
+                .filter_map(|span| span.inner.as_ref())
+                .flat_map(|inner| inner.issue_collect_token()),
+        );
+        Self::new(token, event, collect)
     }
 
     #[inline]
-    pub fn enter_with_local_parent(event: &'static str) -> Self {
-        let stack = LOCAL_SPAN_STACK.with(Rc::clone);
-        Self::enter_with_stack_collect(event, stack, GlobalCollect::default())
+    pub fn enter_with_local_parent(
+        event: &'static str,
+        #[cfg(test)] collect: GlobalCollect,
+    ) -> Self {
+        #[cfg(not(test))]
+        let collect = GlobalCollect::default();
+        LOCAL_SPAN_STACK
+            .with(move |stack| Self::enter_with_stack(event, &mut *(&*stack).borrow_mut(), collect))
     }
 }
 
@@ -117,6 +153,17 @@ impl Span {
             }),
         }
     }
+
+    pub(crate) fn enter_with_stack(
+        event: &'static str,
+        stack: &mut LocalSpanStack,
+        collect: GlobalCollect,
+    ) -> Self {
+        match stack.current_collect_token() {
+            Some(token) => Span::new(token, event, collect),
+            None => Self::new_noop(),
+        }
+    }
 }
 
 impl SpanInner {
@@ -159,53 +206,6 @@ impl SpanInner {
                 collect_id: *collect_id,
             },
         )
-    }
-}
-
-impl Span {
-    #[inline]
-    pub(crate) fn new_noop_with_collect() -> Self {
-        Self { inner: None }
-    }
-
-    pub(crate) fn root_with_args_collect(
-        event: &'static str,
-        args: CollectArgs,
-        collect: GlobalCollect,
-    ) -> (Self, Collector) {
-        let (collector, token) = Collector::start_collect(args, collect.clone());
-        let span = Self::new(token, event, collect);
-        (span, collector)
-    }
-
-    pub(crate) fn enter_with_parents_collect<'a>(
-        event: &'static str,
-        parents: impl IntoIterator<Item = &'a Span>,
-        collect: GlobalCollect,
-    ) -> Self {
-        let token = new_collect_token(
-            parents
-                .into_iter()
-                .filter_map(|span| span.inner.as_ref())
-                .flat_map(|inner| inner.issue_collect_token()),
-        );
-        Self::new(token, event, collect)
-    }
-
-    pub(crate) fn enter_with_stack_collect(
-        event: &'static str,
-        stack: Rc<RefCell<LocalSpanStack>>,
-        collect: GlobalCollect,
-    ) -> Self {
-        let token = {
-            let span_stack = &mut *stack.borrow_mut();
-            span_stack.current_collect_token()
-        };
-
-        match token {
-            Some(token) => Span::new(token, event, collect),
-            None => Self::new_noop_with_collect(),
-        }
     }
 }
 
