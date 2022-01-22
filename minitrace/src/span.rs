@@ -99,15 +99,9 @@ impl Span {
         LOCAL_SPAN_STACK
             .with(move |stack| Self::enter_with_stack(event, &mut (*stack).borrow_mut(), collect))
     }
-}
 
-impl Span {
-    #[inline]
     pub fn set_local_parent(&self) -> Option<Guard<impl FnOnce()>> {
-        self.inner.as_ref().map(move |inner| {
-            let stack = LOCAL_SPAN_STACK.with(Rc::clone);
-            inner.capture_local_spans(stack)
-        })
+        LOCAL_SPAN_STACK.with(|s| self.attach_into_stack(s))
     }
 
     #[inline]
@@ -166,6 +160,15 @@ impl Span {
             Some(token) => Span::new(token, event, collect),
             None => Self::new_noop(),
         }
+    }
+
+    pub(crate) fn attach_into_stack(
+        &self,
+        stack: &Rc<RefCell<LocalSpanStack>>,
+    ) -> Option<Guard<impl FnOnce()>> {
+        self.inner
+            .as_ref()
+            .map(move |inner| inner.capture_local_spans(stack.clone()))
     }
 }
 
