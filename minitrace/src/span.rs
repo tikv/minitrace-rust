@@ -1,7 +1,7 @@
 // Copyright 2020 TiKV Project Authors. Licensed under Apache-2.0.
 
-use crate::collector::global_collector::Global;
-use crate::collector::{Collect, CollectArgs, CollectTokenItem, Collector, SpanSet};
+use crate::collector::GlobalCollect;
+use crate::collector::{CollectArgs, CollectTokenItem, Collector, SpanSet};
 use crate::local::local_span_stack::{LocalSpanStack, LOCAL_SPAN_STACK};
 use crate::local::raw_span::RawSpan;
 use crate::local::span_id::{DefaultIdGenerator, SpanId};
@@ -18,15 +18,15 @@ use minstant::Instant;
 /// A thread-safe span.
 #[must_use]
 #[derive(Debug)]
-pub struct Span<C: Collect = Global> {
-    pub(crate) inner: Option<SpanInner<C>>,
+pub struct Span {
+    pub(crate) inner: Option<SpanInner>,
 }
 
 #[derive(Debug)]
-pub(crate) struct SpanInner<C: Collect> {
+pub(crate) struct SpanInner {
     pub(crate) raw_span: RawSpan,
     pub(crate) collect_token: CollectToken,
-    collect: C,
+    collect: GlobalCollect,
 }
 
 impl Span {
@@ -37,18 +37,18 @@ impl Span {
     }
 
     #[inline]
-    pub fn root(event: &'static str) -> (Self, Collector<Global>) {
-        Self::root_with_args_collect(event, CollectArgs::default(), Global)
+    pub fn root(event: &'static str) -> (Self, Collector) {
+        Self::root_with_args_collect(event, CollectArgs::default(), GlobalCollect::default())
     }
 
     #[inline]
-    pub fn root_with_args(event: &'static str, args: CollectArgs) -> (Self, Collector<Global>) {
-        Self::root_with_args_collect(event, args, Global)
+    pub fn root_with_args(event: &'static str, args: CollectArgs) -> (Self, Collector) {
+        Self::root_with_args_collect(event, args, GlobalCollect::default())
     }
 
     #[inline]
     pub fn enter_with_parent(event: &'static str, parent: &Span) -> Self {
-        Self::enter_with_parents_collect(event, [parent], Global)
+        Self::enter_with_parents_collect(event, [parent], GlobalCollect::default())
     }
 
     #[inline]
@@ -56,17 +56,17 @@ impl Span {
         event: &'static str,
         parents: impl IntoIterator<Item = &'a Span>,
     ) -> Self {
-        Self::enter_with_parents_collect(event, parents, Global)
+        Self::enter_with_parents_collect(event, parents, GlobalCollect::default())
     }
 
     #[inline]
     pub fn enter_with_local_parent(event: &'static str) -> Self {
         let stack = LOCAL_SPAN_STACK.with(Rc::clone);
-        Self::enter_with_stack_collect(event, stack, Global)
+        Self::enter_with_stack_collect(event, stack, GlobalCollect::default())
     }
 }
 
-impl<C: Collect> Span<C> {
+impl Span {
     #[inline]
     pub fn set_local_parent(&self) -> Option<Guard<impl FnOnce()>> {
         self.inner.as_ref().map(move |inner| {
@@ -102,9 +102,9 @@ impl<C: Collect> Span<C> {
     }
 }
 
-impl<C: Collect> Span<C> {
+impl Span {
     #[inline]
-    fn new(collect_token: CollectToken, event: &'static str, collect: C) -> Self {
+    fn new(collect_token: CollectToken, event: &'static str, collect: GlobalCollect) -> Self {
         let span_id = DefaultIdGenerator::next_id();
         let begin_instant = Instant::now();
         let raw_span = RawSpan::begin_with(span_id, SpanId::default(), begin_instant, event);
@@ -119,7 +119,7 @@ impl<C: Collect> Span<C> {
     }
 }
 
-impl<C: Collect> SpanInner<C> {
+impl SpanInner {
     #[inline]
     fn add_properties<I, F>(&mut self, properties: F)
     where
@@ -162,7 +162,7 @@ impl<C: Collect> SpanInner<C> {
     }
 }
 
-impl<C: Collect> Span<C> {
+impl Span {
     #[inline]
     pub(crate) fn new_noop_with_collect() -> Self {
         Self { inner: None }
@@ -171,8 +171,8 @@ impl<C: Collect> Span<C> {
     pub(crate) fn root_with_args_collect(
         event: &'static str,
         args: CollectArgs,
-        collect: C,
-    ) -> (Self, Collector<C>) {
+        collect: GlobalCollect,
+    ) -> (Self, Collector) {
         let (collector, token) = Collector::start_collect(args, collect.clone());
         let span = Self::new(token, event, collect);
         (span, collector)
@@ -180,8 +180,8 @@ impl<C: Collect> Span<C> {
 
     pub(crate) fn enter_with_parents_collect<'a>(
         event: &'static str,
-        parents: impl IntoIterator<Item = &'a Span<C>>,
-        collect: C,
+        parents: impl IntoIterator<Item = &'a Span>,
+        collect: GlobalCollect,
     ) -> Self {
         let token = new_collect_token(
             parents
@@ -195,7 +195,7 @@ impl<C: Collect> Span<C> {
     pub(crate) fn enter_with_stack_collect(
         event: &'static str,
         stack: Rc<RefCell<LocalSpanStack>>,
-        collect: C,
+        collect: GlobalCollect,
     ) -> Self {
         let token = {
             let span_stack = &mut *stack.borrow_mut();
@@ -209,7 +209,7 @@ impl<C: Collect> Span<C> {
     }
 }
 
-impl<C: Collect> Drop for Span<C> {
+impl Drop for Span {
     fn drop(&mut self) {
         if let Some(SpanInner {
             mut raw_span,

@@ -13,7 +13,7 @@ use retain_mut::RetainMut;
 use crate::collector::command::{
     CollectCommand, CommitCollect, DropCollect, StartCollect, SubmitSpans,
 };
-use crate::collector::{Collect, CollectArgs, SpanRecord, SpanSet};
+use crate::collector::{CollectArgs, SpanRecord, SpanSet};
 use crate::local::raw_span::RawSpan;
 use crate::local::span_id::SpanId;
 use crate::local::LocalSpans;
@@ -34,11 +34,12 @@ thread_local! {
     };
 }
 
-#[derive(Default, Copy, Clone)]
-pub struct Global;
+#[derive(Default, Clone, Debug)]
+pub(crate) struct GlobalCollect;
 
-impl Collect for Global {
-    fn start_collect(&self, collect_args: CollectArgs) -> u32 {
+#[mockall::automock]
+impl GlobalCollect {
+    pub fn start_collect(&self, collect_args: CollectArgs) -> u32 {
         let collect_id = NEXT_COLLECT_ID.fetch_add(1, Ordering::AcqRel);
         send_command(CollectCommand::StartCollect(StartCollect {
             collect_id,
@@ -47,22 +48,20 @@ impl Collect for Global {
         collect_id
     }
 
-    fn commit_collect(
-        &self,
-        collect_id: u32,
-        tx: futures::channel::oneshot::Sender<Vec<SpanRecord>>,
-    ) {
+    pub async fn commit_collect(&self, collect_id: u32) -> Vec<SpanRecord> {
+        let (tx, rx) = futures::channel::oneshot::channel();
         force_send_command(CollectCommand::CommitCollect(CommitCollect {
             collect_id,
             tx,
         }));
+        rx.await.unwrap_or_else(|_| Vec::new())
     }
 
-    fn drop_collect(&self, collect_id: u32) {
+    pub fn drop_collect(&self, collect_id: u32) {
         force_send_command(CollectCommand::DropCollect(DropCollect { collect_id }));
     }
 
-    fn submit_spans(&self, spans: SpanSet, collect_token: CollectToken) {
+    pub fn submit_spans(&self, spans: SpanSet, collect_token: CollectToken) {
         send_command(CollectCommand::SubmitSpans(SubmitSpans {
             spans,
             collect_token,

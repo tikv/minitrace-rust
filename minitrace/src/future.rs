@@ -31,7 +31,6 @@
 
 use std::task::Poll;
 
-use crate::collector::Collect;
 use crate::local::LocalSpan;
 use crate::Span;
 
@@ -63,7 +62,7 @@ pub trait FutureExt: std::future::Future + Sized {
     ///
     /// [`Future`]:(std::future::Future)
     #[inline]
-    fn in_span<C: Collect>(self, span: Span<C>) -> InSpan<Self, C> {
+    fn in_span(self, span: Span) -> InSpan<Self> {
         InSpan::new(self, span)
     }
 
@@ -100,14 +99,14 @@ pub trait FutureExt: std::future::Future + Sized {
 
 /// Adapter for [`FutureExt::in_span()`](FutureExt::in_span).
 #[pin_project::pin_project]
-pub struct InSpan<T, C: Collect> {
+pub struct InSpan<T> {
     #[pin]
     inner: T,
-    span: Option<Span<C>>,
+    span: Option<Span>,
 }
 
-impl<T: std::future::Future, C: Collect> InSpan<T, C> {
-    pub(crate) fn new(f: T, span: Span<C>) -> Self {
+impl<T: std::future::Future> InSpan<T> {
+    pub(crate) fn new(f: T, span: Span) -> Self {
         Self {
             inner: f,
             span: Some(span),
@@ -115,7 +114,7 @@ impl<T: std::future::Future, C: Collect> InSpan<T, C> {
     }
 }
 
-impl<T: std::future::Future, C: Collect> std::future::Future for InSpan<T, C> {
+impl<T: std::future::Future> std::future::Future for InSpan<T> {
     type Output = T::Output;
 
     fn poll(self: std::pin::Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> Poll<Self::Output> {
