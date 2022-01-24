@@ -1,38 +1,36 @@
 // Copyright 2022 TiKV Project Authors. Licensed under Apache-2.0.
 
-use std::cell::RefCell;
-
-use criterion::{criterion_group, criterion_main, Criterion};
-use minitrace::util::object_pool::{Pool, Puller, Reusable};
-use once_cell::sync::Lazy;
-
-static VEC_POOL: Lazy<Pool<Vec<usize>>> = Lazy::new(|| Pool::new(Vec::new, Vec::clear));
-
-thread_local! {
-    static VEC_PULLER: std::cell::RefCell<Puller<'static, Vec<usize>>> = RefCell::new(VEC_POOL.puller(512));
-}
-
-type VECS = Reusable<'static, Vec<usize>>;
-
-fn alloc_vec() -> VECS {
-    VEC_PULLER.with(|puller| puller.borrow_mut().pull())
-}
+use criterion::{criterion_group, criterion_main, BatchSize, Criterion};
+use minitrace::util::object_pool::Pool;
 
 fn bench_alloc_vec(c: &mut Criterion) {
     let mut bgroup = c.benchmark_group("Vec::with_capacity(16)");
 
-    bgroup.bench_function("alloc", |b| {
-        b.iter_with_large_drop(|| Vec::<usize>::with_capacity(16))
-    });
-    bgroup.bench_function("object-pool", |b| {
-        b.iter_with_large_drop(|| {
-            let mut vec = alloc_vec();
-            if vec.capacity() < 16 {
-                vec.reserve(16);
-            }
-            vec
-        })
-    });
+    for cap in &[1, 10, 100, 1000, 10000, 100000] {
+        let vec_pool: Pool<Vec<usize>> = Pool::new(Vec::new, Vec::clear);
+        let mut puller = vec_pool.puller(512);
+        bgroup.bench_function(format!("object-pool/{}", cap), |b| {
+            b.iter_batched(
+                || (),
+                |_| {
+                    let mut vec = puller.pull();
+                    if vec.capacity() < *cap {
+                        vec.reserve(*cap);
+                    }
+                    vec
+                },
+                BatchSize::NumIterations(512),
+            )
+        });
+
+        bgroup.bench_function(format!("alloc/{}", cap), |b| {
+            b.iter_batched(
+                || (),
+                |_| Vec::<usize>::with_capacity(*cap),
+                BatchSize::NumIterations(512),
+            )
+        });
+    }
 
     bgroup.finish();
 }
