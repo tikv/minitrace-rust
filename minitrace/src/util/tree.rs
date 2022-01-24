@@ -181,7 +181,7 @@ impl Tree {
         id: SpanId,
         raw: &mut HashMap<SpanId, (&'static str, Vec<SpanId>, Vec<(&'static str, String)>)>,
     ) -> Tree {
-        let (event, children, properties) = raw.remove(&id).unwrap();
+        let (event, children, properties) = raw.get(&id).cloned().unwrap();
         Tree {
             event,
             children: children
