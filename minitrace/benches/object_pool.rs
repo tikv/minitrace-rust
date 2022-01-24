@@ -4,7 +4,7 @@ use criterion::{criterion_group, criterion_main, BatchSize, Criterion};
 use minitrace::util::object_pool::Pool;
 
 fn bench_alloc_vec(c: &mut Criterion) {
-    let mut bgroup = c.benchmark_group("Vec::with_capacity(16)");
+    let mut bgroup = c.benchmark_group("Vec::with_capacity");
 
     for cap in &[1, 10, 100, 1000, 10000, 100000] {
         let vec_pool: Pool<Vec<usize>> = Pool::new(Vec::new, Vec::clear);
