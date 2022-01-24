@@ -53,3 +53,7 @@ harness = false
 [[bench]]
 name = "spsc"
 harness = false
+
+[[bench]]
+name = "object_pool"
+harness = false

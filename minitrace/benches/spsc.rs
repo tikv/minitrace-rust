@@ -56,8 +56,8 @@ fn spsc_comparison(c: &mut Criterion) {
     let mut bgroup = c.benchmark_group("spsc channel");
 
     for len in &[1, 10, 100, 1000, 10000] {
-        bgroup.bench_function(format!("crossbeam-{}", len), |b| b.iter(|| crossbeam(*len)));
-        bgroup.bench_function(format!("minitrace-{}", len), |b| b.iter(|| minitrace(*len)));
+        bgroup.bench_function(format!("crossbeam/{}", len), |b| b.iter(|| crossbeam(*len)));
+        bgroup.bench_function(format!("minitrace/{}", len), |b| b.iter(|| minitrace(*len)));
     }
 
     bgroup.finish();
@@ -67,10 +67,10 @@ fn spsc_send_only_comparison(c: &mut Criterion) {
     let mut bgroup = c.benchmark_group("spsc channel send only");
 
     for len in &[1, 10, 100, 1000, 10000] {
-        bgroup.bench_function(format!("crossbeam-{}", len), |b| {
+        bgroup.bench_function(format!("crossbeam/{}", len), |b| {
             b.iter(|| crossbeam_send_only(*len))
         });
-        bgroup.bench_function(format!("minitrace-{}", len), |b| {
+        bgroup.bench_function(format!("minitrace/{}", len), |b| {
             b.iter(|| minitrace_send_only(*len))
         });
     }
