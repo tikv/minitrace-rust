@@ -31,7 +31,7 @@
 //!   drop(root);
 //!   let records: Vec<SpanRecord> = block_on(collector.collect());
 //!
-//!   println!("{:#?}", records);
+//!   println!("{records:#?}");
 //!   // [
 //!   //     SpanRecord {
 //!   //         id: 1,
@@ -105,7 +105,7 @@
 //!   drop(root);
 //!   let records: Vec<SpanRecord> = block_on(collector.collect());
 //!
-//!   println!("{:#?}", records);
+//!   println!("{records:#?}");
 //!   // [
 //!   //     SpanRecord {
 //!   //         id: 1,
@@ -166,7 +166,7 @@
 //!   drop(root);
 //!   let records: Vec<SpanRecord> = block_on(collector.collect());
 //!
-//!   println!("{:#?}", records);
+//!   println!("{records:#?}");
 //!   // [
 //!   //     SpanRecord {
 //!   //         id: 1,

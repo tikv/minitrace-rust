@@ -130,6 +130,7 @@ mod tests {
     use super::*;
     use crate::collector::CollectTokenItem;
     use crate::local::span_id::SpanId;
+    use crate::util::tree::{t, Tree};
 
     #[test]
     fn local_collector_basic() {
@@ -144,15 +145,23 @@ mod tests {
             };
             let collector2 = LocalCollector::new(token2.into(), stack.clone());
             let span2 = stack.borrow_mut().enter_span("span2").unwrap();
+            let span3 = stack.borrow_mut().enter_span("span3").unwrap();
+            stack.borrow_mut().exit_span(span3);
             stack.borrow_mut().exit_span(span2);
 
             let (spans, token) = collector2.collect_with_token();
             assert_eq!(token.unwrap().as_slice(), &[token2]);
-            assert_eq!(spans.spans[0].event, "span2");
+            assert_eq!(
+                Tree::from_raw_spans(spans.spans).as_slice(),
+                &[t("span2", [t("span3", [])])]
+            );
         }
         stack.borrow_mut().exit_span(span1);
         let spans = collector1.collect();
-        assert_eq!(spans.spans[0].event, "span1");
+        assert_eq!(
+            Tree::from_raw_spans(spans.spans).as_slice(),
+            &[t("span1", [])]
+        );
     }
 
     #[test]
@@ -168,11 +177,16 @@ mod tests {
             };
             let collector2 = LocalCollector::new(token2.into(), stack.clone());
             let span2 = stack.borrow_mut().enter_span("span2").unwrap();
+            let span3 = stack.borrow_mut().enter_span("span3").unwrap();
+            stack.borrow_mut().exit_span(span3);
             stack.borrow_mut().exit_span(span2);
             drop(collector2);
         }
         stack.borrow_mut().exit_span(span1);
         let spans = collector1.collect();
-        assert_eq!(spans.spans[0].event, "span1");
+        assert_eq!(
+            Tree::from_raw_spans(spans.spans).as_slice(),
+            &[t("span1", [])]
+        );
     }
 }

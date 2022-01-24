@@ -121,6 +121,7 @@ mod tests {
     use super::*;
     use crate::collector::CollectTokenItem;
     use crate::local::span_id::SpanId;
+    use crate::util::tree::{t, Tree};
 
     #[test]
     fn span_stack_basic() {
@@ -155,20 +156,20 @@ mod tests {
                 span_stack.exit_span(span3);
             }
 
-            let (mut spans, collect_token) = span_stack.unregister_and_collect(span_line2).unwrap();
+            let (spans, collect_token) = span_stack.unregister_and_collect(span_line2).unwrap();
             assert_eq!(collect_token.unwrap().as_slice(), &[token2]);
-            spans.sort_unstable_by(|a, b| a.id.0.cmp(&b.id.0));
-            assert_eq!(spans.len(), 2);
-            assert_eq!(spans[0].event, "span3");
-            assert_eq!(spans[1].event, "span4");
+            assert_eq!(
+                Tree::from_raw_spans(spans).as_slice(),
+                &[t("span3", [t("span4", [])])]
+            );
         }
 
-        let (mut spans, collect_token) = span_stack.unregister_and_collect(span_line1).unwrap();
+        let (spans, collect_token) = span_stack.unregister_and_collect(span_line1).unwrap();
         assert_eq!(collect_token.unwrap().as_slice(), &[token1]);
-        spans.sort_unstable_by(|a, b| a.id.0.cmp(&b.id.0));
-        assert_eq!(spans.len(), 2);
-        assert_eq!(spans[0].event, "span1");
-        assert_eq!(spans[1].event, "span2");
+        assert_eq!(
+            Tree::from_raw_spans(spans).as_slice(),
+            &[t("span1", [t("span2", [])])]
+        );
     }
 
     #[test]

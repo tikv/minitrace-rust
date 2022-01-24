@@ -78,6 +78,7 @@ mod tests {
     use crate::local::local_span_stack::LocalSpanStack;
     use crate::local::span_id::SpanId;
     use crate::local::LocalCollector;
+    use crate::util::tree::{t, tp, Tree};
 
     use std::cell::RefCell;
     use std::rc::Rc;
@@ -95,20 +96,17 @@ mod tests {
         {
             let _g = LocalSpan::enter_with_stack("span1", stack.clone());
             {
-                let _g = LocalSpan::enter_with_stack("span2", stack)
-                    .add_property(|| ("k1", "v1".to_owned()));
+                let mut span = LocalSpan::enter_with_stack("span2", stack);
+                span.add_property(|| ("k1", "v1".to_owned()));
             }
         }
 
         let (spans, collect_token) = collector.collect_with_token();
         assert_eq!(collect_token.unwrap().as_slice(), &[token]);
-
-        let mut spans = spans.spans.into_inner().1;
-        spans.sort_unstable_by(|a, b| a.id.0.cmp(&b.id.0));
-        assert_eq!(spans.len(), 2);
-        assert_eq!(spans[0].event, "span1");
-        assert_eq!(spans[1].event, "span2");
-        assert_eq!(spans[1].properties.as_slice(), &[("k1", "v1".to_owned())]);
+        assert_eq!(
+            Tree::from_raw_spans(spans.spans).as_slice(),
+            &[t("span1", [tp("span2", [], [("k1", "v1".to_owned())])])]
+        );
     }
 
     #[test]

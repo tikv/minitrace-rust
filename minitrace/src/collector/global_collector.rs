@@ -61,6 +61,21 @@ impl GlobalCollect {
         force_send_command(CollectCommand::DropCollect(DropCollect { collect_id }));
     }
 
+    /// Note that: relationships are not built completely here, and a further job is needed.
+    ///
+    /// Every `SpanSet` has its own root span**s** whose `raw_span.parent_id`s are equal to
+    /// `SpanId::default()`, and such a root span can have multiple parents where mainly comes
+    /// from [`Span::enter_with_parents`].
+    ///
+    /// Parents of root spans are recorded into `CollectToken` which has several `CollectTokenItem`s.
+    /// Look into a `CollectTokenItem`, `parent_id_of_roots` is found.
+    ///
+    /// So the expected further job mentioned above is:
+    /// * Copy `SpanSet` to the same number of copies as `CollectTokenItem`s, one `SpanSet` to one
+    ///   `CollectTokenItem`
+    /// * Amend `raw_span.parent_id` of root spans in `SpanSet` to `parent_id_of_roots` of `CollectTokenItem`
+    ///
+    /// [`Span::enter_with_parents`]: crate::Span::enter_with_parents
     pub fn submit_spans(&self, spans: SpanSet, collect_token: CollectToken) {
         send_command(CollectCommand::SubmitSpans(SubmitSpans {
             spans,

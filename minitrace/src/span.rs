@@ -60,17 +60,16 @@ impl Span {
     }
 
     #[inline]
-    pub fn enter_with_parent(
-        event: &'static str,
-        parent: &Span,
-        #[cfg(test)] collect: GlobalCollect,
-    ) -> Self {
-        Self::enter_with_parents(
-            event,
-            [parent],
-            #[cfg(test)]
-            collect,
-        )
+    pub fn enter_with_parent(event: &'static str, parent: &Span) -> Self {
+        match &parent.inner {
+            Some(_inner) => Self::enter_with_parents(
+                event,
+                [parent],
+                #[cfg(test)]
+                _inner.collect.clone(),
+            ),
+            None => Span::new_noop(),
+        }
     }
 
     #[inline]
@@ -231,5 +230,85 @@ impl Drop for Span {
             raw_span.end_with(end_instant);
             collect.submit_spans(SpanSet::Span(raw_span), collect_token);
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::collector::MockGlobalCollect;
+    use crate::util::tree::{t, Tree};
+
+    use std::sync::Mutex;
+
+    use futures::executor::block_on;
+    use mockall::{predicate, Sequence};
+    use rand::seq::SliceRandom;
+    use rand::thread_rng;
+
+    #[test]
+    fn noop_basic() {
+        let span = Span::new_noop();
+        let stack = Rc::new(RefCell::new(LocalSpanStack::with_capacity(16)));
+        assert!(span.attach_into_stack(&stack).is_none());
+        assert!(stack.borrow_mut().enter_span("span1").is_none());
+    }
+
+    #[test]
+    fn span_with_parent() {
+        let routine = |collect| {
+            let (root_span, root_collector) = Span::root("root", collect);
+            let child1 = Span::enter_with_parent("child1", &root_span);
+            let grandchild = Span::enter_with_parent("grandchild", &child1);
+            let child2 = Span::enter_with_parent("child2", &root_span);
+
+            crossbeam::scope(move |scope| {
+                let mut rng = thread_rng();
+                let mut spans = [root_span, child1, grandchild, child2];
+                spans.shuffle(&mut rng);
+                for span in spans {
+                    scope.spawn(|_| drop(span));
+                }
+            })
+            .unwrap();
+
+            let _ = block_on(root_collector.collect());
+        };
+
+        let mut mock = MockGlobalCollect::new();
+        let mut seq = Sequence::new();
+        let span_sets = Arc::new(Mutex::new(Vec::new()));
+        mock.expect_start_collect()
+            .times(1)
+            .in_sequence(&mut seq)
+            .with(predicate::eq(CollectArgs::default()))
+            .return_const(42_u32);
+        mock.expect_submit_spans()
+            .times(4)
+            .in_sequence(&mut seq)
+            .withf(|_, collect_token| collect_token.len() == 1 && collect_token[0].collect_id == 42)
+            .returning({
+                let span_sets = span_sets.clone();
+                move |span_set, token| span_sets.lock().unwrap().push((span_set, token))
+            });
+        mock.expect_commit_collect()
+            .times(1)
+            .in_sequence(&mut seq)
+            .with(predicate::eq(42_u32))
+            .return_const(vec![]);
+        mock.expect_drop_collect().times(0);
+
+        routine(Arc::new(mock));
+        let span_sets = std::mem::take(&mut *span_sets.lock().unwrap());
+        assert_eq!(
+            Tree::from_span_sets(span_sets.as_slice()).as_slice(),
+            &[(
+                42_u32,
+                t(
+                    "root",
+                    [t("child1", [t("grandchild", [])]), t("child2", [])]
+                )
+            )]
+        );
     }
 }

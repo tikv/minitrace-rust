@@ -93,6 +93,7 @@ impl SpanQueue {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::util::tree::{t, tp, Tree};
 
     #[test]
     fn span_queue_basic() {
@@ -109,15 +110,10 @@ mod tests {
             }
             queue.finish_span(span1);
         }
-        let mut raw_spans = queue.take_queue().into_inner().1;
-        raw_spans.sort_unstable_by(|a, b| a.id.0.cmp(&b.id.0));
-        assert_eq!(raw_spans.len(), 3);
-        assert_eq!(raw_spans[0].event, "span1");
-        assert_eq!(raw_spans[0].parent_id, SpanId(0));
-        assert_eq!(raw_spans[1].event, "span2");
-        assert_eq!(raw_spans[1].parent_id, raw_spans[0].id);
-        assert_eq!(raw_spans[2].event, "span3");
-        assert_eq!(raw_spans[2].parent_id, raw_spans[1].id);
+        assert_eq!(
+            Tree::from_raw_spans(queue.take_queue()).as_slice(),
+            &[t("span1", [t("span2", [t("span3", [])])])]
+        );
     }
 
     #[test]
@@ -133,16 +129,14 @@ mod tests {
             }
             queue.finish_span(span1);
         }
-        let mut raw_spans = queue.take_queue().into_inner().1;
-        raw_spans.sort_unstable_by(|a, b| a.id.0.cmp(&b.id.0));
-        assert_eq!(raw_spans.len(), 2);
-        assert_eq!(raw_spans[0].event, "span1");
         assert_eq!(
-            raw_spans[0].properties,
-            vec![("k1", "v1".to_owned()), ("k2", "v2".to_owned())]
+            Tree::from_raw_spans(queue.take_queue()).as_slice(),
+            &[tp(
+                "span1",
+                [tp("span2", [], [("k1", "v1".to_owned())])],
+                [("k1", "v1".to_owned()), ("k2", "v2".to_owned())]
+            )]
         );
-        assert_eq!(raw_spans[1].event, "span2");
-        assert_eq!(raw_spans[1].properties, vec![("k1", "v1".to_owned())]);
     }
 
     #[test]
@@ -157,15 +151,10 @@ mod tests {
                 }
             }
         }
-        let mut raw_spans = queue.take_queue().into_inner().1;
-        raw_spans.sort_unstable_by(|a, b| a.id.0.cmp(&b.id.0));
-        assert_eq!(raw_spans.len(), 3);
-        assert_eq!(raw_spans[0].event, "span1");
-        assert_eq!(raw_spans[0].parent_id, SpanId(0));
-        assert_eq!(raw_spans[1].event, "span2");
-        assert_eq!(raw_spans[1].parent_id, raw_spans[0].id);
-        assert_eq!(raw_spans[2].event, "span3");
-        assert_eq!(raw_spans[2].parent_id, raw_spans[1].id);
+        assert_eq!(
+            Tree::from_raw_spans(queue.take_queue()).as_slice(),
+            &[t("span1", [t("span2", [t("span3", [])])])]
+        );
     }
 
     #[test]
@@ -202,18 +191,10 @@ mod tests {
             queue.finish_span(span1);
         }
         assert!(queue.start_span("span5").is_none());
-
-        let mut raw_spans = queue.take_queue().into_inner().1;
-        raw_spans.sort_unstable_by(|a, b| a.id.0.cmp(&b.id.0));
-        assert_eq!(raw_spans.len(), 4);
-        assert_eq!(raw_spans[0].event, "span1");
-        assert_eq!(raw_spans[0].parent_id, SpanId(0));
-        assert_eq!(raw_spans[1].event, "span2");
-        assert_eq!(raw_spans[1].parent_id, raw_spans[0].id);
-        assert_eq!(raw_spans[2].event, "span3");
-        assert_eq!(raw_spans[2].parent_id, raw_spans[1].id);
-        assert_eq!(raw_spans[3].event, "span4");
-        assert_eq!(raw_spans[3].parent_id, raw_spans[2].id);
+        assert_eq!(
+            Tree::from_raw_spans(queue.take_queue()).as_slice(),
+            &[t("span1", [t("span2", [t("span3", [t("span4", [])])])])]
+        );
     }
 
     #[test]
@@ -263,22 +244,16 @@ mod tests {
             queue.finish_span(span7);
             assert_eq!(queue.current_span_id(), None);
         }
-        let mut raw_spans = queue.take_queue().into_inner().1;
-        raw_spans.sort_unstable_by(|a, b| a.id.0.cmp(&b.id.0));
-        assert_eq!(raw_spans.len(), 7);
-        assert_eq!(raw_spans[0].event, "span1");
-        assert_eq!(raw_spans[0].parent_id, SpanId(0));
-        assert_eq!(raw_spans[1].event, "span2");
-        assert_eq!(raw_spans[1].parent_id, SpanId(0));
-        assert_eq!(raw_spans[2].event, "span3");
-        assert_eq!(raw_spans[2].parent_id, raw_spans[1].id);
-        assert_eq!(raw_spans[3].event, "span4");
-        assert_eq!(raw_spans[3].parent_id, raw_spans[1].id);
-        assert_eq!(raw_spans[4].event, "span5");
-        assert_eq!(raw_spans[4].parent_id, raw_spans[3].id);
-        assert_eq!(raw_spans[5].event, "span6");
-        assert_eq!(raw_spans[5].parent_id, raw_spans[4].id);
-        assert_eq!(raw_spans[6].event, "span7");
-        assert_eq!(raw_spans[6].parent_id, SpanId(0));
+        assert_eq!(
+            Tree::from_raw_spans(queue.take_queue()).as_slice(),
+            &[
+                t("span1", []),
+                t(
+                    "span2",
+                    [t("span3", []), t("span4", [t("span5", [t("span6", []),]),])]
+                ),
+                t("span7", []),
+            ]
+        );
     }
 }

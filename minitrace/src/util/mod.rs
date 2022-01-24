@@ -3,6 +3,9 @@
 pub mod object_pool;
 pub mod spsc;
 
+#[cfg(test)]
+pub mod tree;
+
 use std::cell::RefCell;
 
 use once_cell::sync::Lazy;
