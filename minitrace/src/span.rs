@@ -19,13 +19,13 @@ use minstant::Instant;
 #[must_use]
 #[derive(Debug)]
 pub struct Span {
-    pub(crate) inner: Option<SpanInner>,
+    inner: Option<SpanInner>,
 }
 
 #[derive(Debug)]
-pub(crate) struct SpanInner {
-    pub(crate) raw_span: RawSpan,
-    pub(crate) collect_token: CollectToken,
+struct SpanInner {
+    raw_span: RawSpan,
+    collect_token: CollectToken,
     collect: GlobalCollect,
 }
 

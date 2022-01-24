@@ -63,7 +63,10 @@ pub trait FutureExt: std::future::Future + Sized {
     /// [`Future`]:(std::future::Future)
     #[inline]
     fn in_span(self, span: Span) -> InSpan<Self> {
-        InSpan::new(self, span)
+        InSpan {
+            inner: self,
+            span: Some(span),
+        }
     }
 
     /// Start a [`LocalSpan`] at every [`Future::poll()`]. It will create multiple _short_ spans if the future get polled multiple times.
@@ -103,15 +106,6 @@ pub struct InSpan<T> {
     #[pin]
     inner: T,
     span: Option<Span>,
-}
-
-impl<T: std::future::Future> InSpan<T> {
-    pub(crate) fn new(f: T, span: Span) -> Self {
-        Self {
-            inner: f,
-            span: Some(span),
-        }
-    }
 }
 
 impl<T: std::future::Future> std::future::Future for InSpan<T> {
