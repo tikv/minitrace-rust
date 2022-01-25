@@ -2,11 +2,10 @@
 
 //! A module for relationship checking in test
 
-use crate::collector::SpanSet;
+use crate::collector::{SpanRecord, SpanSet};
 use crate::local::span_id::SpanId;
 use crate::util::{CollectToken, RawSpans};
 
-use crate::prelude::SpanRecord;
 use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
 
