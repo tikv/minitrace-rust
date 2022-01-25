@@ -37,7 +37,7 @@ thread_local! {
 #[derive(Default, Clone, Debug)]
 pub(crate) struct GlobalCollect;
 
-#[mockall::automock]
+#[cfg_attr(test, mockall::automock)]
 impl GlobalCollect {
     pub fn start_collect(&self, collect_args: CollectArgs) -> u32 {
         let collect_id = NEXT_COLLECT_ID.fetch_add(1, Ordering::AcqRel);

@@ -65,6 +65,7 @@
 //!
 //!   ```
 //!   use minitrace::prelude::*;
+//!   use futures::executor::block_on;
 //!
 //!   let (root, collector) = Span::root("root");
 //!
@@ -81,6 +82,37 @@
 //!       // The parent of this span is `span1`.
 //!       let _span2 = LocalSpan::enter_with_local_parent("a child span of child span");
 //!   }
+//!
+//!   drop(root);
+//!   let records: Vec<SpanRecord> = block_on(collector.collect());
+//!
+//!   println!("{records:#?}");
+//!   // [
+//!   //     SpanRecord {
+//!   //         id: 1,
+//!   //         parent_id: 0,
+//!   //         begin_unix_time_ns: 1643101008017429580,
+//!   //         duration_ns: 64132,
+//!   //         event: "root",
+//!   //         properties: [],
+//!   //     },
+//!   //     SpanRecord {
+//!   //         id: 2,
+//!   //         parent_id: 1,
+//!   //         begin_unix_time_ns: 1643101008017486383,
+//!   //         duration_ns: 4150,
+//!   //         event: "a child span",
+//!   //         properties: [],
+//!   //     },
+//!   //     SpanRecord {
+//!   //         id: 3,
+//!   //         parent_id: 2,
+//!   //         begin_unix_time_ns: 1643101008017488703,
+//!   //         duration_ns: 1318,
+//!   //         event: "a child span of child span",
+//!   //         properties: [],
+//!   //     },
+//!   // ]
 //!   ```
 //!
 //!
@@ -135,6 +167,7 @@
 //!   //     },
 //!   // ]
 //!   ```
+//!
 //!
 //! ## Macro
 //!
