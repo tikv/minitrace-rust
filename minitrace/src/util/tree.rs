@@ -6,6 +6,7 @@ use crate::collector::SpanSet;
 use crate::local::span_id::SpanId;
 use crate::util::{CollectToken, RawSpans};
 
+use crate::prelude::SpanRecord;
 use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
 
@@ -181,6 +182,31 @@ impl Tree {
         res
     }
 
+    pub fn from_span_records(span_records: Vec<SpanRecord>) -> Tree {
+        let mut children = HashMap::new();
+
+        children.insert(SpanId::default(), ("", vec![], vec![]));
+        for span in &span_records {
+            children.insert(
+                SpanId::new(span.id),
+                (span.event, vec![], span.properties.clone()),
+            );
+        }
+        for span in &span_records {
+            children
+                .get_mut(&SpanId::new(span.parent_id))
+                .as_mut()
+                .unwrap()
+                .1
+                .push(SpanId::new(span.id));
+        }
+
+        let mut t = Self::build_tree(SpanId::default(), &mut children);
+        t.sort();
+        assert_eq!(t.children.len(), 1);
+        t.children.remove(0)
+    }
+
     #[allow(clippy::type_complexity)]
     fn build_tree(
         id: SpanId,
@@ -212,4 +238,8 @@ pub fn tree_str_from_span_sets(span_sets: &[(SpanSet, CollectToken)]) -> String 
         .map(|(id, t)| format!("\n#{}\n{}", id, t))
         .collect::<Vec<_>>()
         .join("")
+}
+
+pub fn tree_str_from_span_records(span_records: Vec<SpanRecord>) -> String {
+    format!("\n{}", Tree::from_span_records(span_records))
 }

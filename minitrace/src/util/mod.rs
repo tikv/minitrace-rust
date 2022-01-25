@@ -2,8 +2,7 @@
 
 pub mod object_pool;
 pub mod spsc;
-
-#[cfg(test)]
+#[doc(hidden)]
 pub mod tree;
 
 use std::cell::RefCell;
@@ -13,6 +12,7 @@ use once_cell::sync::Lazy;
 use crate::collector::CollectTokenItem;
 use crate::local::raw_span::RawSpan;
 use crate::util::object_pool::{Pool, Puller, Reusable};
+use std::iter::FromIterator;
 
 static RAW_SPANS_POOL: Lazy<Pool<Vec<RawSpan>>> = Lazy::new(|| Pool::new(Vec::new, Vec::clear));
 static COLLECT_TOKEN_ITEMS_POOL: Lazy<Pool<Vec<CollectTokenItem>>> =
@@ -36,20 +36,20 @@ pub(crate) fn new_collect_token(items: impl IntoIterator<Item = CollectTokenItem
     token
 }
 
-impl<Iter: IntoIterator<Item = CollectTokenItem>> From<Iter> for CollectToken {
-    fn from(iter: Iter) -> Self {
+impl FromIterator<CollectTokenItem> for CollectToken {
+    fn from_iter<T: IntoIterator<Item = CollectTokenItem>>(iter: T) -> Self {
         new_collect_token(iter)
+    }
+}
+
+impl<'a> FromIterator<&'a CollectTokenItem> for CollectToken {
+    fn from_iter<T: IntoIterator<Item = &'a CollectTokenItem>>(iter: T) -> Self {
+        new_collect_token(iter.into_iter().copied())
     }
 }
 
 impl From<CollectTokenItem> for CollectToken {
     fn from(item: CollectTokenItem) -> Self {
         new_collect_token([item])
-    }
-}
-
-impl From<CollectTokenItem> for Option<CollectToken> {
-    fn from(item: CollectTokenItem) -> Self {
-        Some(new_collect_token([item]))
     }
 }

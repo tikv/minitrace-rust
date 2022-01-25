@@ -91,7 +91,7 @@ mod tests {
             parent_id_of_roots: SpanId::new(9527),
             collect_id: 42,
         };
-        let collector = LocalCollector::new(token.into(), stack.clone());
+        let collector = LocalCollector::new(Some(token.into()), stack.clone());
 
         {
             let _g = LocalSpan::enter_with_stack("span1", stack.clone());
@@ -121,7 +121,7 @@ span1 []
             parent_id_of_roots: SpanId::new(9527),
             collect_id: 42,
         };
-        let collector = LocalCollector::new(token.into(), stack.clone());
+        let collector = LocalCollector::new(Some(token.into()), stack.clone());
 
         {
             let span1 = LocalSpan::enter_with_stack("span1", stack.clone());

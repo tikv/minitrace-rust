@@ -84,7 +84,7 @@ impl Span {
             .into_iter()
             .filter_map(|span| span.inner.as_ref())
             .flat_map(|inner| inner.issue_collect_token())
-            .into();
+            .collect();
         Self::new(token, event, collect)
     }
 
@@ -185,13 +185,13 @@ impl SpanInner {
 
     #[inline]
     fn capture_local_spans(&self, stack: Rc<RefCell<LocalSpanStack>>) -> Guard<impl FnOnce()> {
-        let token = self.issue_collect_token().into();
+        let token = self.issue_collect_token().collect();
         let collector = LocalCollector::new(Some(token), stack);
         let collect = self.collect.clone();
         Guard::new(move || {
             let (spans, token) = collector.collect_with_token();
             debug_assert!(token.is_some());
-            let token = token.unwrap_or_else(|| None.into());
+            let token = token.unwrap_or_else(|| [].iter().collect());
 
             if !spans.spans.is_empty() {
                 collect.submit_spans(SpanSet::LocalSpans(spans), token);
@@ -203,7 +203,7 @@ impl SpanInner {
     fn push_child_spans(&self, local_spans: Arc<LocalSpans>) {
         self.collect.submit_spans(
             SpanSet::SharedLocalSpans(local_spans),
-            self.issue_collect_token().into(),
+            self.issue_collect_token().collect(),
         );
     }
 
@@ -369,7 +369,7 @@ root []
         mock.expect_commit_collect()
             .times(5)
             .in_sequence(&mut seq)
-            .with(predicate::in_iter([1_u32, 2_u32, 3_u32, 4_u32, 5_u32]))
+            .with(predicate::in_iter([1_u32, 2, 3, 4, 5]))
             .return_const(vec![]);
         mock.expect_drop_collect().times(0);
 
@@ -461,7 +461,7 @@ parent5 []
         mock.expect_commit_collect()
             .times(5)
             .in_sequence(&mut seq)
-            .with(predicate::in_iter([1_u32, 2_u32, 3_u32, 4_u32, 5_u32]))
+            .with(predicate::in_iter([1_u32, 2, 3, 4, 5]))
             .return_const(vec![]);
         mock.expect_drop_collect().times(0);
 

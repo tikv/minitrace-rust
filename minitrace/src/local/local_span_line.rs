@@ -68,7 +68,7 @@ impl SpanLine {
                         .unwrap_or(item.parent_id_of_roots),
                     collect_id: item.collect_id,
                 })
-                .into()
+                .collect()
         })
     }
 
@@ -129,7 +129,7 @@ span1 []
             parent_id_of_roots: SpanId::new(9528),
             collect_id: 43,
         };
-        let token = [token1, token2].into();
+        let token = [token1, token2].iter().collect();
         let mut span_line = SpanLine::new(16, 1, Some(token));
 
         let current_token = span_line.current_collect_token().unwrap();
@@ -191,7 +191,7 @@ span []
             parent_id_of_roots: SpanId::default(),
             collect_id: 42,
         };
-        let mut span_line1 = SpanLine::new(16, 1, item.into());
+        let mut span_line1 = SpanLine::new(16, 1, Some(item.into()));
         let mut span_line2 = SpanLine::new(16, 2, None);
         assert_eq!(span_line1.span_line_epoch(), 1);
         assert_eq!(span_line2.span_line_epoch(), 2);

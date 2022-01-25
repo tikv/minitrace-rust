@@ -143,7 +143,7 @@ mod tests {
                 parent_id_of_roots: SpanId::new(9527),
                 collect_id: 42,
             };
-            let collector2 = LocalCollector::new(token2.into(), stack.clone());
+            let collector2 = LocalCollector::new(Some(token2.into()), stack.clone());
             let span2 = stack.borrow_mut().enter_span("span2").unwrap();
             let span3 = stack.borrow_mut().enter_span("span3").unwrap();
             stack.borrow_mut().exit_span(span3);
@@ -180,7 +180,7 @@ span1 []
                 parent_id_of_roots: SpanId::new(9527),
                 collect_id: 42,
             };
-            let collector2 = LocalCollector::new(token2.into(), stack.clone());
+            let collector2 = LocalCollector::new(Some(token2.into()), stack.clone());
             let span2 = stack.borrow_mut().enter_span("span2").unwrap();
             let span3 = stack.borrow_mut().enter_span("span3").unwrap();
             stack.borrow_mut().exit_span(span3);
