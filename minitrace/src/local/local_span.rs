@@ -101,7 +101,7 @@ mod tests {
             }
         }
 
-        let (spans, collect_token) = collector.collect_with_token();
+        let (spans, collect_token) = collector.collect_spans_and_token();
         assert_eq!(collect_token.unwrap().as_slice(), &[token]);
         assert_eq!(
             tree_str_from_raw_spans(spans.spans),
@@ -133,6 +133,6 @@ span1 []
             }
         }
 
-        let _ = collector.collect_with_token();
+        let _ = collector.collect_spans_and_token();
     }
 }

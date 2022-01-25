@@ -189,7 +189,7 @@ impl SpanInner {
         let collector = LocalCollector::new(Some(token), stack);
         let collect = self.collect.clone();
         Guard::new(move || {
-            let (spans, token) = collector.collect_with_token();
+            let (spans, token) = collector.collect_spans_and_token();
             debug_assert!(token.is_some());
             let token = token.unwrap_or_else(|| [].iter().collect());
 

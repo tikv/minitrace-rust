@@ -84,10 +84,10 @@ impl LocalCollector {
     }
 
     pub fn collect(self) -> LocalSpans {
-        self.collect_with_token().0
+        self.collect_spans_and_token().0
     }
 
-    pub(crate) fn collect_with_token(mut self) -> (LocalSpans, Option<CollectToken>) {
+    pub(crate) fn collect_spans_and_token(mut self) -> (LocalSpans, Option<CollectToken>) {
         let (spans, collect_token) = self
             .inner
             .take()
@@ -149,7 +149,7 @@ mod tests {
             stack.borrow_mut().exit_span(span3);
             stack.borrow_mut().exit_span(span2);
 
-            let (spans, token) = collector2.collect_with_token();
+            let (spans, token) = collector2.collect_spans_and_token();
             assert_eq!(token.unwrap().as_slice(), &[token2]);
             assert_eq!(
                 tree_str_from_raw_spans(spans.spans),
