@@ -34,6 +34,14 @@ thread_local! {
     };
 }
 
+fn send_command(cmd: CollectCommand) {
+    COMMAND_SENDER.with(|sender| sender.send(cmd).ok());
+}
+
+fn force_send_command(cmd: CollectCommand) {
+    COMMAND_SENDER.with(|sender| sender.force_send(cmd));
+}
+
 #[derive(Default, Clone, Debug)]
 pub(crate) struct GlobalCollect;
 
@@ -61,7 +69,7 @@ impl GlobalCollect {
         force_send_command(CollectCommand::DropCollect(DropCollect { collect_id }));
     }
 
-    /// Note that: relationships are not built completely here, and a further job is needed.
+    /// Note that: relationships are not built completely for now, and a further job is needed.
     ///
     /// Every `SpanSet` has its own root span**s** whose `raw_span.parent_id`s are equal to
     /// `SpanId::default()`, and such a root span can have multiple parents where mainly comes
@@ -82,14 +90,6 @@ impl GlobalCollect {
             collect_token,
         }));
     }
-}
-
-fn send_command(cmd: CollectCommand) {
-    COMMAND_SENDER.with(|sender| sender.send(cmd).ok());
-}
-
-fn force_send_command(cmd: CollectCommand) {
-    COMMAND_SENDER.with(|sender| sender.force_send(cmd));
 }
 
 #[derive(Debug)]
@@ -190,14 +190,10 @@ impl GlobalCollector {
                 if let Some((buf, span_count, collect_args)) =
                     self.active_collectors.get_mut(&item.collect_id)
                 {
-                    if item.parent_id_of_roots == SpanId::default() {
-                        // the root span
-                        *span_count += spans.len();
-                        buf.push(SpanCollection::Owned {
-                            spans,
-                            parent_id: SpanId::default(),
-                        });
-                    } else if *span_count < collect_args.max_span_count.unwrap_or(usize::MAX) {
+                    // The root span, i.e. the span whose parent id is `SpanId::default`, is intended to be kept.
+                    if *span_count < collect_args.max_span_count.unwrap_or(usize::MAX)
+                        || item.parent_id_of_roots == SpanId::default()
+                    {
                         *span_count += spans.len();
                         buf.push(SpanCollection::Owned {
                             spans,
@@ -211,6 +207,8 @@ impl GlobalCollector {
                     if let Some((buf, span_count, collect_args)) =
                         self.active_collectors.get_mut(&item.collect_id)
                     {
+                        // Multiple items in a collect token are built from `Span::enter_from_parents`,
+                        // so relative span cannot be a root span.
                         if *span_count < collect_args.max_span_count.unwrap_or(usize::MAX) {
                             *span_count += spans.len();
                             buf.push(SpanCollection::Shared {
