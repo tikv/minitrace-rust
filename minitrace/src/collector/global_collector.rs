@@ -69,21 +69,32 @@ impl GlobalCollect {
         force_send_command(CollectCommand::DropCollect(DropCollect { collect_id }));
     }
 
-    /// Note that: relationships are not built completely for now, and a further job is needed.
+    /// Note that: relationships are not built completely for now so a further job is needed.
     ///
-    /// Every `SpanSet` has its own root span**s** whose `raw_span.parent_id`s are equal to
-    /// `SpanId::default()`, and such a root span can have multiple parents where mainly comes
-    /// from [`Span::enter_with_parents`].
+    /// Every `SpanSet` has its own root spans whose `raw_span.parent_id`s are equal to `SpanId::default()`.
     ///
-    /// Parents of root spans are recorded into `CollectToken` which has several `CollectTokenItem`s.
-    /// Look into a `CollectTokenItem`, `parent_id_of_roots` is found.
+    /// Every root span can have multiple parents where mainly comes from `Span::enter_with_parents`.
+    /// Those parents are recorded into `CollectToken` which has several `CollectTokenItem`s. Look into
+    /// a `CollectTokenItem`, `parent_id_of_roots` can be found.
+    ///
+    /// For example, we have a `SpanSet::LocalSpans` and a `CollectToken` as follow:
+    ///
+    ///     SpanSet::LocalSpans::spans                        CollectToken::parent_id_of_roots
+    ///     +------+-----------+-----+                      +------------+--------------------+
+    ///     |  id  | parent_id | ... |                      | collect_id | parent_id_of_roots |
+    ///     +------+-----------+-----+                      +------------+--------------------+
+    ///     |  43  |    545    | ... |                      |    1212    |          7         |
+    ///     |  15  |  default  | ... | <- root span         |    874     |         321        |
+    ///     | 545  |    15     | ... |                      |    915     |         413        |
+    ///     |  70  |  default  | ... | <- root span         +------------+--------------------+
+    ///     +------+-----------+-----+
+    ///
+    /// There is a many-to-many mapping. Span#15 has parents Span#7, Span#321 and Span#413, so does Span#70.
     ///
     /// So the expected further job mentioned above is:
     /// * Copy `SpanSet` to the same number of copies as `CollectTokenItem`s, one `SpanSet` to one
     ///   `CollectTokenItem`
     /// * Amend `raw_span.parent_id` of root spans in `SpanSet` to `parent_id_of_roots` of `CollectTokenItem`
-    ///
-    /// [`Span::enter_with_parents`]: crate::Span::enter_with_parents
     pub fn submit_spans(&self, spans: SpanSet, collect_token: CollectToken) {
         send_command(CollectCommand::SubmitSpans(SubmitSpans {
             spans,
