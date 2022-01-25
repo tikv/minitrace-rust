@@ -121,7 +121,7 @@ mod tests {
     use super::*;
     use crate::collector::CollectTokenItem;
     use crate::local::span_id::SpanId;
-    use crate::util::tree::{t, Tree};
+    use crate::util::tree::tree_str_from_raw_spans;
 
     #[test]
     fn span_stack_basic() {
@@ -159,16 +159,22 @@ mod tests {
             let (spans, collect_token) = span_stack.unregister_and_collect(span_line2).unwrap();
             assert_eq!(collect_token.unwrap().as_slice(), &[token2]);
             assert_eq!(
-                Tree::from_raw_spans(spans).as_slice(),
-                &[t("span3", [t("span4", [])])]
+                tree_str_from_raw_spans(spans),
+                r"
+span3 []
+    span4 []
+"
             );
         }
 
         let (spans, collect_token) = span_stack.unregister_and_collect(span_line1).unwrap();
         assert_eq!(collect_token.unwrap().as_slice(), &[token1]);
         assert_eq!(
-            Tree::from_raw_spans(spans).as_slice(),
-            &[t("span1", [t("span2", [])])]
+            tree_str_from_raw_spans(spans),
+            r"
+span1 []
+    span2 []
+"
         );
     }
 

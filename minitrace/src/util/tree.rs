@@ -7,6 +7,7 @@ use crate::local::span_id::SpanId;
 use crate::util::{CollectToken, RawSpans};
 
 use std::collections::HashMap;
+use std::fmt::{Display, Formatter};
 
 #[derive(Debug, PartialOrd, PartialEq, Ord, Eq)]
 pub struct Tree {
@@ -15,23 +16,26 @@ pub struct Tree {
     properties: Vec<(&'static str, String)>,
 }
 
-pub fn t(event: &'static str, children: impl IntoIterator<Item = Tree>) -> Tree {
-    Tree {
-        event,
-        children: children.into_iter().collect(),
-        properties: vec![],
+impl Display for Tree {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        self.fmt_with_depth(f, 0)
     }
 }
 
-pub fn tp(
-    event: &'static str,
-    children: impl IntoIterator<Item = Tree>,
-    properties: impl IntoIterator<Item = (&'static str, String)>,
-) -> Tree {
-    Tree {
-        event,
-        children: children.into_iter().collect(),
-        properties: properties.into_iter().collect(),
+impl Tree {
+    fn fmt_with_depth(&self, f: &mut Formatter<'_>, depth: usize) -> std::fmt::Result {
+        writeln!(
+            f,
+            "{:indent$}{} {:?}",
+            "",
+            self.event,
+            self.properties,
+            indent = depth * 4
+        )?;
+        for child in &self.children {
+            child.fmt_with_depth(f, depth + 1)?;
+        }
+        Ok(())
     }
 }
 
@@ -192,4 +196,20 @@ impl Tree {
             properties,
         }
     }
+}
+
+pub fn tree_str_from_raw_spans(raw_spans: RawSpans) -> String {
+    Tree::from_raw_spans(raw_spans)
+        .iter()
+        .map(|t| format!("\n{}", t))
+        .collect::<Vec<_>>()
+        .join("")
+}
+
+pub fn tree_str_from_span_sets(span_sets: &[(SpanSet, CollectToken)]) -> String {
+    Tree::from_span_sets(span_sets)
+        .iter()
+        .map(|(id, t)| format!("\n#{}\n{}", id, t))
+        .collect::<Vec<_>>()
+        .join("")
 }

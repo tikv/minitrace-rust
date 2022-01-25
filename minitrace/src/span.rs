@@ -237,12 +237,12 @@ impl Drop for Span {
 mod tests {
     use super::*;
     use crate::collector::MockGlobalCollect;
-    use crate::util::tree::{t, tp, Tree};
+    use crate::local::LocalSpan;
+    use crate::util::tree::tree_str_from_span_sets;
 
     use std::sync::atomic::{AtomicU32, Ordering};
     use std::sync::Mutex;
 
-    use crate::local::LocalSpan;
     use futures::executor::block_on;
     use mockall::{predicate, Sequence};
     use rand::seq::SliceRandom;
@@ -304,17 +304,14 @@ mod tests {
         routine(Arc::new(mock));
         let span_sets = std::mem::take(&mut *span_sets.lock().unwrap());
         assert_eq!(
-            Tree::from_span_sets(span_sets.as_slice()).as_slice(),
-            &[(
-                42_u32,
-                t(
-                    "root",
-                    [
-                        tp("child1", [t("grandchild", [])], [("k1", "v1".to_owned())]),
-                        t("child2", [])
-                    ]
-                )
-            )]
+            tree_str_from_span_sets(span_sets.as_slice()),
+            r#"
+#42
+root []
+    child1 [("k1", "v1")]
+        grandchild []
+    child2 []
+"#
         );
     }
 
@@ -379,35 +376,30 @@ mod tests {
         routine(Arc::new(mock));
         let span_sets = std::mem::take(&mut *span_sets.lock().unwrap());
         assert_eq!(
-            Tree::from_span_sets(span_sets.as_slice()).as_slice(),
-            &[
-                (
-                    1_u32,
-                    t("parent1", [tp("child2", [], [("k1", "v1".to_owned())])])
-                ),
-                (
-                    2_u32,
-                    t("parent2", [tp("child2", [], [("k1", "v1".to_owned())])])
-                ),
-                (
-                    3_u32,
-                    t("parent3", [tp("child2", [], [("k1", "v1".to_owned())])])
-                ),
-                (
-                    4_u32,
-                    t("parent4", [tp("child2", [], [("k1", "v1".to_owned())])])
-                ),
-                (
-                    5_u32,
-                    t(
-                        "parent5",
-                        [
-                            t("child1", [tp("child2", [], [("k1", "v1".to_owned())])]),
-                            tp("child2", [], [("k1", "v1".to_owned())])
-                        ]
-                    )
-                ),
-            ]
+            tree_str_from_span_sets(span_sets.as_slice()),
+            r#"
+#1
+parent1 []
+    child2 [("k1", "v1")]
+
+#2
+parent2 []
+    child2 [("k1", "v1")]
+
+#3
+parent3 []
+    child2 [("k1", "v1")]
+
+#4
+parent4 []
+    child2 [("k1", "v1")]
+
+#5
+parent5 []
+    child1 []
+        child2 [("k1", "v1")]
+    child2 [("k1", "v1")]
+"#
         );
     }
 
@@ -476,14 +468,28 @@ mod tests {
         routine(Arc::new(mock));
         let span_sets = std::mem::take(&mut *span_sets.lock().unwrap());
         assert_eq!(
-            Tree::from_span_sets(span_sets.as_slice()).as_slice(),
-            &[
-                (1_u32, t("parent1", [t("child", [])])),
-                (2_u32, t("parent2", [t("child", [])])),
-                (3_u32, t("parent3", [t("child", [])])),
-                (4_u32, t("parent4", [t("child", [])])),
-                (5_u32, t("parent5", [t("child", [])])),
-            ]
+            tree_str_from_span_sets(span_sets.as_slice()),
+            r"
+#1
+parent1 []
+    child []
+
+#2
+parent2 []
+    child []
+
+#3
+parent3 []
+    child []
+
+#4
+parent4 []
+    child []
+
+#5
+parent5 []
+    child []
+"
         );
     }
 
@@ -534,11 +540,14 @@ mod tests {
         routine(Arc::new(mock));
         let span_sets = std::mem::take(&mut *span_sets.lock().unwrap());
         assert_eq!(
-            Tree::from_span_sets(span_sets.as_slice()).as_slice(),
-            &[(
-                42_u32,
-                t("root", [t("child", [t("grandchild", [])]), t("local", [])])
-            ),]
+            tree_str_from_span_sets(span_sets.as_slice()),
+            r#"
+#42
+root []
+    child []
+        grandchild []
+    local []
+"#
         );
     }
 }

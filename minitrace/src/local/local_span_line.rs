@@ -89,7 +89,7 @@ pub struct LocalSpanHandle {
 mod tests {
     use super::*;
     use crate::local::span_id::SpanId;
-    use crate::util::tree::{t, tp, Tree};
+    use crate::util::tree::tree_str_from_raw_spans;
 
     #[test]
     fn span_line_basic() {
@@ -110,11 +110,12 @@ mod tests {
         let (spans, collect_token) = span_line.collect(1).unwrap();
         assert!(collect_token.is_none());
         assert_eq!(
-            Tree::from_raw_spans(spans).as_slice(),
-            &[t(
-                "span1",
-                [t("span2", [tp("span3", [], [("k1", "v1".to_owned())])])]
-            )]
+            tree_str_from_raw_spans(spans),
+            r#"
+span1 []
+    span2 []
+        span3 [("k1", "v1")]
+"#
         );
     }
 
@@ -157,7 +158,12 @@ mod tests {
 
         let (spans, collect_token) = span_line.collect(1).unwrap();
         assert_eq!(collect_token.unwrap().as_slice(), &[token1, token2]);
-        assert_eq!(Tree::from_raw_spans(spans).as_slice(), &[t("span", [])]);
+        assert_eq!(
+            tree_str_from_raw_spans(spans),
+            r#"
+span []
+"#
+        );
     }
 
     #[test]

@@ -93,7 +93,7 @@ impl SpanQueue {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::util::tree::{t, tp, Tree};
+    use crate::util::tree::tree_str_from_raw_spans;
 
     #[test]
     fn span_queue_basic() {
@@ -111,8 +111,12 @@ mod tests {
             queue.finish_span(span1);
         }
         assert_eq!(
-            Tree::from_raw_spans(queue.take_queue()).as_slice(),
-            &[t("span1", [t("span2", [t("span3", [])])])]
+            tree_str_from_raw_spans(queue.take_queue()),
+            r"
+span1 []
+    span2 []
+        span3 []
+"
         );
     }
 
@@ -130,12 +134,11 @@ mod tests {
             queue.finish_span(span1);
         }
         assert_eq!(
-            Tree::from_raw_spans(queue.take_queue()).as_slice(),
-            &[tp(
-                "span1",
-                [tp("span2", [], [("k1", "v1".to_owned())])],
-                [("k1", "v1".to_owned()), ("k2", "v2".to_owned())]
-            )]
+            tree_str_from_raw_spans(queue.take_queue()),
+            r#"
+span1 [("k1", "v1"), ("k2", "v2")]
+    span2 [("k1", "v1")]
+"#
         );
     }
 
@@ -152,8 +155,12 @@ mod tests {
             }
         }
         assert_eq!(
-            Tree::from_raw_spans(queue.take_queue()).as_slice(),
-            &[t("span1", [t("span2", [t("span3", [])])])]
+            tree_str_from_raw_spans(queue.take_queue()),
+            r"
+span1 []
+    span2 []
+        span3 []
+"
         );
     }
 
@@ -192,8 +199,13 @@ mod tests {
         }
         assert!(queue.start_span("span5").is_none());
         assert_eq!(
-            Tree::from_raw_spans(queue.take_queue()).as_slice(),
-            &[t("span1", [t("span2", [t("span3", [t("span4", [])])])])]
+            tree_str_from_raw_spans(queue.take_queue()),
+            r"
+span1 []
+    span2 []
+        span3 []
+            span4 []
+"
         );
     }
 
@@ -245,15 +257,18 @@ mod tests {
             assert_eq!(queue.current_span_id(), None);
         }
         assert_eq!(
-            Tree::from_raw_spans(queue.take_queue()).as_slice(),
-            &[
-                t("span1", []),
-                t(
-                    "span2",
-                    [t("span3", []), t("span4", [t("span5", [t("span6", []),]),])]
-                ),
-                t("span7", []),
-            ]
+            tree_str_from_raw_spans(queue.take_queue()),
+            r"
+span1 []
+
+span2 []
+    span3 []
+    span4 []
+        span5 []
+            span6 []
+
+span7 []
+"
         );
     }
 }

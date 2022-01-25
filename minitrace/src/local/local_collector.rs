@@ -130,7 +130,7 @@ mod tests {
     use super::*;
     use crate::collector::CollectTokenItem;
     use crate::local::span_id::SpanId;
-    use crate::util::tree::{t, Tree};
+    use crate::util::tree::tree_str_from_raw_spans;
 
     #[test]
     fn local_collector_basic() {
@@ -152,15 +152,20 @@ mod tests {
             let (spans, token) = collector2.collect_with_token();
             assert_eq!(token.unwrap().as_slice(), &[token2]);
             assert_eq!(
-                Tree::from_raw_spans(spans.spans).as_slice(),
-                &[t("span2", [t("span3", [])])]
+                tree_str_from_raw_spans(spans.spans),
+                r"
+span2 []
+    span3 []
+"
             );
         }
         stack.borrow_mut().exit_span(span1);
         let spans = collector1.collect();
         assert_eq!(
-            Tree::from_raw_spans(spans.spans).as_slice(),
-            &[t("span1", [])]
+            tree_str_from_raw_spans(spans.spans),
+            r"
+span1 []
+"
         );
     }
 
@@ -185,8 +190,10 @@ mod tests {
         stack.borrow_mut().exit_span(span1);
         let spans = collector1.collect();
         assert_eq!(
-            Tree::from_raw_spans(spans.spans).as_slice(),
-            &[t("span1", [])]
+            tree_str_from_raw_spans(spans.spans),
+            r"
+span1 []
+"
         );
     }
 }

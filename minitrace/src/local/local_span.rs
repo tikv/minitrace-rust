@@ -78,7 +78,7 @@ mod tests {
     use crate::local::local_span_stack::LocalSpanStack;
     use crate::local::span_id::SpanId;
     use crate::local::LocalCollector;
-    use crate::util::tree::{t, tp, Tree};
+    use crate::util::tree::tree_str_from_raw_spans;
 
     use std::cell::RefCell;
     use std::rc::Rc;
@@ -104,8 +104,11 @@ mod tests {
         let (spans, collect_token) = collector.collect_with_token();
         assert_eq!(collect_token.unwrap().as_slice(), &[token]);
         assert_eq!(
-            Tree::from_raw_spans(spans.spans).as_slice(),
-            &[t("span1", [tp("span2", [], [("k1", "v1".to_owned())])])]
+            tree_str_from_raw_spans(spans.spans),
+            r#"
+span1 []
+    span2 [("k1", "v1")]
+"#
         );
     }
 
