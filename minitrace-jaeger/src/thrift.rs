@@ -3,6 +3,7 @@
 //! Thrift components defined in [jaeger.thrift].
 //!
 //! [jaeger.thrift]: https://github.com/uber/jaeger-idl/blob/master/thrift/jaeger.thrift
+
 use thrift_codec::data::{Field, List, Struct};
 use thrift_codec::message::Message;
 

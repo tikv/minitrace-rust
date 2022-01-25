@@ -1,7 +1,7 @@
 // Copyright 2021 TiKV Project Authors. Licensed under Apache-2.0.
 
 use crate::local::local_span_stack::{LocalSpanStack, SpanLineHandle, LOCAL_SPAN_STACK};
-use crate::util::{alloc_raw_spans, CollectToken, RawSpans};
+use crate::util::{CollectToken, RawSpans};
 
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -100,7 +100,7 @@ impl LocalCollector {
                     s.unregister_and_collect(span_line_handle)
                 },
             )
-            .unwrap_or_else(|| (alloc_raw_spans(), None));
+            .unwrap_or_default();
 
         (
             LocalSpans {

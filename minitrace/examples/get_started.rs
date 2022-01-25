@@ -1,8 +1,9 @@
 // Copyright 2022 TiKV Project Authors. Licensed under Apache-2.0.
 
+use std::net::SocketAddr;
+
 use futures::executor::block_on;
 use minitrace::prelude::*;
-use std::net::SocketAddr;
 
 fn main() {
     let collector = {

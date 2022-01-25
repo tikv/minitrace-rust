@@ -45,9 +45,10 @@
 
 mod thrift;
 
-use minitrace::prelude::*;
 use std::error::Error;
 use std::net::SocketAddr;
+
+use minitrace::prelude::*;
 use thrift_codec::message::Message;
 use thrift_codec::CompactEncode;
 

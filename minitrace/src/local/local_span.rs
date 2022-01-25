@@ -1,10 +1,10 @@
 // Copyright 2021 TiKV Project Authors. Licensed under Apache-2.0.
 
-use std::cell::RefCell;
-use std::rc::Rc;
-
 use crate::local::local_span_line::LocalSpanHandle;
 use crate::local::local_span_stack::{LocalSpanStack, LOCAL_SPAN_STACK};
+
+use std::cell::RefCell;
+use std::rc::Rc;
 
 #[must_use]
 pub struct LocalSpan {

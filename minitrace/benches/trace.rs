@@ -3,7 +3,6 @@
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use minitrace::local::LocalCollector;
 use minitrace::prelude::*;
-use minitrace_macro::trace;
 
 fn dummy_iter(i: usize) {
     #[trace("")]

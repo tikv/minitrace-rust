@@ -1,7 +1,8 @@
 // Copyright 2022 TiKV Project Authors. Licensed under Apache-2.0.
 
-use parking_lot::Mutex;
 use std::ops::{Deref, DerefMut};
+
+use parking_lot::Mutex;
 
 pub struct Pool<T> {
     objects: Mutex<Vec<T>>,

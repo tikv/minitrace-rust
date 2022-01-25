@@ -2,7 +2,7 @@
 
 use crate::local::raw_span::RawSpan;
 use crate::local::span_id::{DefaultIdGenerator, SpanId};
-use crate::util::{alloc_raw_spans, RawSpans};
+use crate::util::RawSpans;
 
 use minstant::Instant;
 
@@ -20,9 +20,8 @@ pub struct SpanHandle {
 
 impl SpanQueue {
     pub fn with_capacity(capacity: usize) -> Self {
-        let span_queue = alloc_raw_spans();
         Self {
-            span_queue,
+            span_queue: RawSpans::default(),
             capacity,
             next_parent_id: None,
         }
@@ -59,7 +58,7 @@ impl SpanQueue {
         let span = &mut self.span_queue[span_handle.index];
         span.end_with(Instant::now());
 
-        self.next_parent_id = Some(span.parent_id).filter(|id| id.0 != 0);
+        self.next_parent_id = Some(span.parent_id).filter(|id| id != SpanId::default());
     }
 
     #[inline]

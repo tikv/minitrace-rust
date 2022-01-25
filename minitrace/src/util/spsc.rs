@@ -1,7 +1,8 @@
 // Copyright 2022 TiKV Project Authors. Licensed under Apache-2.0.
 
-use parking_lot::Mutex;
 use std::sync::Arc;
+
+use parking_lot::Mutex;
 
 pub fn bounded<T>(capacity: usize) -> (Sender<T>, Receiver<T>) {
     let page = Arc::new(Mutex::new(Vec::with_capacity(capacity)));
