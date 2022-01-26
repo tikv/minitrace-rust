@@ -12,7 +12,7 @@ Provides an attribute-macro `trace` to help get rid of boilerplate.
 
 ```toml
 [dependencies]
-minitrace = "0.3" # minitrace-macro is within minitrace::prelude
+minitrace = "0.4" # minitrace-macro is within minitrace::prelude
 ```
 
 ### Synchronous Function

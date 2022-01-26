@@ -10,8 +10,8 @@ Builtin [Datadog](https://docs.datadoghq.com/tracing/) reporter for minitrace.
 
 ```toml
 [dependencies]
-minitrace = "0.3"
-minitrace-datadog = "0.3"
+minitrace = "0.4"
+minitrace-datadog = "0.4"
 ```
 
 ## Setup Datadog Agent
