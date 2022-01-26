@@ -1,72 +1,138 @@
 // Copyright 2021 TiKV Project Authors. Licensed under Apache-2.0.
 
-use std::marker::PhantomData;
+use crate::local::local_span_line::LocalSpanHandle;
+use crate::local::local_span_stack::{LocalSpanStack, LOCAL_SPAN_STACK};
 
-use crate::local::local_span_line::{LocalSpanHandle, LOCAL_SPAN_STACK};
+use std::cell::RefCell;
+use std::rc::Rc;
 
 #[must_use]
 pub struct LocalSpan {
-    span_handle: Option<LocalSpanHandle>,
+    inner: Option<LocalSpanInner>,
+}
 
-    // Identical to
-    // ```
-    // impl !Sync for LocalSpan {}
-    // impl !Send for LocalSpan {}
-    // ```
-    //
-    // TODO: Replace it once feature `negative_impls` is stable.
-    _p: PhantomData<*const ()>,
+struct LocalSpanInner {
+    stack: Rc<RefCell<LocalSpanStack>>,
+    span_handle: LocalSpanHandle,
 }
 
 impl LocalSpan {
     #[inline]
     pub fn enter_with_local_parent(event: &'static str) -> Self {
-        LOCAL_SPAN_STACK.with(|span_line| {
-            let mut span_line = span_line.borrow_mut();
-            let span_handle = span_line.enter_span(event);
-            Self {
-                span_handle,
-                _p: Default::default(),
-            }
-        })
+        let stack = LOCAL_SPAN_STACK.with(Rc::clone);
+        Self::enter_with_stack(event, stack)
     }
 
     #[inline]
-    #[must_use]
-    #[allow(clippy::double_must_use)]
-    pub fn with_property<F>(&mut self, property: F) -> &mut Self
+    pub fn add_property<F>(&mut self, property: F)
     where
         F: FnOnce() -> (&'static str, String),
     {
-        self.with_properties(|| [property()])
+        self.add_properties(|| [property()]);
     }
 
     #[inline]
-    #[must_use]
-    #[allow(clippy::double_must_use)]
-    pub fn with_properties<I, F>(&mut self, properties: F) -> &mut Self
+    pub fn add_properties<I, F>(&mut self, properties: F)
     where
         I: IntoIterator<Item = (&'static str, String)>,
         F: FnOnce() -> I,
     {
-        if let Some(local_span_handle) = &self.span_handle {
-            LOCAL_SPAN_STACK.with(|span_stack| {
-                let span_stack = &mut *span_stack.borrow_mut();
-                span_stack.add_properties(local_span_handle, properties)
-            })
+        if let Some(LocalSpanInner { stack, span_handle }) = &self.inner {
+            let span_stack = &mut *stack.borrow_mut();
+            span_stack.add_properties(span_handle, properties);
         }
-        self
+    }
+}
+
+impl LocalSpan {
+    #[inline]
+    pub(crate) fn enter_with_stack(
+        event: &'static str,
+        stack: Rc<RefCell<LocalSpanStack>>,
+    ) -> Self {
+        let span_handle = {
+            let mut stack = stack.borrow_mut();
+            stack.enter_span(event)
+        };
+
+        let inner = span_handle.map(|span_handle| LocalSpanInner { stack, span_handle });
+
+        Self { inner }
     }
 }
 
 impl Drop for LocalSpan {
     #[inline]
     fn drop(&mut self) {
-        if let Some(span_handle) = self.span_handle.take() {
-            LOCAL_SPAN_STACK.with(|span_stack| {
-                let mut span_stack = span_stack.borrow_mut();
-                span_stack.exit_span(span_handle);
-            });
+        if let Some(LocalSpanInner { stack, span_handle }) = self.inner.take() {
+            let mut span_stack = stack.borrow_mut();
+            span_stack.exit_span(span_handle);
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::collector::CollectTokenItem;
+    use crate::local::local_span_stack::LocalSpanStack;
+    use crate::local::span_id::SpanId;
+    use crate::local::LocalCollector;
+    use crate::util::tree::tree_str_from_raw_spans;
+
+    use std::cell::RefCell;
+    use std::rc::Rc;
+
+    #[test]
+    fn local_span_basic() {
+        let stack = Rc::new(RefCell::new(LocalSpanStack::with_capacity(16)));
+
+        let token = CollectTokenItem {
+            parent_id_of_roots: SpanId::new(9527),
+            collect_id: 42,
+        };
+        let collector = LocalCollector::new(Some(token.into()), stack.clone());
+
+        {
+            let _g = LocalSpan::enter_with_stack("span1", stack.clone());
+            {
+                let mut span = LocalSpan::enter_with_stack("span2", stack);
+                span.add_property(|| ("k1", "v1".to_owned()));
+            }
+        }
+
+        let (spans, collect_token) = collector.collect_spans_and_token();
+        assert_eq!(collect_token.unwrap().as_slice(), &[token]);
+        assert_eq!(
+            tree_str_from_raw_spans(spans.spans),
+            r#"
+span1 []
+    span2 [("k1", "v1")]
+"#
+        );
+    }
+
+    #[test]
+    #[should_panic]
+    fn drop_out_of_order() {
+        let stack = Rc::new(RefCell::new(LocalSpanStack::with_capacity(16)));
+
+        let token = CollectTokenItem {
+            parent_id_of_roots: SpanId::new(9527),
+            collect_id: 42,
+        };
+        let collector = LocalCollector::new(Some(token.into()), stack.clone());
+
+        {
+            let span1 = LocalSpan::enter_with_stack("span1", stack.clone());
+            {
+                let mut span2 = LocalSpan::enter_with_stack("span2", stack);
+                span2.add_property(|| ("k1", "v1".to_owned()));
+
+                drop(span1);
+            }
+        }
+
+        let _ = collector.collect_spans_and_token();
     }
 }

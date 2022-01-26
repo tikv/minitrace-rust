@@ -34,8 +34,8 @@ async fn main() {
 
     let f = async {
         let jhs = {
-            let _s = LocalSpan::enter_with_local_parent("a span")
-                .with_property(|| ("a property", "a value".to_owned()));
+            let mut span = LocalSpan::enter_with_local_parent("a span");
+            span.add_property(|| ("a property", "a value".to_owned()));
             parallel_job()
         };
 

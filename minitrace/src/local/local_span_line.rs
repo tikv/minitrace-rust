@@ -1,155 +1,227 @@
 // Copyright 2020 TiKV Project Authors. Licensed under Apache-2.0.
 
-use std::cell::RefCell;
-
-use minstant::Instant;
-
-use crate::collector::global_collector::SpanSet;
-use crate::collector::{global_collector, ParentSpan};
-use crate::local::local_collector::LocalCollector;
+use crate::collector::CollectTokenItem;
 use crate::local::span_queue::{SpanHandle, SpanQueue};
-use crate::local::LocalSpans;
-use crate::util::{alloc_parent_spans, ParentSpans, RawSpans};
+use crate::util::{CollectToken, RawSpans};
 
-thread_local! {
-    pub(crate) static LOCAL_SPAN_STACK: RefCell<LocalSpanStack> = RefCell::new(LocalSpanStack::new());
-}
-
-pub(crate) struct LocalSpanStack {
-    span_lines: Vec<SpanLine>,
-    next_local_collector_epoch: usize,
-}
-
-pub(crate) struct SpanLine {
+pub struct SpanLine {
     span_queue: SpanQueue,
-    local_collector_epoch: usize,
-    parents: Option<ParentSpans>,
+    epoch: usize,
+    collect_token: Option<CollectToken>,
 }
 
-pub(crate) struct LocalSpanHandle {
-    local_collector_epoch: usize,
-    span_handle: SpanHandle,
-}
-
-impl LocalSpanStack {
-    #[inline]
-    pub fn new() -> Self {
+impl SpanLine {
+    pub fn new(
+        capacity: usize,
+        span_line_epoch: usize,
+        collect_token: Option<CollectToken>,
+    ) -> Self {
         Self {
-            span_lines: Vec::new(),
-            next_local_collector_epoch: 0,
+            span_queue: SpanQueue::with_capacity(capacity),
+            epoch: span_line_epoch,
+            collect_token,
         }
     }
 
     #[inline]
-    pub fn current_span_line(&mut self) -> Option<&mut SpanLine> {
-        self.span_lines.last_mut()
+    pub fn span_line_epoch(&self) -> usize {
+        self.epoch
     }
 
     #[inline]
-    pub fn enter_span(&mut self, event: &'static str) -> Option<LocalSpanHandle> {
-        let span_line = self.current_span_line()?;
-
+    pub fn start_span(&mut self, event: &'static str) -> Option<LocalSpanHandle> {
         Some(LocalSpanHandle {
-            span_handle: span_line.span_queue.start_span(event),
-            local_collector_epoch: span_line.local_collector_epoch,
+            span_handle: self.span_queue.start_span(event)?,
+            span_line_epoch: self.epoch,
         })
     }
 
     #[inline]
-    pub fn exit_span(&mut self, local_span_handle: LocalSpanHandle) {
-        if let Some(span_line) = self.current_span_line() {
-            debug_assert_eq!(
-                span_line.local_collector_epoch,
-                local_span_handle.local_collector_epoch
-            );
-
-            if span_line.local_collector_epoch == local_span_handle.local_collector_epoch {
-                span_line
-                    .span_queue
-                    .finish_span(local_span_handle.span_handle);
-            }
+    pub fn finish_span(&mut self, handle: LocalSpanHandle) {
+        if self.epoch == handle.span_line_epoch {
+            self.span_queue.finish_span(handle.span_handle);
         }
     }
 
     #[inline]
-    pub fn register_local_collector(&mut self, parents: Option<ParentSpans>) -> LocalCollector {
-        let epoch = self.next_local_collector_epoch;
-        self.next_local_collector_epoch = self.next_local_collector_epoch.wrapping_add(1);
-
-        let span_line = SpanLine {
-            span_queue: SpanQueue::new(),
-            local_collector_epoch: epoch,
-            parents,
-        };
-
-        self.span_lines.push(span_line);
-
-        LocalCollector::new(epoch)
-    }
-
-    // Raw spans will be sent to acquirers directly and return None if parent span exists.
-    pub fn unregister_and_collect(&mut self, local_collector: &LocalCollector) -> Option<RawSpans> {
-        debug_assert_eq!(
-            self.current_span_line()
-                .map(|span_line| span_line.local_collector_epoch),
-            Some(local_collector.local_collector_epoch)
-        );
-
-        let mut span_line = self.span_lines.pop()?;
-        if span_line.local_collector_epoch == local_collector.local_collector_epoch {
-            let raw_spans = span_line.span_queue.take_queue();
-
-            if let Some(parents) = span_line.parents.take() {
-                if !raw_spans.is_empty() {
-                    let local_spans = LocalSpans {
-                        spans: raw_spans,
-                        end_time: Instant::now(),
-                    };
-
-                    global_collector::submit_spans(SpanSet::LocalSpans(local_spans), parents);
-                }
-                None
-            } else {
-                Some(raw_spans)
-            }
-        } else {
-            None
-        }
-    }
-
-    #[inline]
-    pub fn add_properties<I, F>(&mut self, local_span_handle: &LocalSpanHandle, properties: F)
+    pub fn add_properties<I, F>(&mut self, handle: &LocalSpanHandle, properties: F)
     where
         I: IntoIterator<Item = (&'static str, String)>,
         F: FnOnce() -> I,
     {
-        debug_assert!(self.current_span_line().is_some());
-
-        if let Some(span_line) = self.current_span_line() {
-            debug_assert_eq!(
-                span_line.local_collector_epoch,
-                local_span_handle.local_collector_epoch
-            );
-
-            if span_line.local_collector_epoch == local_span_handle.local_collector_epoch {
-                span_line
-                    .span_queue
-                    .add_properties(&local_span_handle.span_handle, properties());
-            }
+        if self.epoch == handle.span_line_epoch {
+            self.span_queue
+                .add_properties(&handle.span_handle, properties());
         }
+    }
+
+    #[inline]
+    pub fn current_collect_token(&self) -> Option<CollectToken> {
+        self.collect_token.as_ref().map(|collect_token| {
+            collect_token
+                .iter()
+                .map(|item| CollectTokenItem {
+                    parent_id_of_roots: self
+                        .span_queue
+                        .current_span_id()
+                        .unwrap_or(item.parent_id_of_roots),
+                    collect_id: item.collect_id,
+                })
+                .collect()
+        })
+    }
+
+    #[inline]
+    pub fn collect(self, span_line_epoch: usize) -> Option<(RawSpans, Option<CollectToken>)> {
+        (self.epoch == span_line_epoch)
+            .then(move || (self.span_queue.take_queue(), self.collect_token))
     }
 }
 
-impl SpanLine {
-    #[inline]
-    pub fn current_parents(&self) -> Option<ParentSpans> {
-        self.parents.as_ref().map(|parents| {
-            let mut parents_spans = alloc_parent_spans();
-            parents_spans.extend(parents.iter().map(|parent| ParentSpan {
-                span_id: self.span_queue.next_parent_id.unwrap_or(parent.span_id),
-                collect_id: parent.collect_id,
-            }));
-            parents_spans
-        })
+pub struct LocalSpanHandle {
+    pub span_line_epoch: usize,
+    span_handle: SpanHandle,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::local::span_id::SpanId;
+    use crate::util::tree::tree_str_from_raw_spans;
+
+    #[test]
+    fn span_line_basic() {
+        let mut span_line = SpanLine::new(16, 1, None);
+        {
+            let span1 = span_line.start_span("span1").unwrap();
+            {
+                let span2 = span_line.start_span("span2").unwrap();
+                {
+                    let span3 = span_line.start_span("span3").unwrap();
+                    span_line.add_properties(&span3, || [("k1", "v1".to_owned())]);
+                    span_line.finish_span(span3);
+                }
+                span_line.finish_span(span2);
+            }
+            span_line.finish_span(span1);
+        }
+        let (spans, collect_token) = span_line.collect(1).unwrap();
+        assert!(collect_token.is_none());
+        assert_eq!(
+            tree_str_from_raw_spans(spans),
+            r#"
+span1 []
+    span2 []
+        span3 [("k1", "v1")]
+"#
+        );
+    }
+
+    #[test]
+    fn current_collect_token() {
+        let token1 = CollectTokenItem {
+            parent_id_of_roots: SpanId::new(9527),
+            collect_id: 42,
+        };
+        let token2 = CollectTokenItem {
+            parent_id_of_roots: SpanId::new(9528),
+            collect_id: 43,
+        };
+        let token = [token1, token2].iter().collect();
+        let mut span_line = SpanLine::new(16, 1, Some(token));
+
+        let current_token = span_line.current_collect_token().unwrap();
+        assert_eq!(current_token.as_slice(), &[token1, token2]);
+
+        let span = span_line.start_span("span").unwrap();
+        let current_token = span_line.current_collect_token().unwrap();
+        assert_eq!(current_token.len(), 2);
+        assert_eq!(
+            current_token.as_slice(),
+            &[
+                CollectTokenItem {
+                    parent_id_of_roots: span_line.span_queue.current_span_id().unwrap(),
+                    collect_id: 42,
+                },
+                CollectTokenItem {
+                    parent_id_of_roots: span_line.span_queue.current_span_id().unwrap(),
+                    collect_id: 43,
+                }
+            ]
+        );
+        span_line.finish_span(span);
+
+        let current_token = span_line.current_collect_token().unwrap();
+        assert_eq!(current_token.as_slice(), &[token1, token2]);
+
+        let (spans, collect_token) = span_line.collect(1).unwrap();
+        assert_eq!(collect_token.unwrap().as_slice(), &[token1, token2]);
+        assert_eq!(
+            tree_str_from_raw_spans(spans),
+            r#"
+span []
+"#
+        );
+    }
+
+    #[test]
+    fn unmatched_epoch_add_properties() {
+        let mut span_line1 = SpanLine::new(16, 1, None);
+        let mut span_line2 = SpanLine::new(16, 2, None);
+        assert_eq!(span_line1.span_line_epoch(), 1);
+        assert_eq!(span_line2.span_line_epoch(), 2);
+
+        let span = span_line1.start_span("span").unwrap();
+        span_line2.add_properties(&span, || [("k1", "v1".to_owned())]);
+        span_line1.finish_span(span);
+
+        let raw_spans = span_line1.collect(1).unwrap().0.into_inner().1;
+        assert_eq!(raw_spans.len(), 1);
+        assert_eq!(raw_spans[0].properties.len(), 0);
+
+        let raw_spans = span_line2.collect(2).unwrap().0.into_inner().1;
+        assert!(raw_spans.is_empty());
+    }
+
+    #[test]
+    fn unmatched_epoch_finish_span() {
+        let item = CollectTokenItem {
+            parent_id_of_roots: SpanId::default(),
+            collect_id: 42,
+        };
+        let mut span_line1 = SpanLine::new(16, 1, Some(item.into()));
+        let mut span_line2 = SpanLine::new(16, 2, None);
+        assert_eq!(span_line1.span_line_epoch(), 1);
+        assert_eq!(span_line2.span_line_epoch(), 2);
+
+        let span = span_line1.start_span("span").unwrap();
+        let token_before_finish = span_line1.current_collect_token().unwrap();
+        span_line2.finish_span(span);
+
+        let token_after_finish = span_line1.current_collect_token().unwrap();
+        // the span failed to finish
+        assert_eq!(
+            token_before_finish.as_slice(),
+            token_after_finish.as_slice()
+        );
+
+        let (spans, collect_token) = span_line1.collect(1).unwrap();
+        let collect_token = collect_token.unwrap();
+        assert_eq!(collect_token.as_slice(), &[item]);
+        assert_eq!(spans.into_inner().1.len(), 1);
+
+        let (spans, collect_token) = span_line2.collect(2).unwrap();
+        assert!(collect_token.is_none());
+        assert!(spans.into_inner().1.is_empty());
+    }
+
+    #[test]
+    fn unmatched_epoch_collect() {
+        let span_line1 = SpanLine::new(16, 1, None);
+        let span_line2 = SpanLine::new(16, 2, None);
+        assert_eq!(span_line1.span_line_epoch(), 1);
+        assert_eq!(span_line2.span_line_epoch(), 2);
+        assert!(span_line1.collect(2).is_none());
+        assert!(span_line2.collect(1).is_none());
     }
 }

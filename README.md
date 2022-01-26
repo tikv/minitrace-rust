@@ -1,6 +1,7 @@
 # minitrace
 
 [![Actions Status](https://github.com/tikv/minitrace-rust/workflows/CI/badge.svg)](https://github.com/tikv/minitrace-rust/actions)
+[![Coverage Status](https://coveralls.io/repos/github/tikv/minitrace-rust/badge.svg?branch=master)](https://coveralls.io/github/tikv/minitrace-rust?branch=master)
 [![Documentation](https://docs.rs/minitrace/badge.svg)](https://docs.rs/minitrace/)
 [![Crates.io](https://img.shields.io/crates/v/minitrace.svg)](https://crates.io/crates/minitrace)
 [![LICENSE](https://img.shields.io/github/license/tikv/minitrace-rust.svg)](https://github.com/tikv/minitrace-rust/blob/master/LICENSE)

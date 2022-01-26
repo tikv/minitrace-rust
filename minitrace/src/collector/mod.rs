@@ -2,9 +2,29 @@
 
 //! Collector and the collected spans.
 
-pub(crate) mod global_collector;
+pub(crate) mod command;
 
+use crate::local::raw_span::RawSpan;
 use crate::local::span_id::SpanId;
+use crate::local::LocalSpans;
+use crate::util::CollectToken;
+
+use std::sync::Arc;
+
+#[allow(dead_code)]
+mod global_collector;
+#[cfg(not(test))]
+pub(crate) use global_collector::GlobalCollect;
+#[cfg(test)]
+pub(crate) use global_collector::MockGlobalCollect;
+#[cfg(test)]
+pub(crate) type GlobalCollect = Arc<MockGlobalCollect>;
+
+pub enum SpanSet {
+    Span(RawSpan),
+    LocalSpans(LocalSpans),
+    SharedLocalSpans(Arc<LocalSpans>),
+}
 
 /// A span record been collected.
 #[derive(Clone, Debug, Default)]
@@ -17,10 +37,11 @@ pub struct SpanRecord {
     pub properties: Vec<(&'static str, String)>,
 }
 
-#[derive(Debug, Clone, Copy)]
-pub(crate) struct ParentSpan {
-    pub(crate) span_id: SpanId,
-    pub(crate) collect_id: u32,
+#[doc(hidden)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+pub struct CollectTokenItem {
+    pub parent_id_of_roots: SpanId,
+    pub collect_id: u32,
 }
 
 /// The collector for collecting all spans of a request.
@@ -39,14 +60,25 @@ pub(crate) struct ParentSpan {
 /// let records: Vec<SpanRecord> = block_on(collector.collect());
 /// ```
 pub struct Collector {
-    collect_id: u32,
+    collect_id: Option<u32>,
+    collect: GlobalCollect,
 }
 
 impl Collector {
-    pub(crate) fn start_collect(args: CollectArgs) -> (Self, u32) {
-        let collect_id = global_collector::start_collect(args);
+    pub(crate) fn start_collect(args: CollectArgs, collect: GlobalCollect) -> (Self, CollectToken) {
+        let collect_id = collect.start_collect(args);
 
-        (Collector { collect_id }, collect_id)
+        (
+            Collector {
+                collect_id: Some(collect_id),
+                collect,
+            },
+            CollectTokenItem {
+                parent_id_of_roots: SpanId::default(),
+                collect_id,
+            }
+            .into(),
+        )
     }
 
     /// Stop the trace and collect all span been recorded.
@@ -55,20 +87,19 @@ impl Collector {
     /// work are moved to a background thread, and thus, we have to wait for the background thread to send
     /// the result back. It usually takes 10 milliseconds because the background thread wakes up and processes
     /// messages every 10 milliseconds.
-    pub async fn collect(self) -> Vec<SpanRecord> {
-        let (tx, rx) = futures::channel::oneshot::channel();
-        global_collector::commit_collect(self.collect_id, tx);
-
-        // Because the collect is committed, don't drop the collect.
-        std::mem::forget(self);
-
-        rx.await.unwrap_or_else(|_| Vec::new())
+    pub async fn collect(mut self) -> Vec<SpanRecord> {
+        match self.collect_id.take() {
+            Some(collect_id) => self.collect.commit_collect(collect_id).await,
+            None => Vec::default(),
+        }
     }
 }
 
 impl Drop for Collector {
     fn drop(&mut self) {
-        global_collector::drop_collect(self.collect_id);
+        if let Some(collect_id) = self.collect_id {
+            self.collect.drop_collect(collect_id);
+        }
     }
 }
 
@@ -76,7 +107,7 @@ impl Drop for Collector {
 ///
 /// Customize collection behavior through [`Span::root_with_args()`](crate::Span::root_with_args).
 #[must_use]
-#[derive(Default, Debug)]
+#[derive(Default, Debug, Copy, Clone, Eq, PartialEq)]
 pub struct CollectArgs {
     pub(crate) max_span_count: Option<usize>,
 }
@@ -98,5 +129,76 @@ impl CollectArgs {
     /// ```
     pub fn max_span_count(self, max_span_count: Option<usize>) -> Self {
         Self { max_span_count }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::collector::CollectTokenItem;
+    use futures::executor::block_on;
+    use mockall::{predicate, Sequence};
+
+    #[test]
+    fn collector_basic() {
+        let mut mock = MockGlobalCollect::new();
+        let mut seq = Sequence::new();
+        mock.expect_start_collect()
+            .times(1)
+            .in_sequence(&mut seq)
+            .with(predicate::eq(CollectArgs::default()))
+            .return_const(42_u32);
+        mock.expect_commit_collect()
+            .times(1)
+            .in_sequence(&mut seq)
+            .with(predicate::eq(42_u32))
+            .return_const(vec![SpanRecord {
+                id: 9527,
+                event: "span",
+                ..SpanRecord::default()
+            }]);
+        mock.expect_submit_spans().times(0);
+        mock.expect_drop_collect().times(0);
+
+        let mock = Arc::new(mock);
+        let (collector, token) = Collector::start_collect(CollectArgs::default(), mock);
+        assert_eq!(
+            token.into_inner().1.as_slice(),
+            &[CollectTokenItem {
+                parent_id_of_roots: SpanId::default(),
+                collect_id: 42
+            }]
+        );
+        let spans = block_on(collector.collect());
+        assert_eq!(spans.len(), 1);
+        assert_eq!(spans[0].id, 9527);
+        assert_eq!(spans[0].event, "span");
+    }
+
+    #[test]
+    fn drop_collector() {
+        let mut mock = MockGlobalCollect::new();
+        let mut seq = Sequence::new();
+        mock.expect_start_collect()
+            .times(1)
+            .in_sequence(&mut seq)
+            .return_const(42_u32);
+        mock.expect_drop_collect()
+            .times(1)
+            .in_sequence(&mut seq)
+            .with(predicate::eq(42_u32))
+            .return_const(());
+        mock.expect_commit_collect().times(0);
+        mock.expect_submit_spans().times(0);
+
+        let mock = Arc::new(mock);
+        let (_collector, token) = Collector::start_collect(CollectArgs::default(), mock);
+        assert_eq!(
+            token.into_inner().1.as_slice(),
+            &[CollectTokenItem {
+                parent_id_of_roots: SpanId::default(),
+                collect_id: 42
+            }]
+        );
     }
 }

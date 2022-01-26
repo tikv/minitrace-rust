@@ -2,31 +2,56 @@
 
 pub mod object_pool;
 pub mod spsc;
+#[doc(hidden)]
+pub mod tree;
 
-use std::cell::RefCell;
-
-use once_cell::sync::Lazy;
-
-use crate::collector::ParentSpan;
+use crate::collector::CollectTokenItem;
 use crate::local::raw_span::RawSpan;
 use crate::util::object_pool::{Pool, Puller, Reusable};
 
+use std::cell::RefCell;
+use std::iter::FromIterator;
+
+use once_cell::sync::Lazy;
+
 static RAW_SPANS_POOL: Lazy<Pool<Vec<RawSpan>>> = Lazy::new(|| Pool::new(Vec::new, Vec::clear));
-static PARENT_SPANS_POOL: Lazy<Pool<Vec<ParentSpan>>> =
+static COLLECT_TOKEN_ITEMS_POOL: Lazy<Pool<Vec<CollectTokenItem>>> =
     Lazy::new(|| Pool::new(Vec::new, Vec::clear));
 
 thread_local! {
     static RAW_SPANS_PULLER: RefCell<Puller<'static, Vec<RawSpan>>> = RefCell::new(RAW_SPANS_POOL.puller(512));
-    static PARENT_SPANS_PULLER: RefCell<Puller<'static, Vec<ParentSpan>>>  = RefCell::new(PARENT_SPANS_POOL.puller(512));
+    static COLLECT_TOKEN_ITEMS_PULLER: RefCell<Puller<'static, Vec<CollectTokenItem>>>  = RefCell::new(COLLECT_TOKEN_ITEMS_POOL.puller(512));
 }
 
-pub(crate) type RawSpans = Reusable<'static, Vec<RawSpan>>;
-pub(crate) type ParentSpans = Reusable<'static, Vec<ParentSpan>>;
+pub type RawSpans = Reusable<'static, Vec<RawSpan>>;
+pub type CollectToken = Reusable<'static, Vec<CollectTokenItem>>;
 
-pub(crate) fn alloc_raw_spans() -> RawSpans {
-    RAW_SPANS_PULLER.with(|puller| puller.borrow_mut().pull())
+impl Default for RawSpans {
+    fn default() -> Self {
+        RAW_SPANS_PULLER.with(|puller| puller.borrow_mut().pull())
+    }
 }
 
-pub(crate) fn alloc_parent_spans() -> ParentSpans {
-    PARENT_SPANS_PULLER.with(|puller| puller.borrow_mut().pull())
+fn new_collect_token(items: impl IntoIterator<Item = CollectTokenItem>) -> CollectToken {
+    let mut token = COLLECT_TOKEN_ITEMS_PULLER.with(|puller| puller.borrow_mut().pull());
+    token.extend(items);
+    token
+}
+
+impl FromIterator<CollectTokenItem> for CollectToken {
+    fn from_iter<T: IntoIterator<Item = CollectTokenItem>>(iter: T) -> Self {
+        new_collect_token(iter)
+    }
+}
+
+impl<'a> FromIterator<&'a CollectTokenItem> for CollectToken {
+    fn from_iter<T: IntoIterator<Item = &'a CollectTokenItem>>(iter: T) -> Self {
+        new_collect_token(iter.into_iter().copied())
+    }
+}
+
+impl From<CollectTokenItem> for CollectToken {
+    fn from(item: CollectTokenItem) -> Self {
+        new_collect_token([item])
+    }
 }

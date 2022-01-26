@@ -1,7 +1,8 @@
 // Copyright 2022 TiKV Project Authors. Licensed under Apache-2.0.
 
-use parking_lot::Mutex;
 use std::sync::Arc;
+
+use parking_lot::Mutex;
 
 pub fn bounded<T>(capacity: usize) -> (Sender<T>, Receiver<T>) {
     let page = Arc::new(Mutex::new(Vec::with_capacity(capacity)));
@@ -55,15 +56,17 @@ impl<T> Receiver<T> {
         match self.received.pop() {
             Some(val) => Ok(Some(val)),
             None => {
-                let is_disconnected = Arc::strong_count(&self.page) < 2;
-                {
-                    let mut page = self.page.lock();
-                    std::mem::swap(&mut *page, &mut self.received);
-                }
+                std::mem::swap(&mut *self.page.lock(), &mut self.received);
                 match self.received.pop() {
                     Some(val) => Ok(Some(val)),
-                    None if is_disconnected => Err(ChannelClosed),
-                    None => Ok(None),
+                    None => {
+                        let is_disconnected = Arc::strong_count(&self.page) < 2;
+                        if is_disconnected {
+                            Err(ChannelClosed)
+                        } else {
+                            Ok(None)
+                        }
+                    }
                 }
             }
         }

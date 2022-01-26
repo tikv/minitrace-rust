@@ -37,7 +37,7 @@ use crate::Span;
 impl<T: std::future::Future> FutureExt for T {}
 
 /// An extension trait for `Futures` that provides tracing instrument adapters.
-pub trait FutureExt: Sized {
+pub trait FutureExt: std::future::Future + Sized {
     /// Bind a [`Span`] to the [`Future`] that keeps clocking until the future drops.
     ///
     /// Besides, it will set the span as the local parent at every poll so that `LocalSpan` becomes available inside the future.
