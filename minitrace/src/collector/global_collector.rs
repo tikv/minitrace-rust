@@ -103,7 +103,6 @@ impl GlobalCollect {
     }
 }
 
-#[derive(Debug)]
 enum SpanCollection {
     Owned {
         spans: SpanSet,

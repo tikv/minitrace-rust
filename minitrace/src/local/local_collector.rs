@@ -41,18 +41,15 @@ use minstant::Instant;
 /// [`Span`]: crate::Span
 /// [`LocalSpan`]: crate::local::LocalSpan
 #[must_use]
-#[derive(Debug, Default)]
 pub struct LocalCollector {
     inner: Option<LocalCollectorInner>,
 }
 
-#[derive(Debug)]
 struct LocalCollectorInner {
     stack: Rc<RefCell<LocalSpanStack>>,
     span_line_handle: SpanLineHandle,
 }
 
-#[derive(Debug)]
 pub struct LocalSpans {
     pub(crate) spans: RawSpans,
     pub(crate) end_time: Instant,

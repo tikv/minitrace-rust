@@ -1,4 +1,3 @@
-ignore:
-  - "./minitrace-datadog"
-  - "./minitrace-jaeger"
-  - "./minitrace-macro"
+source-dir: "minitrace"
+keep-only: "./minitrace"
+ignore-not-existing: true

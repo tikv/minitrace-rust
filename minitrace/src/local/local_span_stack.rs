@@ -13,7 +13,6 @@ thread_local! {
     pub static LOCAL_SPAN_STACK: Rc<RefCell<LocalSpanStack>> = Rc::new(RefCell::new(LocalSpanStack::with_capacity(DEFAULT_SPAN_STACK_SIZE)));
 }
 
-#[derive(Debug)]
 pub struct LocalSpanStack {
     span_lines: Vec<SpanLine>,
     capacity: usize,
@@ -111,7 +110,6 @@ impl LocalSpanStack {
     }
 }
 
-#[derive(Debug)]
 pub struct SpanLineHandle {
     span_line_epoch: usize,
 }

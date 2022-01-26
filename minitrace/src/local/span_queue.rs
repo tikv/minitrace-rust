@@ -6,14 +6,12 @@ use crate::util::RawSpans;
 
 use minstant::Instant;
 
-#[derive(Debug)]
 pub struct SpanQueue {
     span_queue: RawSpans,
     capacity: usize,
     next_parent_id: Option<SpanId>,
 }
 
-#[derive(Debug)]
 pub struct SpanHandle {
     index: usize,
 }

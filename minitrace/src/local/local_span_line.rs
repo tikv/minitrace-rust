@@ -4,7 +4,6 @@ use crate::collector::CollectTokenItem;
 use crate::local::span_queue::{SpanHandle, SpanQueue};
 use crate::util::{CollectToken, RawSpans};
 
-#[derive(Debug)]
 pub struct SpanLine {
     span_queue: SpanQueue,
     epoch: usize,
@@ -79,7 +78,6 @@ impl SpanLine {
     }
 }
 
-#[derive(Debug)]
 pub struct LocalSpanHandle {
     pub span_line_epoch: usize,
     span_handle: SpanHandle,

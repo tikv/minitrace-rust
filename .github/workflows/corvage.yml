@@ -15,14 +15,16 @@ jobs:
         with:
           toolchain: nightly
           override: true
-      - uses: actions-rs/cargo@v1
-        with:
-          command: test
-          args: -p minitrace --all-features --no-fail-fast
+      - name: Run
         env:
           CARGO_INCREMENTAL: '0'
           RUSTFLAGS: '-Zprofile -Ccodegen-units=1 -Cinline-threshold=0 -Clink-dead-code -Coverflow-checks=off -Cpanic=abort -Zpanic_abort_tests'
           RUSTDOCFLAGS: '-Zprofile -Ccodegen-units=1 -Cinline-threshold=0 -Clink-dead-code -Coverflow-checks=off -Cpanic=abort -Zpanic_abort_tests'
+        run: |
+          cargo test -p minitrace --all-features --no-fail-fast
+          cargo run --example synchronous
+          cargo run --example asynchronous
+          cargo run --example get_started
       - id: coverage
         uses: actions-rs/grcov@v0.1
       - name: Coveralls upload
