@@ -1,0 +1,4 @@
+ignore:
+  - "./minitrace-datadog"
+  - "./minitrace-jaeger"
+  - "./minitrace-macro"
