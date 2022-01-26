@@ -1,3 +1,5 @@
-source-dir: "minitrace"
-keep-only: "./minitrace"
+ignore:
+  - "*/.cargo/registry/*"
 ignore-not-existing: true
+branch: true
+llvm: true
