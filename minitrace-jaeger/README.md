@@ -10,8 +10,8 @@ Builtin [Jaeger](https://www.jaegertracing.io/) reporter for minitrace.
 
 ```toml
 [dependencies]
-minitrace = "0.3"
-minitrace-jaeger = "0.3"
+minitrace = "0.4"
+minitrace-jaeger = "0.4"
 ```
 
 ## Setup Jaeger Agent
