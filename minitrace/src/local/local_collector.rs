@@ -50,6 +50,7 @@ struct LocalCollectorInner {
     span_line_handle: SpanLineHandle,
 }
 
+#[derive(Debug)]
 pub struct LocalSpans {
     pub(crate) spans: RawSpans,
     pub(crate) end_time: Instant,

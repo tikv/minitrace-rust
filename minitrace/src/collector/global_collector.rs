@@ -42,7 +42,7 @@ fn force_send_command(cmd: CollectCommand) {
     COMMAND_SENDER.with(|sender| sender.force_send(cmd));
 }
 
-#[derive(Default, Clone, Debug)]
+#[derive(Default, Clone)]
 pub(crate) struct GlobalCollect;
 
 #[cfg_attr(test, mockall::automock)]

@@ -265,7 +265,7 @@ root2 []
 
 #[test]
 fn multiple_spans_without_local_spans() {
-    let (spans1, spans2, spans3) = {
+    let (spans1, spans2) = {
         let (c1, c2, c3) = {
             let (root_span1, collector1) = Span::root("root1");
             let (root_span2, collector2) = Span::root("root2");
@@ -281,16 +281,12 @@ fn multiple_spans_without_local_spans() {
             (collector1, collector2, collector3)
         };
 
-        (
-            block_on(c1.collect()),
-            block_on(c2.collect()),
-            block_on(c3.collect()),
-        )
+        drop(c3);
+        (block_on(c1.collect()), block_on(c2.collect()))
     };
 
     assert_eq!(spans1.len(), 1);
     assert_eq!(spans2.len(), 1);
-    assert_eq!(spans3.len(), 1);
 }
 
 #[test]

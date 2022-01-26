@@ -17,12 +17,10 @@ use minstant::Instant;
 
 /// A thread-safe span.
 #[must_use]
-#[derive(Debug)]
 pub struct Span {
     inner: Option<SpanInner>,
 }
 
-#[derive(Debug)]
 struct SpanInner {
     raw_span: RawSpan,
     collect_token: CollectToken,

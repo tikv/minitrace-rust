@@ -1,5 +1,3 @@
 ignore:
   - "*/.cargo/registry/*"
-ignore-not-existing: true
-branch: true
 llvm: true
