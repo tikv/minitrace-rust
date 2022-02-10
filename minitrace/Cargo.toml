@@ -14,7 +14,6 @@ keywords = ["tracing", "span", "datadog", "jaeger", "opentracing"]
 [dependencies]
 minstant = "0.1"
 minitrace-macro = { path = "../minitrace-macro" }
-crossbeam = "0.8"
 pin-project = "1.0"
 parking_lot = "0.11"
 futures = "0.3"
@@ -25,6 +24,7 @@ retain_mut = "0.1"
 
 [dev-dependencies]
 criterion = { version = "0.3", features = ["html_reports"] }
+crossbeam = "0.8"
 minitrace-jaeger = { path = "../minitrace-jaeger" }
 minitrace-datadog = { path = "../minitrace-datadog" }
 tokio = { version = "1.15", features = ["full"] }
