@@ -550,8 +550,7 @@ fn path_to_string(path: &Path) -> String {
     // some heuristic to prevent too many allocations
     let mut res = String::with_capacity(path.segments.len() * 5);
     for i in 0..path.segments.len() {
-        write!(&mut res, "{}", path.segments[i].ident)
-            .expect("writing to a String should never fail");
+        write!(res, "{}", path.segments[i].ident).expect("writing to a String should never fail");
         if i < path.segments.len() - 1 {
             res.push_str("::");
         }
