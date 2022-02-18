@@ -48,7 +48,7 @@ pub(crate) struct GlobalCollect;
 #[cfg_attr(test, mockall::automock)]
 impl GlobalCollect {
     pub fn start_collect(&self, collect_args: CollectArgs) -> u32 {
-        let collect_id = NEXT_COLLECT_ID.fetch_add(1, Ordering::AcqRel);
+        let collect_id = NEXT_COLLECT_ID.fetch_add(1, Ordering::Relaxed);
         send_command(CollectCommand::StartCollect(StartCollect {
             collect_id,
             collect_args,
