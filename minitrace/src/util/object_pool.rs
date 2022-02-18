@@ -31,16 +31,16 @@ impl<T> Pool<T> {
     }
 
     #[inline]
-    pub fn batch_pull<'a>(&'a self, n: usize, buffer: &mut Vec<Reusable<'a, T>>) {
+    fn batch_pull<'a>(&'a self, n: usize, buffer: &mut Vec<Reusable<'a, T>>) {
         let mut objects = self.objects.lock();
         let len = objects.len();
         buffer.extend(
             objects
                 .drain(len.saturating_sub(n)..)
-                .chain(std::iter::repeat_with(self.init))
-                .take(n)
                 .map(|obj| Reusable::new(self, obj)),
         );
+        drop(objects);
+        buffer.resize_with(n, || Reusable::new(self, (self.init)()));
     }
 
     pub fn puller(&self, buffer_size: usize) -> Puller<T> {
