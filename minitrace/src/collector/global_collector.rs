@@ -127,11 +127,14 @@ pub(crate) struct GlobalCollector {
 
 impl GlobalCollector {
     fn start() -> Self {
-        std::thread::spawn(move || loop {
-            let begin_instant = std::time::Instant::now();
-            GLOBAL_COLLECTOR.lock().handle_commands();
-            std::thread::sleep(COLLECT_LOOP_INTERVAL.saturating_sub(begin_instant.elapsed()));
-        });
+        std::thread::Builder::new()
+            .name("minitrace".to_string())
+            .spawn(move || loop {
+                let begin_instant = std::time::Instant::now();
+                GLOBAL_COLLECTOR.lock().handle_commands();
+                std::thread::sleep(COLLECT_LOOP_INTERVAL.saturating_sub(begin_instant.elapsed()));
+            })
+            .unwrap();
 
         GlobalCollector {
             active_collectors: HashMap::new(),
