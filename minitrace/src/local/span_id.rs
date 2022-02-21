@@ -16,7 +16,7 @@ pub struct DefaultIdGenerator;
 
 static NEXT_ID_PREFIX: AtomicU16 = AtomicU16::new(0);
 fn next_id_prefix() -> u16 {
-    NEXT_ID_PREFIX.fetch_add(1, Ordering::AcqRel)
+    NEXT_ID_PREFIX.fetch_add(1, Ordering::Relaxed)
 }
 
 thread_local! {
