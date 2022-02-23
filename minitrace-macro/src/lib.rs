@@ -24,16 +24,12 @@ struct Args {
 
 impl Args {
     fn parse(default_name: String, input: AttributeArgs) -> Args {
-        let mut next = input.get(1);
-        let name = match input.get(0) {
+        let (name, next) = match input.get(0) {
             Some(arg0) => match arg0 {
-                NestedMeta::Lit(Lit::Str(name)) => name.value(),
-                _ => {
-                    next = input.get(0);
-                    default_name
-                }
+                NestedMeta::Lit(Lit::Str(name)) => (name.value(), input.get(1)),
+                _ => (default_name, input.get(0)),
             },
-            None => default_name,
+            None => (default_name, None),
         };
         let enter_on_poll = match next {
             Some(arg1) => match arg1 {
