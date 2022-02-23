@@ -15,7 +15,7 @@ use proc_macro2::TokenStream;
 use proc_macro2::{Span, TokenTree};
 use quote::{format_ident, quote_spanned};
 use syn::spanned::Spanned;
-use syn::{Ident, punctuated::Punctuated, visit_mut::VisitMut, *};
+use syn::{punctuated::Punctuated, visit_mut::VisitMut, Ident, *};
 
 struct Args {
     event: String,
@@ -28,12 +28,12 @@ impl Args {
         let name = match input.get(0) {
             Some(arg0) => match arg0 {
                 NestedMeta::Lit(Lit::Str(name)) => name.value(),
-                _ => abort!(arg0.span(), "expected string literal"),
+                _ => {
+                    next = input.get(0);
+                    default_name
+                }
             },
-            None => {
-                next = input.get(0);
-                default_name
-            },
+            None => default_name,
         };
         let enter_on_poll = match next {
             Some(arg1) => match arg1 {
@@ -64,7 +64,10 @@ pub fn trace(
     item: proc_macro::TokenStream,
 ) -> proc_macro::TokenStream {
     let input = syn::parse_macro_input!(item as ItemFn);
-    let args = Args::parse(input.sig.fn_token.to_string(), syn::parse_macro_input!(args as AttributeArgs));
+    let args = Args::parse(
+        input.sig.ident.to_string(),
+        syn::parse_macro_input!(args as AttributeArgs),
+    );
 
     // check for async_trait-like patterns in the block, and instrument
     // the future instead of the wrapper
@@ -217,8 +220,8 @@ fn transform_sig(sig: &mut Signature, has_self: bool, is_local: bool) {
         sig.generics.gt_token = Some(Token![>](sig.paren_token.span));
     }
 
-    for elided in lifetimes.elided {
-        sig.generics.params.push(parse_quote!(#elided));
+    for (idx, elided) in lifetimes.elided.iter().enumerate() {
+        sig.generics.params.insert(idx, parse_quote!(#elided));
         where_clause_or_default(&mut sig.generics.where_clause)
             .predicates
             .push(parse_quote_spanned!(elided.span()=> #elided: 'minitrace));
@@ -226,7 +229,7 @@ fn transform_sig(sig: &mut Signature, has_self: bool, is_local: bool) {
 
     sig.generics
         .params
-        .push(parse_quote_spanned!(default_span=> 'minitrace));
+        .insert(0, parse_quote_spanned!(default_span=> 'minitrace));
 
     if has_self {
         let bound_span = sig.ident.span();
