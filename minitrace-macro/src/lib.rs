@@ -15,7 +15,7 @@ use proc_macro2::TokenStream;
 use proc_macro2::{Span, TokenTree};
 use quote::{format_ident, quote_spanned};
 use syn::spanned::Spanned;
-use syn::{punctuated::Punctuated, visit_mut::VisitMut, *};
+use syn::{Ident, punctuated::Punctuated, visit_mut::VisitMut, *};
 
 struct Args {
     event: String,
@@ -23,13 +23,13 @@ struct Args {
 }
 
 impl Args {
-    fn parse(input: AttributeArgs) -> Args {
+    fn parse(fn_token: String, input: AttributeArgs) -> Args {
         let name = match input.get(0) {
             Some(arg0) => match arg0 {
                 NestedMeta::Lit(Lit::Str(name)) => name.value(),
                 _ => abort!(arg0.span(), "expected string literal"),
             },
-            None => abort_call_site!("expected at least one string literal"),
+            None => fn_token,
         };
         let enter_on_poll = match input.get(1) {
             Some(arg1) => match arg1 {
@@ -60,7 +60,7 @@ pub fn trace(
     item: proc_macro::TokenStream,
 ) -> proc_macro::TokenStream {
     let input = syn::parse_macro_input!(item as ItemFn);
-    let args = Args::parse(syn::parse_macro_input!(args as AttributeArgs));
+    let args = Args::parse(input.sig.fn_token.to_string(), syn::parse_macro_input!(args as AttributeArgs));
 
     // check for async_trait-like patterns in the block, and instrument
     // the future instead of the wrapper
