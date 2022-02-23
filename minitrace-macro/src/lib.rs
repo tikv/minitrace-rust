@@ -23,15 +23,19 @@ struct Args {
 }
 
 impl Args {
-    fn parse(fn_token: String, input: AttributeArgs) -> Args {
+    fn parse(default_name: String, input: AttributeArgs) -> Args {
+        let mut next = input.get(1);
         let name = match input.get(0) {
             Some(arg0) => match arg0 {
                 NestedMeta::Lit(Lit::Str(name)) => name.value(),
                 _ => abort!(arg0.span(), "expected string literal"),
             },
-            None => fn_token,
+            None => {
+                next = input.get(0);
+                default_name
+            },
         };
-        let enter_on_poll = match input.get(1) {
+        let enter_on_poll = match next {
             Some(arg1) => match arg1 {
                 NestedMeta::Meta(Meta::NameValue(MetaNameValue {
                     path,
