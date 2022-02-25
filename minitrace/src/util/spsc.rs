@@ -56,7 +56,8 @@ impl<T> Receiver<T> {
         match self.received.pop() {
             Some(val) => Ok(Some(val)),
             None => {
-                std::mem::swap(&mut *self.page.lock(), &mut self.received);
+                let mut page = self.page.lock();
+                std::mem::swap(&mut *page, &mut self.received);
                 match self.received.pop() {
                     Some(val) => Ok(Some(val)),
                     None => {
