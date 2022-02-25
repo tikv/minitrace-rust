@@ -20,6 +20,7 @@ pub(crate) use global_collector::MockGlobalCollect;
 #[cfg(test)]
 pub(crate) type GlobalCollect = Arc<MockGlobalCollect>;
 
+#[doc(hidden)]
 pub enum SpanSet {
     Span(RawSpan),
     LocalSpans(LocalSpans),
