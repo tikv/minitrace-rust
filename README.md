@@ -63,12 +63,4 @@ Open http://localhost:16686 to see the results.
 
 Benchmark platform is `Intel(R) Xeon(R) CPU E5-2630 v4 @ 2.20GHz` on CentOS 7.
 
-```sh
-> cargo criterion
-
-100 spans/Tokio Tracing   time:   [147.64 us 148.80 us 150.25 us]
-100 spans/Rustracing      time:   [36.486 us 36.690 us 36.941 us]
-100 spans/minitrace       time:   [3.7514 us 3.7564 us 3.7689 us]
-```
-
-![Benchmark](img/benchmark.jpeg)
+![Benchmark](img/benchmark.png)

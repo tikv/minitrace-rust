@@ -2,24 +2,6 @@
 
 use criterion::{criterion_group, criterion_main, Criterion};
 
-fn rustracing_harness() {
-    fn dummy_rustracing(span: &rustracing::span::Span<()>) {
-        for _ in 0..100 {
-            let _child_span = span.child("child", |c| c.start_with_state(()));
-        }
-    }
-
-    let (span_tx, span_rx) = crossbeam::channel::bounded(100);
-
-    {
-        let tracer = rustracing::Tracer::with_sender(rustracing::sampler::AllSampler, span_tx);
-        let parent_span = tracer.span("parent").start_with_state(());
-        dummy_rustracing(&parent_span);
-    }
-
-    let _r = span_rx.iter().collect::<Vec<_>>();
-}
-
 fn init_opentelemetry() {
     use tracing_subscriber::prelude::*;
 
@@ -30,9 +12,9 @@ fn init_opentelemetry() {
         .unwrap();
 }
 
-fn opentelemetry_harness() {
-    fn dummy_opentelementry() {
-        for _ in 0..100 {
+fn opentelemetry_harness(n: usize) {
+    fn dummy_opentelementry(n: usize) {
+        for _ in 0..n {
             let child = tracing::span!(tracing::Level::TRACE, "child");
             let _enter = child.enter();
         }
@@ -41,14 +23,32 @@ fn opentelemetry_harness() {
     let root = tracing::span!(tracing::Level::TRACE, "parent");
     let _enter = root.enter();
 
-    dummy_opentelementry();
+    dummy_opentelementry(n);
 }
 
-fn minitrace_harness() {
+fn rustracing_harness(n: usize) {
+    fn dummy_rustracing(n: usize, span: &rustracing::span::Span<()>) {
+        for _ in 0..n {
+            let _child_span = span.child("child", |c| c.start_with_state(()));
+        }
+    }
+
+    let (span_tx, span_rx) = crossbeam::channel::bounded(1000);
+
+    {
+        let tracer = rustracing::Tracer::with_sender(rustracing::sampler::AllSampler, span_tx);
+        let parent_span = tracer.span("parent").start_with_state(());
+        dummy_rustracing(n, &parent_span);
+    }
+
+    let _r = span_rx.iter().collect::<Vec<_>>();
+}
+
+fn minitrace_harness(n: usize) {
     use minitrace::prelude::*;
 
-    fn dummy_minitrace() {
-        for _ in 0..100 {
+    fn dummy_minitrace(n: usize) {
+        for _ in 0..n {
             let _guard = LocalSpan::enter_with_local_parent("child");
         }
     }
@@ -57,7 +57,7 @@ fn minitrace_harness() {
         let (root_span, collector) = Span::root("parent");
         let _g = root_span.set_local_parent();
 
-        dummy_minitrace();
+        dummy_minitrace(n);
 
         collector
     }
@@ -67,11 +67,19 @@ fn minitrace_harness() {
 fn tracing_comparison(c: &mut Criterion) {
     init_opentelemetry();
 
-    let mut bgroup = c.benchmark_group("100 spans");
+    let mut bgroup = c.benchmark_group("compare");
 
-    bgroup.bench_function("Tokio Tracing", |b| b.iter(opentelemetry_harness));
-    bgroup.bench_function("Rustracing", |b| b.iter(rustracing_harness));
-    bgroup.bench_function("minitrace", |b| b.iter(minitrace_harness));
+    for n in &[1000, 2000, 3000, 4000, 5000, 6000, 7000, 8000, 9000, 10000] {
+        bgroup.bench_function(format!("Tokio Tracing/{n}"), |b| {
+            b.iter(|| opentelemetry_harness(*n))
+        });
+        bgroup.bench_function(format!("Rustracing/{n}"), |b| {
+            b.iter(|| rustracing_harness(*n))
+        });
+        bgroup.bench_function(format!("minitrace/{n}"), |b| {
+            b.iter(|| minitrace_harness(*n))
+        });
+    }
 
     bgroup.finish();
 }
