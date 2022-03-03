@@ -69,7 +69,7 @@ fn tracing_comparison(c: &mut Criterion) {
 
     let mut bgroup = c.benchmark_group("compare");
 
-    for n in &[1000, 2000, 3000, 4000, 5000, 6000, 7000, 8000, 9000, 10000] {
+    for n in &[1, 10, 100, 1000] {
         bgroup.bench_function(format!("Tokio Tracing/{n}"), |b| {
             b.iter(|| opentelemetry_harness(*n))
         });
