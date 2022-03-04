@@ -4,12 +4,6 @@
 
 [Docs] | [Getting Started] | [Examples] | [FAQ](#faq)
 
-[![Crates.io](https://img.shields.io/crates/v/minitrace.svg?style=for-the-badge)](https://crates.io/crates/minitrace)
-[![Documentation](https://img.shields.io/docsrs/minitrace?style=for-the-badge)](https://docs.rs/minitrace/)
-[![CI Status](https://img.shields.io/github/workflow/status/tikv/minitrace-rust/CI?style=for-the-badge)](https://github.com/tikv/minitrace-rust/actions)
-[![Coverage](https://img.shields.io/coveralls/github/tikv/minitrace-rust?style=for-the-badge)](https://coveralls.io/github/tikv/minitrace-rust?branch=master)
-[![License](https://img.shields.io/crates/l/minitrace?style=for-the-badge)](https://github.com/tikv/minitrace-rust/blob/master/LICENSE)
-
 </div>
 
 ---
@@ -17,6 +11,12 @@
 Minitrace is a Rust tracing library [10~100x faster](#benchmarks) than others:
 
 ![benchmark](etc/img/head-benchmark.svg)
+
+[![Crates.io](https://img.shields.io/crates/v/minitrace.svg?style=flat-square&logo=rust)](https://crates.io/crates/minitrace)
+[![Documentation](https://img.shields.io/docsrs/minitrace?style=flat-square&logo=rust)](https://docs.rs/minitrace/)
+[![CI Status](https://img.shields.io/github/workflow/status/tikv/minitrace-rust/CI?style=flat-square&logo=github)](https://github.com/tikv/minitrace-rust/actions)
+[![Coverage](https://img.shields.io/coveralls/github/tikv/minitrace-rust?style=flat-square)](https://coveralls.io/github/tikv/minitrace-rust?branch=master)
+[![License](https://img.shields.io/crates/l/minitrace?style=flat-square)](https://github.com/tikv/minitrace-rust/blob/master/LICENSE)
 
 ## Features
 
