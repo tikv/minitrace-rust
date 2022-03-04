@@ -1,10 +1,12 @@
 <p align="center">
-  <img src="etc/img/head-img-640.svg" align="center" alt="minitrace: Extremely fast tracing library for Rust">
+  <img src="etc/img/head-img-640.svg" alt="minitrace: Extremely fast tracing library for Rust">
   <br>
   <a href="https://docs.rs/minitrace/">Docs</a> |
   <a href="minitrace/examples/get_started.rs">Getting Started</a> |
   <a href="minitrace/examples">Examples</a> |
   <a href="#faq">FAQ</a>
+  <br>
+  <br>
 </p>
 
 ---
