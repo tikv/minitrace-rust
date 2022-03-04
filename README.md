@@ -1,10 +1,11 @@
-<img src="etc/img/head-img-640.svg" align="center" alt="minitrace: Extremely fast tracing library for Rust">
-
-<div align="center">
-
-[Docs] | [Getting Started] | [Examples] | [FAQ](#faq)
-
-</div>
+<p align="center">
+  <img src="etc/img/head-img-640.svg" align="center" alt="minitrace: Extremely fast tracing library for Rust">
+  <br>
+  <a href="https://docs.rs/minitrace/">Docs</a> |
+  <a href="minitrace/examples/get_started.rs">Getting Started</a> |
+  <a href="minitrace/examples">Examples</a> |
+  <a href="#faq">FAQ</a>
+</p>
 
 ---
 
@@ -83,9 +84,6 @@ Note that we always prioritize performance over features, so that not all tracin
 
 **Code base Tested**: Minitrace has been tested with high coverage. However, applications utilizing minitrace have not been widely deployed, so that minitrace is currently **NOT** regarded as battle-tested. 
 
-[Docs]: https://docs.rs/minitrace/
-[Getting Started]: minitrace/examples/get_started.rs
-[Examples]: minitrace/examples
 [OpenTracing]: https://opentracing.io/
 [OpenTelemetry]: https://opentelemetry.io/
 [Jaeger]: https://crates.io/crates/minitrace-jaeger
