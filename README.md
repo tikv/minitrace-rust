@@ -4,9 +4,6 @@
 
 [Docs] | [Getting Started] | [Examples] | [FAQ](#faq)
 
-<br>
-<br>
-
 </div>
 
 ---
