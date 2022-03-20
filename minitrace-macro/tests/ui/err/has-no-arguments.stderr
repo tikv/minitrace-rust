@@ -1,0 +1,7 @@
+error: expected at least one string literal
+ --> tests/ui/err/has-no-arguments.rs:4:1
+  |
+4 | #[trace]
+  | ^^^^^^^^
+  |
+  = note: this error originates in the attribute macro `trace` (in Nightly builds, run with -Z macro-backtrace for more info)
