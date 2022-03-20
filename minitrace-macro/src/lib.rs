@@ -265,7 +265,6 @@ fn transform_sig(sig: &mut Signature, has_self: bool, is_local: bool) {
             FnArg::Typed(arg) => {
                 if let Pat::Ident(ident) = &mut *arg.pat {
                     ident.by_ref = None;
-                    ident.mutability = None;
                 } else {
                     let positional = positional_arg(i, &arg.pat);
                     let m = mut_pat(&mut arg.pat);
