@@ -1,5 +1,0 @@
-error: expected string literal
- --> tests/ui/err/has-arguments.rs:3:9
-  |
-3 | #[trace(a, b)]
-  |         ^
