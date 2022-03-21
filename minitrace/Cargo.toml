@@ -29,7 +29,7 @@ criterion = { version = "0.3", features = ["html_reports"] }
 crossbeam = "0.8"
 minitrace-jaeger = { path = "../minitrace-jaeger" }
 minitrace-datadog = { path = "../minitrace-datadog" }
-tokio = { version = "1", features = ["full"] }
+tokio = { version = "1", features = ["rt", "time", "macros"] }
 rustracing = "0.5"
 opentelemetry = { version = "0.16", default-features = false, features = ["trace"] }
 opentelemetry-jaeger = "0.15"
