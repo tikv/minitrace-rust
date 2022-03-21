@@ -17,6 +17,12 @@ pub use dissimilar::diff as __diff;
 /// # Panics
 ///
 /// The macro will panic in case of text inequality.
+///
+/// # License
+///
+/// SPDX-License-Identifier: Apache-2.0 OR MIT
+/// Copyright 2022 rust-analyzer project authors
+///
 #[macro_export]
 macro_rules! assert_eq_text {
     ($left:expr, $right:expr) => {
