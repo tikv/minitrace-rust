@@ -23,6 +23,7 @@ proc-macro-error = "1"
 
 [dev-dependencies]
 futures = "0.3.21"
+futures-timer = "3.0.2"
 minitrace = { path = "../minitrace" }
 regex = "1.5.5"
 test-utilities = { path = "../test-utilities" }
