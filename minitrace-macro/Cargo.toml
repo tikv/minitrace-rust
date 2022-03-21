@@ -23,11 +23,8 @@ proc-macro-error = "1"
 
 [dev-dependencies]
 futures = "0.3.21"
-minitrace = "0.4.0"
+minitrace = { path = "../minitrace" }
 regex = "1.5.5"
 test-utilities = { path = "../test-utilities" }
 tokio = { version = "1", features = ["full"] }
 trybuild = "1"
-
-[patch.crates-io]
-minitrace = { path = "../" }
