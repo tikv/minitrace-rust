@@ -3,7 +3,7 @@ use minitrace::prelude::*;
 use regex::Regex;
 use test_utilities::*;
 
-// Implement doctest example as an integration test.
+// Implement documentation example as an integration test.
 //
 // Reference:
 // - https://github.com/tikv/minitrace-rust/blob/master/minitrace/src/lib.rs#L178-L202
@@ -13,18 +13,12 @@ fn do_something(i: u64) {
     std::thread::sleep(std::time::Duration::from_millis(i));
 }
 
-// #[trace("do_something_async")]
-// async fn do_something_async(i: u64) {
-//     futures_timer::Delay::new(std::time::Duration::from_millis(i)).await;
-// }
-
 fn main() {
     let (root, collector) = Span::root("root");
 
     {
         let _g = root.set_local_parent();
         do_something(100);
-        //    block_on(do_something_async(100));
     }
 
     drop(root);
@@ -54,5 +48,4 @@ fn main() {
     let int: std::string::String = re1.replace_all(&pre, r"begin_unix_time_ns: \d+,").into();
     let actual: std::string::String = re2.replace_all(&int, r"duration_ns: \d+,").into();
     assert_eq_text!(expected, &actual);
-
 }
