@@ -1,8 +1,10 @@
 use minitrace::trace;
 
-// This Tracing crate like-syntax
-#[allow(unused_braces)]
-#[trace["test-span"]]
-fn f(a: u32) -> u32 { a }
+#[trace("test-span")]
+fn f(a: u32) -> u32 {
+    a
+}
 
-fn main() {}
+fn main() {
+    f(1);
+}
