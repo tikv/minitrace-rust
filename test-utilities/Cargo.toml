@@ -11,3 +11,5 @@ doctest = false
 # Avoid adding crates, this is widely used in tests. It should compile fast!
 [dependencies]
 dissimilar = "1.0.2"
+minitrace = { path = "../minitrace" }
+regex = "1.5.5"

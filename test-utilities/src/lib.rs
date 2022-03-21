@@ -50,3 +50,17 @@ pub fn format_diff(chunks: Vec<dissimilar::Chunk>) -> String {
     }
     buf
 }
+
+pub fn normalize_spans<R, S>(records: R) -> std::string::String
+where
+    S: Sized,
+    R: AsRef<[S]> + std::fmt::Debug,
+{
+    let pre = format!("{records:#?}");
+    //let pre = records.to_string();
+    let re1 = regex::Regex::new(r"begin_unix_time_ns: \d+,").unwrap();
+    let re2 = regex::Regex::new(r"duration_ns: \d+,").unwrap();
+    let int: std::string::String = re1.replace_all(&pre, r"begin_unix_time_ns: \d+,").into();
+    let actual: std::string::String = re2.replace_all(&int, r"duration_ns: \d+,").into();
+    actual
+}
