@@ -2,18 +2,21 @@ use minitrace::trace;
 use regex::Regex;
 use test_utilities::*;
 
+// Reference:
+// - https://github.com/tikv/minitrace-rust/issues/122
 #[trace("test-span")]
-fn f(a: u32) -> u32 {
+async fn f(a: u32) -> u32 {
     a
 }
 
-fn main() {
+#[tokio::main]
+async fn main() {
     let (root, collector) = minitrace::Span::root("root");
-    root.set_local_parent();
-    f(1);
+    let _child_span = minitrace::Span::enter_with_parent("test-span", &root);
+    f(1).await;
     drop(root);
-    let records: Vec<minitrace::collector::SpanRecord> =
-        futures::executor::block_on(collector.collect());
+    let records: Vec<minitrace::collector::SpanRecord> = futures::executor::block_on(collector.collect());
+
     let expected = r#"[
     SpanRecord {
         id: 1,
