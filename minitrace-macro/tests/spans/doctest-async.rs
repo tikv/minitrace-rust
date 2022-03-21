@@ -1,6 +1,5 @@
 use futures::executor::block_on;
 use minitrace::prelude::*;
-use regex::Regex;
 use test_utilities::*;
 
 // Implement documentation example as an integration test.
@@ -42,11 +41,7 @@ fn main() {
         properties: [],
     },
 ]"#;
-    let pre = format!("{records:#?}");
-    let re1 = Regex::new(r"begin_unix_time_ns: \d+,").unwrap();
-    let re2 = Regex::new(r"duration_ns: \d+,").unwrap();
-    let int: std::string::String = re1.replace_all(&pre, r"begin_unix_time_ns: \d+,").into();
-    let actual: std::string::String = re2.replace_all(&int, r"duration_ns: \d+,").into();
+    let actual = normalize_spans(records);
     assert_eq_text!(expected, &actual);
 
 }
