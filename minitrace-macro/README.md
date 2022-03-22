@@ -70,7 +70,7 @@ async fn qux() {
 // }
 ```
 
-### ⚠️ Local Parent Needed 
+### ⚠️ Local Parent Needed
 
 A function instrumented by `trace` always require a local parent in the context. Make sure that the caller is within the scope of `Span::set_local_parent()`.
 
@@ -102,4 +102,40 @@ let (root, collector) = Span::root("root");
     let _g = root.set_local_parent();
     runtime::spawn(bar()); // This `bar` will be traced.
 }
+```
+
+## Developers
+
+This Crate adopts the [Ferrous Systems](https://ferrous-systems.com/blog/testing-proc-macros/)
+proc-macro pipeline:
+
+<!--
+
+```mermaid
+flowchart LR;
+    subgraph M[proc-macro-attribute]
+      direction LR
+        P([Parse])--AST->A([Analyze])--Model->L([Lower])--IR->C([CodeGen])
+    end
+    Input-. Rust .->M-. Rust .->Output;
+```
+
+-->
+
+![image info](./img/pipeline.png)
+
+### Tests
+
+To see a list of all tests:
+
+```bash
+pushd minitest-macro
+    cargo test -- --list
+popd
+```
+
+To run an individual test suite, say the `ui` suite:
+
+```bash
+cargo test ui -- --nocapture
 ```

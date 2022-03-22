@@ -20,3 +20,11 @@ syn = { version = "1.0.84", features = ["full", "parsing", "extra-traits", "proc
 quote = "1"
 proc-macro2 = "1"
 proc-macro-error = "1"
+
+[dev-dependencies]
+trybuild = "1"
+minitrace = "0.4.0"
+tokio = { version = "1", features = ["full"] }
+
+[patch.crates-io]
+minitrace = { path = "../" }
