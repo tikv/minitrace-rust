@@ -120,7 +120,7 @@ fn bench_trace_future(c: &mut Criterion) {
             b.iter(|| {
                 {
                     let (root_span, collector) = Span::root("root");
-                    let _ = futures::executor::block_on(f(*len).in_span(root_span));
+                    futures::executor::block_on(f(*len).in_span(root_span));
                     collector
                 }
                 .collect()

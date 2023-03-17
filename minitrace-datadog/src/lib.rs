@@ -100,7 +100,7 @@ pub fn report_blocking(
 ) -> Result<(), Box<dyn Error + Send + Sync + 'static>> {
     let client = reqwest::blocking::Client::new();
     let rep = client
-        .post(&format!("http://{}/v0.4/traces", agent))
+        .post(format!("http://{}/v0.4/traces", agent))
         .header("Datadog-Meta-Tracer-Version", "v1.27.0")
         .header("Content-Type", "application/msgpack")
         .body(bytes)

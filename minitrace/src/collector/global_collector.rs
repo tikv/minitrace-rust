@@ -259,7 +259,7 @@ fn merge_collection(span_collections: Vec<SpanCollection>, span_count: usize) ->
                     amend_local_span(&local_spans, parent_id, &mut records, &anchor)
                 }
                 SpanSet::SharedLocalSpans(local_spans) => {
-                    amend_local_span(&*local_spans, parent_id, &mut records, &anchor)
+                    amend_local_span(&local_spans, parent_id, &mut records, &anchor)
                 }
             },
             SpanCollection::Shared { spans, parent_id } => match &*spans {

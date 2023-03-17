@@ -500,7 +500,7 @@ parent5 []
             {
                 let _g = root.attach_into_stack(&stack).unwrap();
                 let child =
-                    Span::enter_with_stack("child", &mut *stack.borrow_mut(), collect.clone());
+                    Span::enter_with_stack("child", &mut stack.borrow_mut(), collect.clone());
                 {
                     let _g = child.attach_into_stack(&stack).unwrap();
                     let _s = Span::enter_with_stack("grandchild", &mut stack.borrow_mut(), collect);
