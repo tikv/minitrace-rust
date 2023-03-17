@@ -18,7 +18,6 @@ use std::time::Duration;
 use minstant::Anchor;
 use once_cell::sync::Lazy;
 use parking_lot::Mutex;
-use retain_mut::RetainMut;
 
 const COLLECT_LOOP_INTERVAL: Duration = Duration::from_millis(10);
 
@@ -162,7 +161,7 @@ impl GlobalCollector {
         let commit_collects = &mut self.commit_collects;
         let submit_spans = &mut self.submit_spans;
 
-        RetainMut::retain_mut(&mut self.rxs, |rx| loop {
+        self.rxs.retain_mut(|rx| loop {
             match rx.try_recv() {
                 Ok(Some(CollectCommand::StartCollect(cmd))) => start_collects.push(cmd),
                 Ok(Some(CollectCommand::DropCollect(cmd))) => drop_collects.push(cmd),

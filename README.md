@@ -1,5 +1,5 @@
 <div align="center">
-  
+
   ![minitrace: Extremely fast tracing library for Rust](etc/img/head-img-640.svg)
 
   [![Crates.io](https://img.shields.io/crates/v/minitrace.svg?style=flat-square&logo=rust)](https://crates.io/crates/minitrace)
