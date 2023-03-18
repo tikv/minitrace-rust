@@ -13,7 +13,7 @@ keywords = ["tracing", "span", "datadog", "jaeger", "opentracing"]
 
 [dependencies]
 minitrace = { path = "../minitrace" }
-thrift_codec = "0.1"
+thrift_codec = "0.2"
 async-std = "1"
 
 [dev-dependencies]
