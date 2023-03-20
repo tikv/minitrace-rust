@@ -1,4 +1,4 @@
-error: expected string literal
+error: expected `enter_on_poll = <bool>`
  --> tests/ui/err/name-is-not-an-assignment-expression.rs:3:9
   |
 3 | #[trace(b)]

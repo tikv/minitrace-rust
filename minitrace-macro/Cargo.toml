@@ -25,6 +25,3 @@ proc-macro-error = "1"
 trybuild = "1"
 minitrace = "0.4.0"
 tokio = { version = "1", features = ["full"] }
-
-[patch.crates-io]
-minitrace = { path = "../" }

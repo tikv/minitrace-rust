@@ -1,4 +1,4 @@
-error: expected string literal
+error: expected `enter_on_poll = <bool>`
  --> tests/ui/err/trace-interleaved.rs:4:9
   |
 4 | #[trace(struct)]
