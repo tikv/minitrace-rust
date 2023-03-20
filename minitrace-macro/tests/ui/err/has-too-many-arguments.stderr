@@ -1,4 +1,4 @@
-error: expected string literal
+error: expected `enter_on_poll = <bool>`
  --> tests/ui/err/has-too-many-arguments.rs:3:9
   |
 3 | #[trace(a, b)]
