@@ -126,7 +126,7 @@ pub async fn report(
     .parse()
     .unwrap();
 
-    let udp = async_std::net::UdpSocket::bind(local_addr).await?;
+    let udp = tokio::net::UdpSocket::bind(local_addr).await?;
     udp.send_to(bytes, agent).await?;
 
     Ok(())

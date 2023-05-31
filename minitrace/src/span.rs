@@ -51,7 +51,7 @@ impl Span {
         #[cfg(test)] collect: GlobalCollect,
     ) -> (Self, Collector) {
         #[cfg(not(test))]
-        let collect = GlobalCollect::default();
+        let collect = GlobalCollect;
         let (collector, token) = Collector::start_collect(args, collect.clone());
         let span = Self::new(token, event, collect);
         (span, collector)
@@ -77,7 +77,7 @@ impl Span {
         #[cfg(test)] collect: GlobalCollect,
     ) -> Self {
         #[cfg(not(test))]
-        let collect = GlobalCollect::default();
+        let collect = GlobalCollect;
         let token = parents
             .into_iter()
             .filter_map(|span| span.inner.as_ref())
@@ -92,7 +92,7 @@ impl Span {
         #[cfg(test)] collect: GlobalCollect,
     ) -> Self {
         #[cfg(not(test))]
-        let collect = GlobalCollect::default();
+        let collect = GlobalCollect;
         LOCAL_SPAN_STACK
             .with(move |stack| Self::enter_with_stack(event, &mut (*stack).borrow_mut(), collect))
     }
