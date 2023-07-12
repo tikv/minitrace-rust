@@ -9,7 +9,7 @@ fn func1(i: u64) {
     func2(i);
 }
 
-#[trace("func2")]
+#[trace]
 fn func2(i: u64) {
     std::thread::sleep(std::time::Duration::from_millis(i));
 }

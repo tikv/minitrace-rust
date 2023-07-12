@@ -20,7 +20,7 @@ minitrace = "0.4" # minitrace-macro is within minitrace::prelude
 ```rust
 use minitrace::prelude::*;
 
-#[trace("foo")]
+#[trace]
 fn foo() {
     // function body
 }
@@ -40,7 +40,7 @@ fn foo() {
 ```rust
 use minitrace::prelude::*;
 
-#[trace("bar")]
+#[trace]
 async fn bar() {
     // function body
 }
@@ -55,7 +55,7 @@ async fn bar() {
 // }
 
 
-#[trace("qux", enter_on_poll = true)]
+#[trace(enter_on_poll = true)]
 async fn qux() {
     // function body
 }
@@ -77,10 +77,10 @@ A function instrumented by `trace` always require a local parent in the context.
 ```rust
 use minitrace::prelude::*;
 
-#[trace("foo")]
+#[trace]
 fn foo() {}
 
-#[trace("bar")]
+#[trace]
 async fn bar() {}
 
 let (root, collector) = Span::root("root");

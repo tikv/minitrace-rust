@@ -42,9 +42,7 @@ impl LocalSpan {
             span_stack.add_properties(span_handle, properties);
         }
     }
-}
 
-impl LocalSpan {
     #[inline]
     pub(crate) fn enter_with_stack(
         event: &'static str,
@@ -110,6 +108,12 @@ span1 []
     span2 [("k1", "v1")]
 "#
         );
+    }
+
+    #[test]
+    fn local_span_noop() {
+        let mut span1 = LocalSpan::enter_with_local_parent("span1");
+        span1.add_property(|| ("k1", "v1".to_string()));
     }
 
     #[test]

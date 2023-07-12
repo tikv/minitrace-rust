@@ -83,11 +83,6 @@ impl LocalSpanStack {
         span_line.collect(span_line_handle.span_line_epoch)
     }
 
-    pub fn current_collect_token(&mut self) -> Option<CollectToken> {
-        let span_line = self.current_span_line()?;
-        span_line.current_collect_token()
-    }
-
     #[inline]
     pub fn add_properties<I, F>(&mut self, local_span_handle: &LocalSpanHandle, properties: F)
     where
@@ -102,6 +97,11 @@ impl LocalSpanStack {
             );
             span_line.add_properties(local_span_handle, properties);
         }
+    }
+
+    pub fn current_collect_token(&mut self) -> Option<CollectToken> {
+        let span_line = self.current_span_line()?;
+        span_line.current_collect_token()
     }
 
     #[inline]

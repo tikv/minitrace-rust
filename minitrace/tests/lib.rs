@@ -171,8 +171,7 @@ fn multiple_threads_multiple_spans() {
             let local_collector = LocalCollector::start();
 
             for _ in 0..4 {
-                let merged =
-                    Span::enter_with_parents("merged", vec![&root_span1, &root_span2].into_iter());
+                let merged = Span::enter_with_parents("merged", vec![&root_span1, &root_span2]);
                 let _g = merged.set_local_parent();
                 let _local = LocalSpan::enter_with_local_parent("local");
                 scope.spawn(move |_| {
@@ -310,7 +309,7 @@ fn test_macro() {
         }
     }
 
-    #[trace("work", enter_on_poll = true)]
+    #[trace(enter_on_poll = true)]
     async fn work(millis: &u64) {
         let _g = Span::enter_with_local_parent("work-inner");
         tokio::time::sleep(std::time::Duration::from_millis(*millis))
@@ -319,7 +318,7 @@ fn test_macro() {
     }
 
     impl Bar {
-        #[trace("work2")]
+        #[trace]
         async fn work2(&self, millis: &u64) {
             let _g = Span::enter_with_local_parent("work-inner");
             tokio::time::sleep(std::time::Duration::from_millis(*millis))
@@ -328,7 +327,7 @@ fn test_macro() {
         }
     }
 
-    #[trace("work3")]
+    #[trace]
     async fn work3<'a>(millis1: &'a u64, millis2: &u64) {
         let _g = Span::enter_with_local_parent("work-inner");
         tokio::time::sleep(std::time::Duration::from_millis(*millis1))
@@ -383,12 +382,12 @@ root []
 
 #[test]
 fn macro_example() {
-    #[trace("do_something")]
+    #[trace]
     fn do_something(i: u64) {
         std::thread::sleep(std::time::Duration::from_millis(i));
     }
 
-    #[trace("do_something_async")]
+    #[trace]
     async fn do_something_async(i: u64) {
         futures_timer::Delay::new(std::time::Duration::from_millis(i)).await;
     }
@@ -469,7 +468,7 @@ fn max_span_count() {
         block_on(collector.collect());
     }
 
-    #[trace("recursive")]
+    #[trace]
     fn recursive(n: usize) {
         if n > 1 {
             recursive(n - 1);

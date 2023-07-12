@@ -5,7 +5,7 @@ use minitrace::local::LocalCollector;
 use minitrace::prelude::*;
 
 fn dummy_iter(i: usize) {
-    #[trace("")]
+    #[trace]
     fn dummy() {}
 
     for _ in 0..i {
@@ -13,7 +13,7 @@ fn dummy_iter(i: usize) {
     }
 }
 
-#[trace("")]
+#[trace]
 fn dummy_rec(i: usize) {
     if i > 1 {
         dummy_rec(i - 1);

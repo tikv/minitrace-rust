@@ -178,12 +178,12 @@
 //!   use minitrace::prelude::*;
 //!   use futures::executor::block_on;
 //!
-//!   #[trace("do_something")]
+//!   #[trace]
 //!   fn do_something(i: u64) {
 //!       std::thread::sleep(std::time::Duration::from_millis(i));
 //!   }
 //!
-//!   #[trace("do_something_async")]
+//!   #[trace]
 //!   async fn do_something_async(i: u64) {
 //!       futures_timer::Delay::new(std::time::Duration::from_millis(i)).await;
 //!   }
@@ -239,6 +239,11 @@
 //! [`Span::set_local_parent()`]: crate::Span::set_local_parent
 //! [`LocalSpan::enter_with_local_parent()`]: crate::local::LocalSpan::enter_with_local_parent
 
+// Suppress a false-positive lint from clippy
+// TODO: remove me once https://github.com/rust-lang/rust-clippy/issues/11076 is released
+#![allow(unknown_lints)]
+#![allow(clippy::arc_with_non_send_sync)]
+
 pub mod collector;
 pub mod future;
 pub mod local;
@@ -249,6 +254,8 @@ pub mod util;
 pub use crate::span::Span;
 /// An attribute-macro to help get rid of boilerplate.
 ///
+/// The span name is the function name by default. It can be customized by passing a string literal.
+///
 /// [`trace`] always require an local parent in the context. Make sure that the caller
 /// is within the scope of [`Span::set_local_parent()`].
 ///
@@ -257,12 +264,12 @@ pub use crate::span::Span;
 /// ```
 /// use minitrace::prelude::*;
 ///
-/// #[trace("foo")]
+/// #[trace]
 /// fn foo() {
 ///     // some work
 /// }
 ///
-/// #[trace("bar")]
+/// #[trace]
 /// async fn bar() {
 ///     // some work
 /// }
