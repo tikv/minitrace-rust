@@ -250,7 +250,7 @@ pub use crate::span::Span;
 /// An attribute-macro to help get rid of boilerplate.
 ///
 /// The span name is the function name by default. It can be customized by passing a string literal.
-/// 
+///
 /// [`trace`] always require an local parent in the context. Make sure that the caller
 /// is within the scope of [`Span::set_local_parent()`].
 ///

@@ -42,9 +42,7 @@ impl LocalSpan {
             span_stack.add_properties(span_handle, properties);
         }
     }
-}
 
-impl LocalSpan {
     #[inline]
     pub(crate) fn enter_with_stack(
         event: &'static str,

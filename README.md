@@ -69,7 +69,13 @@ There are some articles posted by the maintainer of minitrace:
 
 ### Why / What's the difference compared to 'X'?
 
-Most tracing libraries aims to provide more features, while minitrace always prioritize performance. Usually minitrace only provides basic and common tracing features.
+Most tracing libraries aims to provide more features, while minitrace always prioritize performance. 
+
+Rather than providing a full-featured tracing library, minitrace is designed to be simple, modular and extensible.
+You can easily compose your own tracing features on top of minitrace with minimal effort.
+
+For a practical illustration, refer to `examples/log.rs` to learn how to integrate the widely-used `log` library and
+its macros with minitrace in just 10 lines of code.
 
 ### Will you support OpenTelemetry feature 'X'?
 
