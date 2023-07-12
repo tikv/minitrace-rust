@@ -1,8 +1,8 @@
 // Copyright 2021 TiKV Project Authors. Licensed under Apache-2.0.
 
-use crate::local::span_id::SpanId;
-
 use minstant::Instant;
+
+use crate::local::span_id::SpanId;
 
 #[derive(Clone, Debug)]
 pub struct RawSpan {

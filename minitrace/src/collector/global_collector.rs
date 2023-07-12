@@ -1,23 +1,30 @@
 // Copyright 2021 TiKV Project Authors. Licensed under Apache-2.0.
 
-use crate::collector::command::{
-    CollectCommand, CommitCollect, DropCollect, StartCollect, SubmitSpans,
-};
-use crate::collector::{CollectArgs, SpanRecord, SpanSet};
-use crate::local::raw_span::RawSpan;
-use crate::local::span_id::SpanId;
-use crate::local::LocalSpans;
-use crate::util::spsc::{self, Receiver, Sender};
-use crate::util::CollectToken;
-
 use std::collections::HashMap;
-use std::sync::atomic::{AtomicU32, Ordering};
+use std::sync::atomic::AtomicU32;
+use std::sync::atomic::Ordering;
 use std::sync::Arc;
 use std::time::Duration;
 
 use minstant::Anchor;
 use once_cell::sync::Lazy;
 use parking_lot::Mutex;
+
+use crate::collector::command::CollectCommand;
+use crate::collector::command::CommitCollect;
+use crate::collector::command::DropCollect;
+use crate::collector::command::StartCollect;
+use crate::collector::command::SubmitSpans;
+use crate::collector::CollectArgs;
+use crate::collector::SpanRecord;
+use crate::collector::SpanSet;
+use crate::local::raw_span::RawSpan;
+use crate::local::span_id::SpanId;
+use crate::local::LocalSpans;
+use crate::util::spsc::Receiver;
+use crate::util::spsc::Sender;
+use crate::util::spsc::{self};
+use crate::util::CollectToken;
 
 const COLLECT_LOOP_INTERVAL: Duration = Duration::from_millis(10);
 
@@ -128,10 +135,14 @@ impl GlobalCollector {
     fn start() -> Self {
         std::thread::Builder::new()
             .name("minitrace".to_string())
-            .spawn(move || loop {
-                let begin_instant = std::time::Instant::now();
-                GLOBAL_COLLECTOR.lock().handle_commands();
-                std::thread::sleep(COLLECT_LOOP_INTERVAL.saturating_sub(begin_instant.elapsed()));
+            .spawn(move || {
+                loop {
+                    let begin_instant = std::time::Instant::now();
+                    GLOBAL_COLLECTOR.lock().handle_commands();
+                    std::thread::sleep(
+                        COLLECT_LOOP_INTERVAL.saturating_sub(begin_instant.elapsed()),
+                    );
+                }
             })
             .unwrap();
 
@@ -161,18 +172,20 @@ impl GlobalCollector {
         let commit_collects = &mut self.commit_collects;
         let submit_spans = &mut self.submit_spans;
 
-        self.rxs.retain_mut(|rx| loop {
-            match rx.try_recv() {
-                Ok(Some(CollectCommand::StartCollect(cmd))) => start_collects.push(cmd),
-                Ok(Some(CollectCommand::DropCollect(cmd))) => drop_collects.push(cmd),
-                Ok(Some(CollectCommand::CommitCollect(cmd))) => commit_collects.push(cmd),
-                Ok(Some(CollectCommand::SubmitSpans(cmd))) => submit_spans.push(cmd),
-                Ok(None) => {
-                    return true;
-                }
-                Err(_) => {
-                    // Channel disconnected. It must be because the sender thread has stopped.
-                    return false;
+        self.rxs.retain_mut(|rx| {
+            loop {
+                match rx.try_recv() {
+                    Ok(Some(CollectCommand::StartCollect(cmd))) => start_collects.push(cmd),
+                    Ok(Some(CollectCommand::DropCollect(cmd))) => drop_collects.push(cmd),
+                    Ok(Some(CollectCommand::CommitCollect(cmd))) => commit_collects.push(cmd),
+                    Ok(Some(CollectCommand::SubmitSpans(cmd))) => submit_spans.push(cmd),
+                    Ok(None) => {
+                        return true;
+                    }
+                    Err(_) => {
+                        // Channel disconnected. It must be because the sender thread has stopped.
+                        return false;
+                    }
                 }
             }
         });

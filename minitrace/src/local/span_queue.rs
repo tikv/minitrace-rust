@@ -1,10 +1,11 @@
 // Copyright 2020 TiKV Project Authors. Licensed under Apache-2.0.
 
-use crate::local::raw_span::RawSpan;
-use crate::local::span_id::{DefaultIdGenerator, SpanId};
-use crate::util::RawSpans;
-
 use minstant::Instant;
+
+use crate::local::raw_span::RawSpan;
+use crate::local::span_id::DefaultIdGenerator;
+use crate::local::span_id::SpanId;
+use crate::util::RawSpans;
 
 pub struct SpanQueue {
     span_queue: RawSpans,

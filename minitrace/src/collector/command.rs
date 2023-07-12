@@ -1,6 +1,8 @@
 // Copyright 2022 TiKV Project Authors. Licensed under Apache-2.0.
 
-use crate::collector::{CollectArgs, SpanRecord, SpanSet};
+use crate::collector::CollectArgs;
+use crate::collector::SpanRecord;
+use crate::collector::SpanSet;
 use crate::util::CollectToken;
 
 pub enum CollectCommand {

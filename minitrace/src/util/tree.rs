@@ -2,12 +2,15 @@
 
 //! A module for relationship checking in test
 
-use crate::collector::{SpanRecord, SpanSet};
-use crate::local::span_id::SpanId;
-use crate::util::{CollectToken, RawSpans};
-
 use std::collections::HashMap;
-use std::fmt::{Display, Formatter};
+use std::fmt::Display;
+use std::fmt::Formatter;
+
+use crate::collector::SpanRecord;
+use crate::collector::SpanSet;
+use crate::local::span_id::SpanId;
+use crate::util::CollectToken;
+use crate::util::RawSpans;
 
 #[derive(Debug, PartialOrd, PartialEq, Ord, Eq)]
 pub struct Tree {

@@ -1,10 +1,11 @@
 // Copyright 2021 TiKV Project Authors. Licensed under Apache-2.0.
 
-use crate::local::local_span_line::LocalSpanHandle;
-use crate::local::local_span_stack::{LocalSpanStack, LOCAL_SPAN_STACK};
-
 use std::cell::RefCell;
 use std::rc::Rc;
+
+use crate::local::local_span_line::LocalSpanHandle;
+use crate::local::local_span_stack::LocalSpanStack;
+use crate::local::local_span_stack::LOCAL_SPAN_STACK;
 
 #[must_use]
 pub struct LocalSpan {
@@ -25,9 +26,7 @@ impl LocalSpan {
 
     #[inline]
     pub fn add_property<F>(&mut self, property: F)
-    where
-        F: FnOnce() -> (&'static str, String),
-    {
+    where F: FnOnce() -> (&'static str, String) {
         self.add_properties(|| [property()]);
     }
 
@@ -71,15 +70,15 @@ impl Drop for LocalSpan {
 
 #[cfg(test)]
 mod tests {
+    use std::cell::RefCell;
+    use std::rc::Rc;
+
     use super::*;
     use crate::collector::CollectTokenItem;
     use crate::local::local_span_stack::LocalSpanStack;
     use crate::local::span_id::SpanId;
     use crate::local::LocalCollector;
     use crate::util::tree::tree_str_from_raw_spans;
-
-    use std::cell::RefCell;
-    use std::rc::Rc;
 
     #[test]
     fn local_span_basic() {

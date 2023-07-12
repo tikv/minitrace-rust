@@ -3,7 +3,6 @@
 use std::sync::Arc;
 
 use futures::executor::block_on;
-
 use minitrace::local::LocalCollector;
 use minitrace::prelude::*;
 use minitrace::util::tree::tree_str_from_span_records;
