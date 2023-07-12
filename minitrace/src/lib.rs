@@ -239,6 +239,9 @@
 //! [`Span::set_local_parent()`]: crate::Span::set_local_parent
 //! [`LocalSpan::enter_with_local_parent()`]: crate::local::LocalSpan::enter_with_local_parent
 
+// Suppress a false-positive lint from clippy
+// TODO: remove me once https://github.com/rust-lang/rust-clippy/issues/11076 is released
+#![allow(unknown_lints)]
 #![allow(clippy::arc_with_non_send_sync)]
 
 pub mod collector;
