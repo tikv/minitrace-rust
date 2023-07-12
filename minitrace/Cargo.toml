@@ -13,7 +13,7 @@ keywords = ["tracing", "span", "datadog", "jaeger", "opentracing"]
 
 [dependencies]
 futures = "0.3"
-minitrace-macro = { path = "../minitrace-macro" }
+minitrace-macro = { version = "0.4.1", path = "../minitrace-macro" }
 minstant = "0.1"
 parking_lot = "0.12"
 pin-project = "1.0"
@@ -29,8 +29,8 @@ env_logger = "0.10"
 futures = "0.3"
 futures-timer = "3"
 log = "0.4"
-minitrace-datadog = { path = "../minitrace-datadog" }
-minitrace-jaeger = { path = "../minitrace-jaeger" }
+minitrace-datadog = { version = "0.4.1", path = "../minitrace-datadog" }
+minitrace-jaeger = { version = "0.4.1", path = "../minitrace-jaeger" }
 mockall = "0.11"
 opentelemetry = { version = "0.18", default-features = false, features = ["trace"] }
 opentelemetry-jaeger = "0.17"

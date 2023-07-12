@@ -26,9 +26,19 @@ jobs:
         toolchain: ${{ matrix.rust }}
         override: true
         components: rustfmt, clippy
+    - name: Install taplo-cli from crates.io
+      uses: baptiste0928/cargo-install@v2
+      with:
+        crate: taplo-cli
+        version: "0.8"
     - name: Check format
+      if: matrix.rust == 'nightly'
       run: cargo fmt --all -- --check
+    - name: Check Cargo.toml format
+      if: matrix.rust == 'nightly'
+      run: taplo fmt --check
     - name: Lints
+      if: matrix.rust == 'nightly'
       run: cargo clippy --all-targets --all-features -- --deny warnings
     - name: Build
       run: cargo build --workspace --all-targets
