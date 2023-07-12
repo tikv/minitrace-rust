@@ -171,8 +171,7 @@ fn multiple_threads_multiple_spans() {
             let local_collector = LocalCollector::start();
 
             for _ in 0..4 {
-                let merged =
-                    Span::enter_with_parents("merged", vec![&root_span1, &root_span2].into_iter());
+                let merged = Span::enter_with_parents("merged", vec![&root_span1, &root_span2]);
                 let _g = merged.set_local_parent();
                 let _local = LocalSpan::enter_with_local_parent("local");
                 scope.spawn(move |_| {

@@ -239,6 +239,8 @@
 //! [`Span::set_local_parent()`]: crate::Span::set_local_parent
 //! [`LocalSpan::enter_with_local_parent()`]: crate::local::LocalSpan::enter_with_local_parent
 
+#![allow(clippy::arc_with_non_send_sync)]
+
 pub mod collector;
 pub mod future;
 pub mod local;
