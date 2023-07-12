@@ -113,6 +113,12 @@ span1 []
     }
 
     #[test]
+    fn local_span_noop() {
+        let mut span1 = LocalSpan::enter_with_local_parent("span1");
+        span1.add_property(|| ("k1", "v1".to_string()));
+    }
+
+    #[test]
     #[should_panic]
     fn drop_out_of_order() {
         let stack = Rc::new(RefCell::new(LocalSpanStack::with_capacity(16)));
