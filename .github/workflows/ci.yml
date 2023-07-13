@@ -30,7 +30,7 @@ jobs:
       uses: baptiste0928/cargo-install@v2
       with:
         crate: taplo-cli
-        version: "0.8.1"
+        version: "0.7.2"
     - name: Check format
       if: matrix.rust == 'nightly'
       run: cargo fmt --all -- --check
