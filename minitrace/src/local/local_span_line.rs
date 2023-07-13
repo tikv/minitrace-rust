@@ -1,8 +1,10 @@
 // Copyright 2020 TiKV Project Authors. Licensed under Apache-2.0.
 
 use crate::collector::CollectTokenItem;
-use crate::local::span_queue::{SpanHandle, SpanQueue};
-use crate::util::{CollectToken, RawSpans};
+use crate::local::span_queue::SpanHandle;
+use crate::local::span_queue::SpanQueue;
+use crate::util::CollectToken;
+use crate::util::RawSpans;
 
 pub struct SpanLine {
     span_queue: SpanQueue,
@@ -136,19 +138,16 @@ span1 []
         let span = span_line.start_span("span").unwrap();
         let current_token = span_line.current_collect_token().unwrap();
         assert_eq!(current_token.len(), 2);
-        assert_eq!(
-            current_token.as_slice(),
-            &[
-                CollectTokenItem {
-                    parent_id_of_roots: span_line.span_queue.current_span_id().unwrap(),
-                    collect_id: 42,
-                },
-                CollectTokenItem {
-                    parent_id_of_roots: span_line.span_queue.current_span_id().unwrap(),
-                    collect_id: 43,
-                }
-            ]
-        );
+        assert_eq!(current_token.as_slice(), &[
+            CollectTokenItem {
+                parent_id_of_roots: span_line.span_queue.current_span_id().unwrap(),
+                collect_id: 42,
+            },
+            CollectTokenItem {
+                parent_id_of_roots: span_line.span_queue.current_span_id().unwrap(),
+                collect_id: 43,
+            }
+        ]);
         span_line.finish_span(span);
 
         let current_token = span_line.current_collect_token().unwrap();

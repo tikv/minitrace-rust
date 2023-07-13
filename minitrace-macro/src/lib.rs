@@ -11,11 +11,16 @@ extern crate proc_macro;
 #[macro_use]
 extern crate proc_macro_error;
 
+use proc_macro2::Span;
 use proc_macro2::TokenStream;
-use proc_macro2::{Span, TokenTree};
-use quote::{format_ident, quote_spanned};
+use proc_macro2::TokenTree;
+use quote::format_ident;
+use quote::quote_spanned;
+use syn::punctuated::Punctuated;
 use syn::spanned::Spanned;
-use syn::{punctuated::Punctuated, visit_mut::VisitMut, Ident, *};
+use syn::visit_mut::VisitMut;
+use syn::Ident;
+use syn::*;
 
 struct Args {
     event: String,

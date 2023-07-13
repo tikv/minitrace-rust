@@ -12,5 +12,6 @@ pub(crate) mod span_id;
 pub(crate) mod span_queue;
 
 pub use self::guard::Guard;
-pub use self::local_collector::{LocalCollector, LocalSpans};
+pub use self::local_collector::LocalCollector;
+pub use self::local_collector::LocalSpans;
 pub use self::local_span::LocalSpan;

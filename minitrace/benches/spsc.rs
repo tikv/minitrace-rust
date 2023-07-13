@@ -1,6 +1,8 @@
 // Copyright 2022 TiKV Project Authors. Licensed under Apache-2.0.
 
-use criterion::{criterion_group, criterion_main, Criterion};
+use criterion::criterion_group;
+use criterion::criterion_main;
+use criterion::Criterion;
 
 fn crossbeam(nmsg: usize) {
     let (tx, rx) = crossbeam::channel::bounded(10240);

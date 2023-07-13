@@ -1,6 +1,9 @@
 // Copyright 2022 TiKV Project Authors. Licensed under Apache-2.0.
 
-use criterion::{criterion_group, criterion_main, BatchSize, Criterion};
+use criterion::criterion_group;
+use criterion::criterion_main;
+use criterion::BatchSize;
+use criterion::Criterion;
 use minitrace::util::object_pool::Pool;
 
 fn bench_alloc_vec(c: &mut Criterion) {

@@ -17,7 +17,9 @@
 //!     let task = async {
 //!         async {
 //!             // some work
-//!         }.enter_on_poll("future is polled").await;
+//!         }
+//!         .enter_on_poll("future is polled")
+//!         .await;
 //!     }
 //!     .in_span(Span::enter_with_parent("task", &root));
 //!
@@ -51,10 +53,7 @@ pub trait FutureExt: std::future::Future + Sized {
     /// use minitrace::prelude::*;
     ///
     /// let (root, _collector) = Span::root("Root");
-    /// let task = async {
-    ///     42
-    /// }
-    /// .in_span(Span::enter_with_parent("Task", &root));
+    /// let task = async { 42 }.in_span(Span::enter_with_parent("Task", &root));
     ///
     /// tokio::spawn(task);
     /// # }
@@ -80,14 +79,10 @@ pub trait FutureExt: std::future::Future + Sized {
     ///
     /// let (root, _collector) = Span::root("Root");
     ///
-    /// let fut = async {
-    ///     9527
-    /// };
+    /// let fut = async { 9527 };
     ///
-    /// let task = async {
-    ///     fut.enter_on_poll("Sub Task").await
-    /// }
-    /// .in_span(Span::enter_with_parent("Task", &root));
+    /// let task = async { fut.enter_on_poll("Sub Task").await }
+    ///     .in_span(Span::enter_with_parent("Task", &root));
     ///
     /// tokio::spawn(task);
     /// # }

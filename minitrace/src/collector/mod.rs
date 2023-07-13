@@ -4,12 +4,12 @@
 
 pub(crate) mod command;
 
+use std::sync::Arc;
+
 use crate::local::raw_span::RawSpan;
 use crate::local::span_id::SpanId;
 use crate::local::LocalSpans;
 use crate::util::CollectToken;
-
-use std::sync::Arc;
 
 #[allow(dead_code)]
 mod global_collector;
@@ -52,8 +52,8 @@ pub struct CollectTokenItem {
 /// # Examples
 ///
 /// ```
-/// use minitrace::prelude::*;
 /// use futures::executor::block_on;
+/// use minitrace::prelude::*;
 ///
 /// let (root, collector) = Span::root("root");
 /// drop(root);
@@ -135,10 +135,12 @@ impl CollectArgs {
 
 #[cfg(test)]
 mod tests {
+    use futures::executor::block_on;
+    use mockall::predicate;
+    use mockall::Sequence;
+
     use super::*;
     use crate::collector::CollectTokenItem;
-    use futures::executor::block_on;
-    use mockall::{predicate, Sequence};
 
     #[test]
     fn collector_basic() {
@@ -163,13 +165,10 @@ mod tests {
 
         let mock = Arc::new(mock);
         let (collector, token) = Collector::start_collect(CollectArgs::default(), mock);
-        assert_eq!(
-            token.into_inner().1.as_slice(),
-            &[CollectTokenItem {
-                parent_id_of_roots: SpanId::default(),
-                collect_id: 42
-            }]
-        );
+        assert_eq!(token.into_inner().1.as_slice(), &[CollectTokenItem {
+            parent_id_of_roots: SpanId::default(),
+            collect_id: 42
+        }]);
         let spans = block_on(collector.collect());
         assert_eq!(spans.len(), 1);
         assert_eq!(spans[0].id, 9527);
@@ -194,12 +193,9 @@ mod tests {
 
         let mock = Arc::new(mock);
         let (_collector, token) = Collector::start_collect(CollectArgs::default(), mock);
-        assert_eq!(
-            token.into_inner().1.as_slice(),
-            &[CollectTokenItem {
-                parent_id_of_roots: SpanId::default(),
-                collect_id: 42
-            }]
-        );
+        assert_eq!(token.into_inner().1.as_slice(), &[CollectTokenItem {
+            parent_id_of_roots: SpanId::default(),
+            collect_id: 42
+        }]);
     }
 }

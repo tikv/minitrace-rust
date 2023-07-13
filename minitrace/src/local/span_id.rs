@@ -1,7 +1,8 @@
 // Copyright 2020 TiKV Project Authors. Licensed under Apache-2.0.
 
 use std::cell::Cell;
-use std::sync::atomic::{AtomicU16, Ordering};
+use std::sync::atomic::AtomicU16;
+use std::sync::atomic::Ordering;
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, Default)]
 pub struct SpanId(pub u32);
@@ -46,8 +47,9 @@ impl DefaultIdGenerator {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use std::collections::HashSet;
+
+    use super::*;
 
     #[test]
     #[allow(clippy::needless_collect)]

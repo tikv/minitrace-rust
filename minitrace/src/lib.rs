@@ -251,7 +251,6 @@ mod span;
 #[doc(hidden)]
 pub mod util;
 
-pub use crate::span::Span;
 /// An attribute-macro to help get rid of boilerplate.
 ///
 /// The span name is the function name by default. It can be customized by passing a string literal.
@@ -308,10 +307,16 @@ pub use crate::span::Span;
 /// [`in_span()`]: crate::future::FutureExt::in_span
 pub use minitrace_macro::trace;
 
+pub use crate::span::Span;
+
 pub mod prelude {
     //! A "prelude" for crates using the `minitrace` crate.
     #[doc(no_inline)]
-    pub use crate::collector::{CollectArgs, Collector, SpanRecord};
+    pub use crate::collector::CollectArgs;
+    #[doc(no_inline)]
+    pub use crate::collector::Collector;
+    #[doc(no_inline)]
+    pub use crate::collector::SpanRecord;
     #[doc(no_inline)]
     pub use crate::future::FutureExt as _;
     #[doc(no_inline)]

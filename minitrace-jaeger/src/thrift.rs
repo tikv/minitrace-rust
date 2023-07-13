@@ -4,7 +4,9 @@
 //!
 //! [jaeger.thrift]: https://github.com/uber/jaeger-idl/blob/master/thrift/jaeger.thrift
 
-use thrift_codec::data::{Field, List, Struct};
+use thrift_codec::data::Field;
+use thrift_codec::data::List;
+use thrift_codec::data::Struct;
 use thrift_codec::message::Message;
 
 #[derive(Debug, Clone)]

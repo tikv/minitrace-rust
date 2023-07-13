@@ -1,12 +1,15 @@
 // Copyright 2021 TiKV Project Authors. Licensed under Apache-2.0.
 
-use crate::local::local_span_stack::{LocalSpanStack, SpanLineHandle, LOCAL_SPAN_STACK};
-use crate::util::{CollectToken, RawSpans};
-
 use std::cell::RefCell;
 use std::rc::Rc;
 
 use minstant::Instant;
+
+use crate::local::local_span_stack::LocalSpanStack;
+use crate::local::local_span_stack::SpanLineHandle;
+use crate::local::local_span_stack::LOCAL_SPAN_STACK;
+use crate::util::CollectToken;
+use crate::util::RawSpans;
 
 /// A collector to collect [`LocalSpan`].
 ///
@@ -19,10 +22,11 @@ use minstant::Instant;
 /// # Examples
 ///
 /// ```
-/// use minitrace::prelude::*;
-/// use minitrace::local::LocalCollector;
-/// use futures::executor::block_on;
 /// use std::sync::Arc;
+///
+/// use futures::executor::block_on;
+/// use minitrace::local::LocalCollector;
+/// use minitrace::prelude::*;
 ///
 /// // Collect local spans manually without a parent
 /// let collector = LocalCollector::start();

@@ -1,19 +1,25 @@
 // Copyright 2020 TiKV Project Authors. Licensed under Apache-2.0.
 
-use crate::collector::GlobalCollect;
-use crate::collector::{CollectArgs, CollectTokenItem, Collector, SpanSet};
-use crate::local::local_span_stack::{LocalSpanStack, LOCAL_SPAN_STACK};
-use crate::local::raw_span::RawSpan;
-use crate::local::span_id::{DefaultIdGenerator, SpanId};
-use crate::local::Guard;
-use crate::local::{LocalCollector, LocalSpans};
-use crate::util::CollectToken;
-
 use std::cell::RefCell;
 use std::rc::Rc;
 use std::sync::Arc;
 
 use minstant::Instant;
+
+use crate::collector::CollectArgs;
+use crate::collector::CollectTokenItem;
+use crate::collector::Collector;
+use crate::collector::GlobalCollect;
+use crate::collector::SpanSet;
+use crate::local::local_span_stack::LocalSpanStack;
+use crate::local::local_span_stack::LOCAL_SPAN_STACK;
+use crate::local::raw_span::RawSpan;
+use crate::local::span_id::DefaultIdGenerator;
+use crate::local::span_id::SpanId;
+use crate::local::Guard;
+use crate::local::LocalCollector;
+use crate::local::LocalSpans;
+use crate::util::CollectToken;
 
 /// A thread-safe span.
 #[must_use]
@@ -103,9 +109,7 @@ impl Span {
 
     #[inline]
     pub fn add_property<F>(&mut self, property: F)
-    where
-        F: FnOnce() -> (&'static str, String),
-    {
+    where F: FnOnce() -> (&'static str, String) {
         self.add_properties(move || [property()]);
     }
 
@@ -233,18 +237,20 @@ impl Drop for Span {
 
 #[cfg(test)]
 mod tests {
+    use std::sync::atomic::AtomicU32;
+    use std::sync::atomic::Ordering;
+    use std::sync::Mutex;
+
+    use futures::executor::block_on;
+    use mockall::predicate;
+    use mockall::Sequence;
+    use rand::seq::SliceRandom;
+    use rand::thread_rng;
+
     use super::*;
     use crate::collector::MockGlobalCollect;
     use crate::local::LocalSpan;
     use crate::util::tree::tree_str_from_span_sets;
-
-    use std::sync::atomic::{AtomicU32, Ordering};
-    use std::sync::Mutex;
-
-    use futures::executor::block_on;
-    use mockall::{predicate, Sequence};
-    use rand::seq::SliceRandom;
-    use rand::thread_rng;
 
     #[test]
     fn noop_basic() {

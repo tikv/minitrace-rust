@@ -5,14 +5,16 @@ pub mod spsc;
 #[doc(hidden)]
 pub mod tree;
 
-use crate::collector::CollectTokenItem;
-use crate::local::raw_span::RawSpan;
-use crate::util::object_pool::{Pool, Puller, Reusable};
-
 use std::cell::RefCell;
 use std::iter::FromIterator;
 
 use once_cell::sync::Lazy;
+
+use crate::collector::CollectTokenItem;
+use crate::local::raw_span::RawSpan;
+use crate::util::object_pool::Pool;
+use crate::util::object_pool::Puller;
+use crate::util::object_pool::Reusable;
 
 static RAW_SPANS_POOL: Lazy<Pool<Vec<RawSpan>>> = Lazy::new(|| Pool::new(Vec::new, Vec::clear));
 static COLLECT_TOKEN_ITEMS_POOL: Lazy<Pool<Vec<CollectTokenItem>>> =

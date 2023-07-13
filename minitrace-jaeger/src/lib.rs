@@ -52,9 +52,13 @@ use minitrace::prelude::*;
 use thrift_codec::message::Message;
 use thrift_codec::CompactEncode;
 
-use crate::thrift::{
-    Batch, EmitBatchNotification, Process, Span as JaegerSpan, SpanRef, SpanRefKind, Tag,
-};
+use crate::thrift::Batch;
+use crate::thrift::EmitBatchNotification;
+use crate::thrift::Process;
+use crate::thrift::Span as JaegerSpan;
+use crate::thrift::SpanRef;
+use crate::thrift::SpanRefKind;
+use crate::thrift::Tag;
 
 pub fn encode(
     service_name: String,

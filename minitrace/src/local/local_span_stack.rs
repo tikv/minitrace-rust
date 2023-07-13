@@ -1,10 +1,12 @@
 // Copyright 2022 TiKV Project Authors. Licensed under Apache-2.0.
 
-use crate::local::local_span_line::{LocalSpanHandle, SpanLine};
-use crate::util::{CollectToken, RawSpans};
-
 use std::cell::RefCell;
 use std::rc::Rc;
+
+use crate::local::local_span_line::LocalSpanHandle;
+use crate::local::local_span_line::SpanLine;
+use crate::util::CollectToken;
+use crate::util::RawSpans;
 
 const DEFAULT_SPAN_STACK_SIZE: usize = 4096;
 const DEFAULT_SPAN_QUEUE_SIZE: usize = 10240;
@@ -196,15 +198,17 @@ span1 []
                 {
                     let span_line4 = span_stack.register_span_line(None).unwrap();
                     {
-                        assert!(span_stack
-                            .register_span_line(Some(
-                                CollectTokenItem {
-                                    parent_id_of_roots: SpanId::new(9528),
-                                    collect_id: 43
-                                }
-                                .into()
-                            ))
-                            .is_none());
+                        assert!(
+                            span_stack
+                                .register_span_line(Some(
+                                    CollectTokenItem {
+                                        parent_id_of_roots: SpanId::new(9528),
+                                        collect_id: 43
+                                    }
+                                    .into()
+                                ))
+                                .is_none()
+                        );
                         assert!(span_stack.register_span_line(None).is_none());
                     }
                     let _ = span_stack.unregister_and_collect(span_line4).unwrap();
@@ -212,15 +216,17 @@ span1 []
                 {
                     let span_line5 = span_stack.register_span_line(None).unwrap();
                     {
-                        assert!(span_stack
-                            .register_span_line(Some(
-                                CollectTokenItem {
-                                    parent_id_of_roots: SpanId::new(9529),
-                                    collect_id: 44
-                                }
-                                .into()
-                            ))
-                            .is_none());
+                        assert!(
+                            span_stack
+                                .register_span_line(Some(
+                                    CollectTokenItem {
+                                        parent_id_of_roots: SpanId::new(9529),
+                                        collect_id: 44
+                                    }
+                                    .into()
+                                ))
+                                .is_none()
+                        );
                         assert!(span_stack.register_span_line(None).is_none());
                     }
                     let _ = span_stack.unregister_and_collect(span_line5).unwrap();
@@ -241,10 +247,9 @@ span1 []
             collect_id: 1,
         };
         let span_line1 = span_stack.register_span_line(Some(token1.into())).unwrap();
-        assert_eq!(
-            span_stack.current_collect_token().unwrap().as_slice(),
-            &[token1]
-        );
+        assert_eq!(span_stack.current_collect_token().unwrap().as_slice(), &[
+            token1
+        ]);
         {
             let span_line2 = span_stack.register_span_line(None).unwrap();
             assert!(span_stack.current_collect_token().is_none());
@@ -254,10 +259,9 @@ span1 []
                     collect_id: 3,
                 };
                 let span_line3 = span_stack.register_span_line(Some(token3.into())).unwrap();
-                assert_eq!(
-                    span_stack.current_collect_token().unwrap().as_slice(),
-                    &[token3]
-                );
+                assert_eq!(span_stack.current_collect_token().unwrap().as_slice(), &[
+                    token3
+                ]);
                 let _ = span_stack.unregister_and_collect(span_line3).unwrap();
             }
             assert!(span_stack.current_collect_token().is_none());
@@ -268,16 +272,14 @@ span1 []
                 collect_id: 4,
             };
             let span_line4 = span_stack.register_span_line(Some(token4.into())).unwrap();
-            assert_eq!(
-                span_stack.current_collect_token().unwrap().as_slice(),
-                &[token4]
-            );
+            assert_eq!(span_stack.current_collect_token().unwrap().as_slice(), &[
+                token4
+            ]);
             let _ = span_stack.unregister_and_collect(span_line4).unwrap();
         }
-        assert_eq!(
-            span_stack.current_collect_token().unwrap().as_slice(),
-            &[token1]
-        );
+        assert_eq!(span_stack.current_collect_token().unwrap().as_slice(), &[
+            token1
+        ]);
         let _ = span_stack.unregister_and_collect(span_line1).unwrap();
         assert!(span_stack.current_collect_token().is_none());
     }

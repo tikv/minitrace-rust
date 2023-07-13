@@ -1,6 +1,7 @@
 // Copyright 2022 TiKV Project Authors. Licensed under Apache-2.0.
 
-use std::ops::{Deref, DerefMut};
+use std::ops::Deref;
+use std::ops::DerefMut;
 
 use parking_lot::Mutex;
 
@@ -93,8 +94,7 @@ impl<'a, T> Reusable<'a, T> {
 }
 
 impl<'a, T> std::fmt::Debug for Reusable<'a, T>
-where
-    T: std::fmt::Debug,
+where T: std::fmt::Debug
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         self.obj.as_ref().unwrap().fmt(f)

@@ -21,8 +21,9 @@ impl<F: FnOnce()> Drop for Guard<F> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use std::cell::Cell;
+
+    use super::*;
 
     #[test]
     fn guard_basic() {
