@@ -19,9 +19,9 @@ struct LocalSpanInner {
 
 impl LocalSpan {
     #[inline]
-    pub fn enter_with_local_parent(event: &'static str) -> Self {
+    pub fn enter_with_local_parent(name: &'static str) -> Self {
         let stack = LOCAL_SPAN_STACK.with(Rc::clone);
-        Self::enter_with_stack(event, stack)
+        Self::enter_with_stack(name, stack)
     }
 
     #[inline]
@@ -41,15 +41,14 @@ impl LocalSpan {
             span_stack.add_properties(span_handle, properties);
         }
     }
+}
 
+impl LocalSpan {
     #[inline]
-    pub(crate) fn enter_with_stack(
-        event: &'static str,
-        stack: Rc<RefCell<LocalSpanStack>>,
-    ) -> Self {
+    pub(crate) fn enter_with_stack(name: &'static str, stack: Rc<RefCell<LocalSpanStack>>) -> Self {
         let span_handle = {
             let mut stack = stack.borrow_mut();
-            stack.enter_span(event)
+            stack.enter_span(name)
         };
 
         let inner = span_handle.map(|span_handle| LocalSpanInner { stack, span_handle });

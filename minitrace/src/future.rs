@@ -90,8 +90,8 @@ pub trait FutureExt: std::future::Future + Sized {
     ///
     /// [`Future::poll()`]:(std::future::Future::poll)
     #[inline]
-    fn enter_on_poll(self, event: &'static str) -> EnterOnPoll<Self> {
-        EnterOnPoll { inner: self, event }
+    fn enter_on_poll(self, name: &'static str) -> EnterOnPoll<Self> {
+        EnterOnPoll { inner: self, name }
     }
 }
 
@@ -127,7 +127,7 @@ impl<T: std::future::Future> std::future::Future for InSpan<T> {
 pub struct EnterOnPoll<T> {
     #[pin]
     inner: T,
-    event: &'static str,
+    name: &'static str,
 }
 
 impl<T: std::future::Future> std::future::Future for EnterOnPoll<T> {
@@ -135,7 +135,7 @@ impl<T: std::future::Future> std::future::Future for EnterOnPoll<T> {
 
     fn poll(self: std::pin::Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> Poll<Self::Output> {
         let this = self.project();
-        let _guard = LocalSpan::enter_with_local_parent(this.event);
+        let _guard = LocalSpan::enter_with_local_parent(this.name);
         this.inner.poll(cx)
     }
 }

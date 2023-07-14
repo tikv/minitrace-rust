@@ -23,7 +23,7 @@ use syn::Ident;
 use syn::*;
 
 struct Args {
-    event: String,
+    name: String,
     enter_on_poll: bool,
 }
 
@@ -52,7 +52,7 @@ impl Args {
         }
 
         Args {
-            event: name,
+            name,
             enter_on_poll,
         }
     }
@@ -139,7 +139,7 @@ pub fn trace(
 
 /// Instrument a block
 fn gen_block(block: &Block, async_context: bool, args: Args) -> proc_macro2::TokenStream {
-    let event = args.event;
+    let name = args.name;
 
     // Generate the instrumented function body.
     // If the function is an `async fn`, this will wrap it in an async block.
@@ -149,14 +149,14 @@ fn gen_block(block: &Block, async_context: bool, args: Args) -> proc_macro2::Tok
             quote_spanned!(block.span()=>
                 minitrace::future::FutureExt::enter_on_poll(
                     async move { #block },
-                    #event
+                    #name
                 )
             )
         } else {
             quote_spanned!(block.span()=>
                 minitrace::future::FutureExt::in_span(
                     async move { #block },
-                    minitrace::Span::enter_with_local_parent( #event )
+                    minitrace::Span::enter_with_local_parent( #name )
                 )
             )
         }
@@ -166,7 +166,7 @@ fn gen_block(block: &Block, async_context: bool, args: Args) -> proc_macro2::Tok
         }
 
         quote_spanned!(block.span()=>
-            let __guard = minitrace::local::LocalSpan::enter_with_local_parent( #event );
+            let __guard = minitrace::local::LocalSpan::enter_with_local_parent( #name );
             #block
         )
     }

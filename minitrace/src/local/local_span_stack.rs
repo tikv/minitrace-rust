@@ -32,9 +32,9 @@ impl LocalSpanStack {
     }
 
     #[inline]
-    pub fn enter_span(&mut self, event: &'static str) -> Option<LocalSpanHandle> {
+    pub fn enter_span(&mut self, name: &'static str) -> Option<LocalSpanHandle> {
         let span_line = self.current_span_line()?;
-        span_line.start_span(event)
+        span_line.start_span(name)
     }
 
     #[inline]
@@ -45,6 +45,17 @@ impl LocalSpanStack {
                 local_span_handle.span_line_epoch
             );
             span_line.finish_span(local_span_handle);
+        }
+    }
+
+    #[inline]
+    pub fn add_event<I, F>(&mut self, name: &'static str, properties: F)
+    where
+        I: IntoIterator<Item = (&'static str, String)>,
+        F: FnOnce() -> I,
+    {
+        if let Some(span_line) = self.current_span_line() {
+            span_line.add_event(name, properties);
         }
     }
 

@@ -6,13 +6,15 @@ use std::net::SocketAddr;
 use futures::executor::block_on;
 use log::info;
 use minitrace::prelude::*;
+use minitrace::Event;
 
 fn main() {
     env_logger::Builder::from_default_env()
         .format(|buf, record| {
-            // Add a local span to represent the log record
-            let mut span = LocalSpan::enter_with_local_parent(record.level().as_str());
-            span.add_property(|| ("message", record.args().to_string()));
+            // Add a event to the current local span representing the log record
+            Event::add_to_local_parent(record.level().as_str(), || {
+                [("message", record.args().to_string())]
+            });
 
             // Output the log to stdout as usual
             writeln!(buf, "[{}] {}", record.level(), record.args())
@@ -35,17 +37,9 @@ fn main() {
 
     let spans = block_on(collector.collect());
 
-    const TRACE_ID: u64 = 42;
-    const SPAN_ID_PREFIX: u32 = 42;
-    const ROOT_PARENT_SPAN_ID: u64 = 0;
-    let bytes = minitrace_jaeger::encode(
-        String::from("service name"),
-        TRACE_ID,
-        ROOT_PARENT_SPAN_ID,
-        SPAN_ID_PREFIX,
-        &spans,
-    )
-    .expect("encode error");
+    let bytes =
+        minitrace_jaeger::encode(String::from("service name"), rand::random(), 0, 0, &spans)
+            .expect("encode error");
 
     let socket = SocketAddr::new("127.0.0.1".parse().unwrap(), 6831);
     minitrace_jaeger::report_blocking(socket, &bytes).expect("report error");

@@ -27,7 +27,7 @@ impl SpanQueue {
     }
 
     #[inline]
-    pub fn start_span(&mut self, event: &'static str) -> Option<SpanHandle> {
+    pub fn start_span(&mut self, name: &'static str) -> Option<SpanHandle> {
         if self.span_queue.len() >= self.capacity {
             return None;
         }
@@ -36,7 +36,8 @@ impl SpanQueue {
             DefaultIdGenerator::next_id(),
             self.next_parent_id.unwrap_or(SpanId(0)),
             Instant::now(),
-            event,
+            name,
+            false,
         );
         self.next_parent_id = Some(span.id);
 
@@ -58,6 +59,28 @@ impl SpanQueue {
         span.end_with(Instant::now());
 
         self.next_parent_id = Some(span.parent_id).filter(|id| *id != SpanId::default());
+    }
+
+    #[inline]
+    pub fn add_event<I, F>(&mut self, name: &'static str, properties: F)
+    where
+        I: IntoIterator<Item = (&'static str, String)>,
+        F: FnOnce() -> I,
+    {
+        if self.span_queue.len() >= self.capacity {
+            return;
+        }
+
+        let mut span = RawSpan::begin_with(
+            DefaultIdGenerator::next_id(),
+            self.next_parent_id.unwrap_or(SpanId(0)),
+            Instant::now(),
+            name,
+            true,
+        );
+        span.properties.extend(properties());
+
+        self.span_queue.push(span);
     }
 
     #[inline]

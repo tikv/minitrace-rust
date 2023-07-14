@@ -10,6 +10,7 @@ use minstant::Anchor;
 use once_cell::sync::Lazy;
 use parking_lot::Mutex;
 
+use super::EventRecord;
 use crate::collector::command::CollectCommand;
 use crate::collector::command::CommitCollect;
 use crate::collector::command::DropCollect;
@@ -263,29 +264,36 @@ fn merge_collection(span_collections: Vec<SpanCollection>, span_count: usize) ->
     let anchor = Anchor::new();
 
     let mut records = Vec::with_capacity(span_count);
+    let mut events: HashMap<SpanId, Vec<EventRecord>> = HashMap::new();
 
     for span_collection in span_collections {
         match span_collection {
             SpanCollection::Owned { spans, parent_id } => match spans {
-                SpanSet::Span(raw_span) => amend_span(&raw_span, parent_id, &mut records, &anchor),
+                SpanSet::Span(raw_span) => {
+                    amend_span(&raw_span, parent_id, &mut records, &mut events, &anchor)
+                }
                 SpanSet::LocalSpans(local_spans) => {
-                    amend_local_span(&local_spans, parent_id, &mut records, &anchor)
+                    amend_local_span(&local_spans, parent_id, &mut records, &mut events, &anchor)
                 }
                 SpanSet::SharedLocalSpans(local_spans) => {
-                    amend_local_span(&local_spans, parent_id, &mut records, &anchor)
+                    amend_local_span(&local_spans, parent_id, &mut records, &mut events, &anchor)
                 }
             },
             SpanCollection::Shared { spans, parent_id } => match &*spans {
-                SpanSet::Span(raw_span) => amend_span(raw_span, parent_id, &mut records, &anchor),
+                SpanSet::Span(raw_span) => {
+                    amend_span(raw_span, parent_id, &mut records, &mut events, &anchor)
+                }
                 SpanSet::LocalSpans(local_spans) => {
-                    amend_local_span(local_spans, parent_id, &mut records, &anchor)
+                    amend_local_span(local_spans, parent_id, &mut records, &mut events, &anchor)
                 }
                 SpanSet::SharedLocalSpans(local_spans) => {
-                    amend_local_span(local_spans, parent_id, &mut records, &anchor)
+                    amend_local_span(local_spans, parent_id, &mut records, &mut events, &anchor)
                 }
             },
         }
     }
+
+    mount_events(&mut records, events);
 
     records
 }
@@ -294,42 +302,85 @@ fn amend_local_span(
     local_spans: &LocalSpans,
     parent_id: SpanId,
     spans: &mut Vec<SpanRecord>,
+    events: &mut HashMap<SpanId, Vec<EventRecord>>,
     anchor: &Anchor,
 ) {
     for span in local_spans.spans.iter() {
         let begin_unix_time_ns = span.begin_instant.as_unix_nanos(anchor);
+        let parent_id = if span.parent_id == SpanId::default() {
+            parent_id
+        } else {
+            span.parent_id
+        };
+
+        if span.is_event {
+            let event = EventRecord {
+                name: span.name,
+                timestamp_unix_ns: begin_unix_time_ns,
+                properties: span.properties.clone(),
+            };
+            events.entry(parent_id).or_insert(vec![]).push(event);
+            continue;
+        }
+
         let end_unix_time_ns = if span.end_instant == span.begin_instant {
             local_spans.end_time.as_unix_nanos(anchor)
         } else {
             span.end_instant.as_unix_nanos(anchor)
         };
-        let parent_id = if span.parent_id.0 == 0 {
-            parent_id.0
-        } else {
-            span.parent_id.0
-        };
         spans.push(SpanRecord {
             id: span.id.0,
-            parent_id,
+            parent_id: parent_id.0,
             begin_unix_time_ns,
             duration_ns: end_unix_time_ns.saturating_sub(begin_unix_time_ns),
-            event: span.event,
+            name: span.name,
             properties: span.properties.clone(),
+            events: vec![],
         });
     }
 }
 
-fn amend_span(raw_span: &RawSpan, parent_id: SpanId, spans: &mut Vec<SpanRecord>, anchor: &Anchor) {
+fn amend_span(
+    raw_span: &RawSpan,
+    parent_id: SpanId,
+    spans: &mut Vec<SpanRecord>,
+    events: &mut HashMap<SpanId, Vec<EventRecord>>,
+    anchor: &Anchor,
+) {
     let begin_unix_time_ns = raw_span.begin_instant.as_unix_nanos(anchor);
+
+    if raw_span.is_event {
+        let event = EventRecord {
+            name: raw_span.name,
+            timestamp_unix_ns: begin_unix_time_ns,
+            properties: raw_span.properties.clone(),
+        };
+        events.entry(parent_id).or_insert(vec![]).push(event);
+        return;
+    }
+
     let end_unix_time_ns = raw_span.end_instant.as_unix_nanos(anchor);
     spans.push(SpanRecord {
         id: raw_span.id.0,
         parent_id: parent_id.0,
         begin_unix_time_ns,
         duration_ns: end_unix_time_ns.saturating_sub(begin_unix_time_ns),
-        event: raw_span.event,
+        name: raw_span.name,
         properties: raw_span.properties.clone(),
+        events: vec![],
     });
+}
+
+fn mount_events(records: &mut [SpanRecord], mut events: HashMap<SpanId, Vec<EventRecord>>) {
+    for record in records.iter_mut() {
+        if let Some(event) = events.remove(&SpanId(record.id)) {
+            if record.events.is_empty() {
+                record.events = event;
+            } else {
+                record.events.extend(event);
+            }
+        }
+    }
 }
 
 impl SpanSet {

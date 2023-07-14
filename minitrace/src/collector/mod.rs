@@ -34,7 +34,16 @@ pub struct SpanRecord {
     pub parent_id: u32,
     pub begin_unix_time_ns: u64,
     pub duration_ns: u64,
-    pub event: &'static str,
+    pub name: &'static str,
+    pub properties: Vec<(&'static str, String)>,
+    pub events: Vec<EventRecord>,
+}
+
+/// A span record been collected.
+#[derive(Clone, Debug, Default)]
+pub struct EventRecord {
+    pub name: &'static str,
+    pub timestamp_unix_ns: u64,
     pub properties: Vec<(&'static str, String)>,
 }
 
@@ -157,7 +166,7 @@ mod tests {
             .with(predicate::eq(42_u32))
             .return_const(vec![SpanRecord {
                 id: 9527,
-                event: "span",
+                name: "span",
                 ..SpanRecord::default()
             }]);
         mock.expect_submit_spans().times(0);
@@ -172,7 +181,7 @@ mod tests {
         let spans = block_on(collector.collect());
         assert_eq!(spans.len(), 1);
         assert_eq!(spans[0].id, 9527);
-        assert_eq!(spans[0].event, "span");
+        assert_eq!(spans[0].name, "span");
     }
 
     #[test]

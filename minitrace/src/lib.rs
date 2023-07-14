@@ -38,16 +38,18 @@
 //!   //         parent_id: 0,
 //!   //         begin_unix_time_ns: 1642166520139678013,
 //!   //         duration_ns: 16008,
-//!   //         event: "root",
+//!   //         name: "root",
 //!   //         properties: [],
+//!   //         events: [],
 //!   //     },
 //!   //     SpanRecord {
 //!   //         id: 2,
 //!   //         parent_id: 1,
 //!   //         begin_unix_time_ns: 1642166520139692070,
 //!   //         duration_ns: 634,
-//!   //         event: "a child span",
+//!   //         name: "a child span",
 //!   //         properties: [],
+//!   //         events: [],
 //!   //     },
 //!   // ]
 //!   ```
@@ -93,24 +95,27 @@
 //!   //         parent_id: 0,
 //!   //         begin_unix_time_ns: 1643101008017429580,
 //!   //         duration_ns: 64132,
-//!   //         event: "root",
+//!   //         name: "root",
 //!   //         properties: [],
+//!   //         events: [],
 //!   //     },
 //!   //     SpanRecord {
 //!   //         id: 2,
 //!   //         parent_id: 1,
 //!   //         begin_unix_time_ns: 1643101008017486383,
 //!   //         duration_ns: 4150,
-//!   //         event: "a child span",
+//!   //         name: "a child span",
 //!   //         properties: [],
+//!   //         events: [],
 //!   //     },
 //!   //     SpanRecord {
 //!   //         id: 3,
 //!   //         parent_id: 2,
 //!   //         begin_unix_time_ns: 1643101008017488703,
 //!   //         duration_ns: 1318,
-//!   //         event: "a child span of child span",
+//!   //         name: "a child span of child span",
 //!   //         properties: [],
+//!   //         events: [],
 //!   //     },
 //!   // ]
 //!   ```
@@ -144,25 +149,91 @@
 //!   //         parent_id: 0,
 //!   //         begin_unix_time_ns: 1642166791041022255,
 //!   //         duration_ns: 121705,
-//!   //         event: "root",
+//!   //         name: "root",
 //!   //         properties: [
 //!   //             (
 //!   //                 "key",
 //!   //                 "value",
 //!   //             ),
 //!   //         ],
+//!   //         events: [],
 //!   //     },
 //!   //     SpanRecord {
 //!   //         id: 2,
 //!   //         parent_id: 1,
 //!   //         begin_unix_time_ns: 1642166791041132550,
 //!   //         duration_ns: 7724,
-//!   //         event: "a child span",
+//!   //         name: "a child span",
 //!   //         properties: [
 //!   //             (
 //!   //                 "key",
 //!   //                 "value",
 //!   //             ),
+//!   //         ],
+//!   //         events: [],
+//!   //     },
+//!   // ]
+//!   ```
+//!
+//!
+//! ## Event
+//!
+//!   [`Event`] represent single points in time where something occurred during the execution of a program.
+//!   An `Event` can be seen as a log record attached to a span.
+//!
+//!   ```
+//!   use minitrace::prelude::*;
+//!   use futures::executor::block_on;
+//!
+//!   let (mut root, collector) = Span::root("root");
+//!
+//!   Event::add_to_parent("event in root", &root, || []);
+//!
+//!   {
+//!       let _guard = root.set_local_parent();
+//!       let mut span1 = LocalSpan::enter_with_local_parent("a child span");
+//!
+//!       Event::add_to_local_parent("event in span1", || [("key", "value".to_owned())]);
+//!   }
+//!
+//!   drop(root);
+//!   let records: Vec<SpanRecord> = block_on(collector.collect());
+//!
+//!   println!("{records:#?}");
+//!   // [
+//!   //     SpanRecord {
+//!   //         id: 1,
+//!   //         parent_id: 0,
+//!   //         begin_unix_time_ns: 1689321940550848459,
+//!   //         duration_ns: 25708,
+//!   //         name: "root",
+//!   //         properties: [],
+//!   //         events: [
+//!   //             EventRecord {
+//!   //                 name: "event in root",
+//!   //                 timestamp_unix_ns: 1689321940550870667,
+//!   //                 properties: [],
+//!   //             },
+//!   //         ],
+//!   //     },
+//!   //     SpanRecord {
+//!   //         id: 3,
+//!   //         parent_id: 1,
+//!   //         begin_unix_time_ns: 1689321940550874167,
+//!   //         duration_ns: 0,
+//!   //         name: "span1",
+//!   //         properties: [],
+//!   //         events: [
+//!   //             EventRecord {
+//!   //                 name: "event in span1",
+//!   //                 timestamp_unix_ns: 1689321940550874167,
+//!   //                 properties: [
+//!   //                     (
+//!   //                         "key",
+//!   //                         "value",
+//!   //                     ),
+//!   //                 ],
+//!   //             },
 //!   //         ],
 //!   //     },
 //!   // ]
@@ -206,7 +277,7 @@
 //!   //         parent_id: 0,
 //!   //         begin_unix_time_ns: 1642167988459480418,
 //!   //         duration_ns: 200741472,
-//!   //         event: "root",
+//!   //         name: "root",
 //!   //         properties: [],
 //!   //     },
 //!   //     SpanRecord {
@@ -214,7 +285,7 @@
 //!   //         parent_id: 1,
 //!   //         begin_unix_time_ns: 1642167988459571971,
 //!   //         duration_ns: 100084126,
-//!   //         event: "do_something",
+//!   //         name: "do_something",
 //!   //         properties: [],
 //!   //     },
 //!   //     SpanRecord {
@@ -222,7 +293,7 @@
 //!   //         parent_id: 1,
 //!   //         begin_unix_time_ns: 1642167988559887219,
 //!   //         duration_ns: 100306947,
-//!   //         event: "do_something_async",
+//!   //         name: "do_something_async",
 //!   //         properties: [],
 //!   //     },
 //!   // ]
@@ -245,6 +316,7 @@
 #![allow(clippy::arc_with_non_send_sync)]
 
 pub mod collector;
+mod event;
 pub mod future;
 pub mod local;
 mod span;
@@ -307,6 +379,7 @@ pub mod util;
 /// [`in_span()`]: crate::future::FutureExt::in_span
 pub use minitrace_macro::trace;
 
+pub use crate::event::Event;
 pub use crate::span::Span;
 
 pub mod prelude {
@@ -317,6 +390,8 @@ pub mod prelude {
     pub use crate::collector::Collector;
     #[doc(no_inline)]
     pub use crate::collector::SpanRecord;
+    #[doc(no_inline)]
+    pub use crate::event::Event;
     #[doc(no_inline)]
     pub use crate::future::FutureExt as _;
     #[doc(no_inline)]

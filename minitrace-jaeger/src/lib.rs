@@ -49,6 +49,7 @@ use std::error::Error;
 use std::net::SocketAddr;
 
 use minitrace::prelude::*;
+use thrift::Log;
 use thrift_codec::message::Message;
 use thrift_codec::CompactEncode;
 
@@ -84,7 +85,7 @@ pub fn encode(
                     } else {
                         (span_id_prefix as i64) << 32 | s.parent_id as i64
                     },
-                    operation_name: s.event.to_string(),
+                    operation_name: s.name.to_string(),
                     references: vec![SpanRef {
                         kind: SpanRefKind::FollowsFrom,
                         trace_id_low: trace_id as i64,
@@ -101,12 +102,26 @@ pub fn encode(
                     tags: s
                         .properties
                         .iter()
-                        .map(|p| Tag::String {
-                            key: p.0.to_owned(),
-                            value: p.1.to_owned(),
+                        .map(|(k, v)| Tag::String {
+                            key: k.to_string(),
+                            value: v.to_string(),
                         })
                         .collect(),
-                    logs: vec![],
+                    logs: s
+                        .events
+                        .iter()
+                        .map(|event| Log {
+                            timestamp: (event.timestamp_unix_ns / 1_000) as i64,
+                            fields: event
+                                .properties
+                                .iter()
+                                .map(|(k, v)| Tag::String {
+                                    key: k.to_string(),
+                                    value: v.to_string(),
+                                })
+                                .collect(),
+                        })
+                        .collect(),
                 })
                 .collect(),
         },
