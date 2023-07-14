@@ -45,6 +45,6 @@ async fn main() {
         opentelemetry_otlp::TonicConfig::default(),
     )
     .unwrap();
-    exporter.export(span_data).await.unwrap();
-    exporter.force_flush().await.unwrap();
+    exporter.export(span_data).await.ok();
+    exporter.force_flush().await.ok();
 }

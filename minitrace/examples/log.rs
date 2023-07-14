@@ -5,8 +5,17 @@ use std::net::SocketAddr;
 
 use futures::executor::block_on;
 use log::info;
+use log_derive::logfn;
+use log_derive::logfn_inputs;
 use minitrace::prelude::*;
 use minitrace::Event;
+
+#[logfn_inputs(DEBUG)]
+#[logfn(ok = "DEBUG", err = "ERROR")]
+#[trace]
+fn plus(a: u64, b: u64) -> Result<u64, std::io::Error> {
+    Ok(a + b)
+}
 
 fn main() {
     env_logger::Builder::from_default_env()
@@ -19,7 +28,7 @@ fn main() {
             // Output the log to stdout as usual
             writeln!(buf, "[{}] {}", record.level(), record.args())
         })
-        .filter_level(log::LevelFilter::Info)
+        .filter_level(log::LevelFilter::Debug)
         .init();
 
     let collector = {
@@ -32,14 +41,15 @@ fn main() {
 
         info!("event in child span");
 
+        plus(1, 2).unwrap();
+
         collector
     };
 
     let spans = block_on(collector.collect());
 
-    let bytes =
-        minitrace_jaeger::encode(String::from("service name"), rand::random(), 0, 0, &spans)
-            .expect("encode error");
+    let bytes = minitrace_jaeger::encode(String::from("log"), rand::random(), 0, 0, &spans)
+        .expect("encode error");
 
     let socket = SocketAddr::new("127.0.0.1".parse().unwrap(), 6831);
     minitrace_jaeger::report_blocking(socket, &bytes).expect("report error");

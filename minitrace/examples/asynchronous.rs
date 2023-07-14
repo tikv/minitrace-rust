@@ -73,4 +73,36 @@ async fn main() {
     minitrace_datadog::report("127.0.0.1:8126".parse().unwrap(), bytes)
         .await
         .ok();
+
+    // Report to OpenTelemetry
+    let instrumentation_lib = opentelemetry::InstrumentationLibrary::new(
+        "my-crate",
+        Some(env!("CARGO_PKG_VERSION")),
+        None,
+    );
+    let span_data = minitrace_opentelemetry::convert(
+        rand::random(),
+        opentelemetry::trace::TraceState::default(),
+        opentelemetry::trace::Status::Ok,
+        opentelemetry::trace::SpanKind::Server,
+        true,
+        std::borrow::Cow::Owned(opentelemetry::sdk::Resource::new([
+            opentelemetry::KeyValue::new("service.name", "asynchronous"),
+        ])),
+        instrumentation_lib,
+        0u64.to_le_bytes(),
+        0,
+        &spans,
+    );
+    let mut exporter = opentelemetry_otlp::SpanExporter::new_tonic(
+        opentelemetry_otlp::ExportConfig {
+            endpoint: "http://127.0.0.1:4317".to_string(),
+            protocol: opentelemetry_otlp::Protocol::Grpc,
+            timeout: Duration::from_secs(opentelemetry_otlp::OTEL_EXPORTER_OTLP_TIMEOUT_DEFAULT),
+        },
+        opentelemetry_otlp::TonicConfig::default(),
+    )
+    .unwrap();
+    exporter.export(span_data).await.ok();
+    exporter.force_flush().await.ok();
 }
