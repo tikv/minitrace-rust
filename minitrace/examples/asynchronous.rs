@@ -1,6 +1,9 @@
 // Copyright 2020 TiKV Project Authors. Licensed under Apache-2.0.
 
+use std::time::Duration;
+
 use minitrace::prelude::*;
+use opentelemetry::sdk::export::trace::SpanExporter as _;
 
 fn parallel_job() -> Vec<tokio::task::JoinHandle<()>> {
     let mut v = Vec::with_capacity(4);
