@@ -383,10 +383,6 @@ fn mount_events(records: &mut [SpanRecord], mut events: HashMap<SpanId, Vec<Even
             } else {
                 record.events.extend(event);
             }
-
-            if events.is_empty() {
-                return;
-            }
         }
     }
 }
