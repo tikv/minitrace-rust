@@ -372,11 +372,11 @@ fn amend_span(
 }
 
 fn mount_events(records: &mut [SpanRecord], mut events: HashMap<SpanId, Vec<EventRecord>>) {
-    if events.is_empty() {
-        return;
-    }
-
     for record in records.iter_mut() {
+        if events.is_empty() {
+            return;
+        }
+
         if let Some(event) = events.remove(&SpanId(record.id)) {
             if record.events.is_empty() {
                 record.events = event;

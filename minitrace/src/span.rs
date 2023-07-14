@@ -16,7 +16,6 @@ use crate::local::local_span_stack::LOCAL_SPAN_STACK;
 use crate::local::raw_span::RawSpan;
 use crate::local::span_id::DefaultIdGenerator;
 use crate::local::span_id::SpanId;
-use crate::local::Guard;
 use crate::local::LocalCollector;
 use crate::local::LocalSpans;
 use crate::util::CollectToken;
@@ -103,7 +102,7 @@ impl Span {
             .with(move |stack| Self::enter_with_stack(name, &mut (*stack).borrow_mut(), collect))
     }
 
-    pub fn set_local_parent(&self) -> Option<Guard<impl FnOnce()>> {
+    pub fn set_local_parent(&self) -> Option<impl Drop> {
         LOCAL_SPAN_STACK.with(|s| self.attach_into_stack(s))
     }
 
@@ -166,7 +165,7 @@ impl Span {
     pub(crate) fn attach_into_stack(
         &self,
         stack: &Rc<RefCell<LocalSpanStack>>,
-    ) -> Option<Guard<impl FnOnce()>> {
+    ) -> Option<impl Drop> {
         self.inner
             .as_ref()
             .map(move |inner| inner.capture_local_spans(stack.clone()))
@@ -186,11 +185,11 @@ impl SpanInner {
     }
 
     #[inline]
-    fn capture_local_spans(&self, stack: Rc<RefCell<LocalSpanStack>>) -> Guard<impl FnOnce()> {
+    fn capture_local_spans(&self, stack: Rc<RefCell<LocalSpanStack>>) -> impl Drop {
         let token = self.issue_collect_token().collect();
         let collector = LocalCollector::new(Some(token), stack);
         let collect = self.collect.clone();
-        Guard::new(move || {
+        defer::defer(move || {
             let (spans, token) = collector.collect_spans_and_token();
             debug_assert!(token.is_some());
             let token = token.unwrap_or_else(|| [].iter().collect());

@@ -1,9 +1,9 @@
 [package]
-name = "minitrace-jaeger"
+name = "minitrace-opentelemetry"
 version = "0.4.1"
 authors = ["The TiKV Project Authors"]
 license = "Apache-2.0"
-edition = "2021"
+edition = "2018"
 description = "Jaeger reporter for minitrace-rust"
 homepage = "https://github.com/tikv/minitrace-rust"
 repository = "https://github.com/tikv/minitrace-rust"
@@ -12,9 +12,11 @@ readme = "README.md"
 keywords = ["tracing", "span", "datadog", "jaeger", "opentelemetry"]
 
 [dependencies]
-minitrace = { version = "0.4.1", path = "../minitrace" }
-thrift_codec = "0.2"
-tokio = { version = "1", features = ["net"] }
+minitrace = { path = "../minitrace" }
+opentelemetry = { version = "0.19", features = ["trace"] }
 
 [dev-dependencies]
 futures = "0.3"
+opentelemetry-otlp = { version = "0.12", features = ["trace"] }
+rand = "0.8"
+tokio = { version = "1", features = ["rt-multi-thread"] }

@@ -5,6 +5,7 @@
 - Rename `SpanRecord.event` to `SpanRecord.name`.
 - Add `Event` type to represent single points in time during the span's lifetime.
 - Add `Event` support to minitrace-jaeger reporter.
+- Add `minitrace-opentelementry` reporter that reports spans to OpenTelemetry collector.
 
 ## v0.4.0
 

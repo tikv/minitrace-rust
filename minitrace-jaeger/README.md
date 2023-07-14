@@ -20,6 +20,8 @@ minitrace-jaeger = "0.4"
 docker run --rm -d -p6831:6831/udp -p16686:16686 --name jaeger jaegertracing/all-in-one:latest
 ```
 
+Web UI is available on http://127.0.0.1:16686/
+
 ## Report to Jaeger Agent
 
 ```rust
