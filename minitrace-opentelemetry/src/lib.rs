@@ -20,6 +20,8 @@
 //! use minitrace::prelude::*;
 //! use opentelemetry::sdk::export::trace::SpanExporter as _;
 //!
+//! # #[tokio::main]
+//! # async fn main() {
 //! // start trace
 //! let (root_span, collector) = Span::root("root");
 //!
@@ -27,7 +29,7 @@
 //! drop(root_span);
 //!
 //! // collect spans
-//! let spans = block_on(collector.collect());
+//! let spans = collector.collect().await;
 //!
 //! // report trace
 //! let instrumentation_lib = opentelemetry::InstrumentationLibrary::new(
@@ -60,7 +62,7 @@
 //! .unwrap();
 //! exporter.export(span_data).await.unwrap();
 //! exporter.force_flush().await.unwrap();
-//! ```
+//! # }
 
 use std::borrow::Cow;
 use std::time::Duration;
