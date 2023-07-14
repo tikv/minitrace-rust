@@ -14,7 +14,7 @@
 //!
 //! ## Report to OpenTelemetry Collector
 //!
-//! ```rust
+//! ```no_run
 //! use std::time::Duration;
 //!
 //! use minitrace::prelude::*;
