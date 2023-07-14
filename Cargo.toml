@@ -5,6 +5,7 @@ members = [
     "minitrace-macro",
     "minitrace-jaeger",
     "minitrace-datadog",
+    "minitrace-opentelemetry",
 ]
 
 [profile.bench]
