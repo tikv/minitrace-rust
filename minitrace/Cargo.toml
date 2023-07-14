@@ -12,6 +12,7 @@ readme = "../README.md"
 keywords = ["tracing", "span", "datadog", "jaeger", "opentelemetry"]
 
 [dependencies]
+defer = "0.1"
 futures = "0.3"
 minitrace-macro = { version = "0.4.1", path = "../minitrace-macro" }
 minstant = "0.1"
