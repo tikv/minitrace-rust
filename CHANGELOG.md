@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- Rename `SpanRecord.event` to `SpanRecord.name`.
+- Add `Event` type to represent single points in time during the span's lifetime.
+- Add `Event` support to minitrace-jaeger reporter.
+
 ## v0.4.0
 
 - Remove `LocalSpanGuard` and merge it into `LocalSpan`.
