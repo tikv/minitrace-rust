@@ -9,7 +9,7 @@ homepage = "https://github.com/tikv/minitrace-rust"
 repository = "https://github.com/tikv/minitrace-rust"
 documentation = "https://docs.rs/minitrace-jaeger"
 readme = "README.md"
-keywords = ["tracing", "span", "datadog", "jaeger", "opentracing"]
+keywords = ["tracing", "span", "datadog", "jaeger", "opentelemetry"]
 
 [dependencies]
 minitrace = { path = "../minitrace" }
