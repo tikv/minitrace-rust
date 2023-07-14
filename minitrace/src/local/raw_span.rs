@@ -9,8 +9,9 @@ pub struct RawSpan {
     pub id: SpanId,
     pub parent_id: SpanId,
     pub begin_instant: Instant,
-    pub event: &'static str,
+    pub name: &'static str,
     pub properties: Vec<(&'static str, String)>,
+    pub is_event: bool,
 
     // Will write this field at post processing
     pub end_instant: Instant,
@@ -22,14 +23,16 @@ impl RawSpan {
         id: SpanId,
         parent_id: SpanId,
         begin_instant: Instant,
-        event: &'static str,
+        name: &'static str,
+        is_event: bool,
     ) -> Self {
         RawSpan {
             id,
             parent_id,
             begin_instant,
-            event,
+            name,
             properties: vec![],
+            is_event,
             end_instant: begin_instant,
         }
     }

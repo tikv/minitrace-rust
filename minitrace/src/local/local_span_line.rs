@@ -31,9 +31,9 @@ impl SpanLine {
     }
 
     #[inline]
-    pub fn start_span(&mut self, event: &'static str) -> Option<LocalSpanHandle> {
+    pub fn start_span(&mut self, name: &'static str) -> Option<LocalSpanHandle> {
         Some(LocalSpanHandle {
-            span_handle: self.span_queue.start_span(event)?,
+            span_handle: self.span_queue.start_span(name)?,
             span_line_epoch: self.epoch,
         })
     }
@@ -43,6 +43,15 @@ impl SpanLine {
         if self.epoch == handle.span_line_epoch {
             self.span_queue.finish_span(handle.span_handle);
         }
+    }
+
+    #[inline]
+    pub fn add_event<I, F>(&mut self, name: &'static str, properties: F)
+    where
+        I: IntoIterator<Item = (&'static str, String)>,
+        F: FnOnce() -> I,
+    {
+        self.span_queue.add_event(name, properties);
     }
 
     #[inline]

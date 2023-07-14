@@ -24,11 +24,11 @@ use crate::util::CollectToken;
 /// A thread-safe span.
 #[must_use]
 pub struct Span {
-    inner: Option<SpanInner>,
+    pub(crate) inner: Option<SpanInner>,
 }
 
-struct SpanInner {
-    raw_span: RawSpan,
+pub(crate) struct SpanInner {
+    pub(crate) raw_span: RawSpan,
     collect_token: CollectToken,
     collect: GlobalCollect,
 }
@@ -41,9 +41,9 @@ impl Span {
     }
 
     #[inline]
-    pub fn root(event: &'static str, #[cfg(test)] collect: GlobalCollect) -> (Self, Collector) {
+    pub fn root(name: &'static str, #[cfg(test)] collect: GlobalCollect) -> (Self, Collector) {
         Self::root_with_args(
-            event,
+            name,
             CollectArgs::default(),
             #[cfg(test)]
             collect,
@@ -52,22 +52,22 @@ impl Span {
 
     #[inline]
     pub fn root_with_args(
-        event: &'static str,
+        name: &'static str,
         args: CollectArgs,
         #[cfg(test)] collect: GlobalCollect,
     ) -> (Self, Collector) {
         #[cfg(not(test))]
         let collect = GlobalCollect;
         let (collector, token) = Collector::start_collect(args, collect.clone());
-        let span = Self::new(token, event, collect);
+        let span = Self::new(token, name, collect);
         (span, collector)
     }
 
     #[inline]
-    pub fn enter_with_parent(event: &'static str, parent: &Span) -> Self {
+    pub fn enter_with_parent(name: &'static str, parent: &Span) -> Self {
         match &parent.inner {
             Some(_inner) => Self::enter_with_parents(
-                event,
+                name,
                 [parent],
                 #[cfg(test)]
                 _inner.collect.clone(),
@@ -78,7 +78,7 @@ impl Span {
 
     #[inline]
     pub fn enter_with_parents<'a>(
-        event: &'static str,
+        name: &'static str,
         parents: impl IntoIterator<Item = &'a Span>,
         #[cfg(test)] collect: GlobalCollect,
     ) -> Self {
@@ -89,18 +89,18 @@ impl Span {
             .filter_map(|span| span.inner.as_ref())
             .flat_map(|inner| inner.issue_collect_token())
             .collect();
-        Self::new(token, event, collect)
+        Self::new(token, name, collect)
     }
 
     #[inline]
     pub fn enter_with_local_parent(
-        event: &'static str,
+        name: &'static str,
         #[cfg(test)] collect: GlobalCollect,
     ) -> Self {
         #[cfg(not(test))]
         let collect = GlobalCollect;
         LOCAL_SPAN_STACK
-            .with(move |stack| Self::enter_with_stack(event, &mut (*stack).borrow_mut(), collect))
+            .with(move |stack| Self::enter_with_stack(name, &mut (*stack).borrow_mut(), collect))
     }
 
     pub fn set_local_parent(&self) -> Option<Guard<impl FnOnce()>> {
@@ -138,10 +138,10 @@ impl Span {
 
 impl Span {
     #[inline]
-    fn new(collect_token: CollectToken, event: &'static str, collect: GlobalCollect) -> Self {
+    fn new(collect_token: CollectToken, name: &'static str, collect: GlobalCollect) -> Self {
         let span_id = DefaultIdGenerator::next_id();
         let begin_instant = Instant::now();
-        let raw_span = RawSpan::begin_with(span_id, SpanId::default(), begin_instant, event);
+        let raw_span = RawSpan::begin_with(span_id, SpanId::default(), begin_instant, name, false);
 
         Self {
             inner: Some(SpanInner {
@@ -153,12 +153,12 @@ impl Span {
     }
 
     pub(crate) fn enter_with_stack(
-        event: &'static str,
+        name: &'static str,
         stack: &mut LocalSpanStack,
         collect: GlobalCollect,
     ) -> Self {
         match stack.current_collect_token() {
-            Some(token) => Span::new(token, event, collect),
+            Some(token) => Span::new(token, name, collect),
             None => Self::new_noop(),
         }
     }
@@ -218,19 +218,20 @@ impl SpanInner {
             },
         )
     }
+
+    #[inline]
+    pub(crate) fn submit_spans(self) {
+        self.collect
+            .submit_spans(SpanSet::Span(self.raw_span), self.collect_token);
+    }
 }
 
 impl Drop for Span {
     fn drop(&mut self) {
-        if let Some(SpanInner {
-            mut raw_span,
-            collect_token,
-            collect,
-        }) = self.inner.take()
-        {
+        if let Some(mut inner) = self.inner.take() {
             let end_instant = Instant::now();
-            raw_span.end_with(end_instant);
-            collect.submit_spans(SpanSet::Span(raw_span), collect_token);
+            inner.raw_span.end_with(end_instant);
+            inner.submit_spans();
         }
     }
 }

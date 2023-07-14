@@ -14,7 +14,7 @@ use crate::util::RawSpans;
 
 #[derive(Debug, PartialOrd, PartialEq, Ord, Eq)]
 pub struct Tree {
-    event: &'static str,
+    name: &'static str,
     children: Vec<Tree>,
     properties: Vec<(&'static str, String)>,
 }
@@ -31,7 +31,7 @@ impl Tree {
             f,
             "{:indent$}{} {:?}",
             "",
-            self.event,
+            self.name,
             self.properties,
             indent = depth * 4
         )?;
@@ -57,7 +57,7 @@ impl Tree {
         let spans = raw_spans.into_inner().1;
         children.insert(SpanId::default(), ("", vec![], vec![]));
         for span in &spans {
-            children.insert(span.id, (span.event, vec![], span.properties.clone()));
+            children.insert(span.id, (span.name, vec![], span.properties.clone()));
         }
         for span in &spans {
             children
@@ -90,14 +90,14 @@ impl Tree {
                         collect
                             .entry(item.collect_id)
                             .or_default()
-                            .insert(span.id, (span.event, vec![], span.properties.clone()));
+                            .insert(span.id, (span.name, vec![], span.properties.clone()));
                     }
                     SpanSet::LocalSpans(spans) => {
                         for span in spans.spans.iter() {
                             collect
                                 .entry(item.collect_id)
                                 .or_default()
-                                .insert(span.id, (span.event, vec![], span.properties.clone()));
+                                .insert(span.id, (span.name, vec![], span.properties.clone()));
                         }
                     }
                     SpanSet::SharedLocalSpans(spans) => {
@@ -105,7 +105,7 @@ impl Tree {
                             collect
                                 .entry(item.collect_id)
                                 .or_default()
-                                .insert(span.id, (span.event, vec![], span.properties.clone()));
+                                .insert(span.id, (span.name, vec![], span.properties.clone()));
                         }
                     }
                 }
@@ -191,7 +191,7 @@ impl Tree {
         for span in &span_records {
             children.insert(
                 SpanId::new(span.id),
-                (span.event, vec![], span.properties.clone()),
+                (span.name, vec![], span.properties.clone()),
             );
         }
         for span in &span_records {
@@ -214,9 +214,9 @@ impl Tree {
         id: SpanId,
         raw: &mut HashMap<SpanId, (&'static str, Vec<SpanId>, Vec<(&'static str, String)>)>,
     ) -> Tree {
-        let (event, children, properties) = raw.get(&id).cloned().unwrap();
+        let (name, children, properties) = raw.get(&id).cloned().unwrap();
         Tree {
-            event,
+            name,
             children: children
                 .into_iter()
                 .map(|id| Self::build_tree(id, raw))

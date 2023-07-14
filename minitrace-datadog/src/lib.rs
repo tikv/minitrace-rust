@@ -65,7 +65,7 @@ pub fn encode(
     spans: &[SpanRecord],
 ) -> Result<Vec<u8>, Box<dyn Error + Send + Sync + 'static>> {
     let spans = spans.iter().map(|s| MPSpan {
-        name: s.event,
+        name: s.name,
         service: service_name,
         trace_type,
         resource,
