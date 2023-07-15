@@ -26,21 +26,16 @@
 //! let spans = block_on(collector.collect());
 //!
 //! // encode trace
+//! const NODE_ID: u32 = 42;
 //! const TRACE_ID: u64 = 42;
-//! const SPAN_ID_PREFIX: u32 = 42;
 //! const ROOT_PARENT_SPAN_ID: u64 = 0;
-//! let bytes = minitrace_jaeger::encode(
-//!     String::from("service name"),
-//!     TRACE_ID,
-//!     ROOT_PARENT_SPAN_ID,
-//!     SPAN_ID_PREFIX,
-//!     &spans,
-//! )
-//! .expect("encode error");
+//! let jaeger_spans =
+//!     minitrace_jaeger::convert(&spans, NODE_ID, TRACE_ID, ROOT_PARENT_SPAN_ID).collect();
 //!
 //! // report trace
 //! let socket = SocketAddr::new("127.0.0.1".parse().unwrap(), 6831);
-//! minitrace_jaeger::report_blocking(socket, &bytes).expect("report error");
+//! minitrace_jaeger::report_blocking("service name".to_string(), socket, jaeger_spans)
+//!     .expect("report error");
 //! ```
 
 mod thrift;
@@ -57,86 +52,62 @@ use crate::thrift::Batch;
 use crate::thrift::EmitBatchNotification;
 use crate::thrift::Process;
 use crate::thrift::Span as JaegerSpan;
-use crate::thrift::SpanRef;
-use crate::thrift::SpanRefKind;
 use crate::thrift::Tag;
 
-pub fn encode(
-    service_name: String,
+pub fn convert(
+    spans: &[SpanRecord],
+    // A unique node id in the cluster to avoid span id conflict
+    node_id: u32,
     trace_id: u64,
     root_parent_span_id: u64,
-    span_id_prefix: u32,
-    spans: &[SpanRecord],
-) -> Result<Vec<u8>, Box<dyn Error + Send + Sync + 'static>> {
-    let bn = EmitBatchNotification {
-        batch: Batch {
-            process: Process {
-                service_name,
-                tags: vec![],
-            },
-            spans: spans
-                .iter()
-                .map(|s| JaegerSpan {
-                    trace_id_low: trace_id as i64,
-                    trace_id_high: 0,
-                    span_id: (span_id_prefix as i64) << 32 | s.id as i64,
-                    parent_span_id: if s.parent_id == 0 {
-                        root_parent_span_id as i64
-                    } else {
-                        (span_id_prefix as i64) << 32 | s.parent_id as i64
-                    },
-                    operation_name: s.name.to_string(),
-                    references: vec![SpanRef {
-                        kind: SpanRefKind::FollowsFrom,
-                        trace_id_low: trace_id as i64,
-                        trace_id_high: 0,
-                        span_id: if s.parent_id == 0 {
-                            root_parent_span_id as i64
-                        } else {
-                            (span_id_prefix as i64) << 32 | s.parent_id as i64
-                        },
-                    }],
-                    flags: 1,
-                    start_time: (s.begin_unix_time_ns / 1_000) as i64,
-                    duration: (s.duration_ns / 1_000) as i64,
-                    tags: s
-                        .properties
-                        .iter()
-                        .map(|(k, v)| Tag::String {
-                            key: k.to_string(),
-                            value: v.to_string(),
-                        })
-                        .collect(),
-                    logs: s
-                        .events
-                        .iter()
-                        .map(|event| Log {
-                            timestamp: (event.timestamp_unix_ns / 1_000) as i64,
-                            fields: event
-                                .properties
-                                .iter()
-                                .map(|(k, v)| Tag::String {
-                                    key: k.to_string(),
-                                    value: v.to_string(),
-                                })
-                                .collect(),
-                        })
-                        .collect(),
-                })
-                .collect(),
+) -> impl Iterator<Item = JaegerSpan> + '_ {
+    spans.iter().map(move |s| JaegerSpan {
+        trace_id_low: trace_id as i64,
+        trace_id_high: 0,
+        span_id: (node_id as i64) << 32 | s.id as i64,
+        parent_span_id: if s.parent_id == 0 {
+            root_parent_span_id as i64
+        } else {
+            (node_id as i64) << 32 | s.parent_id as i64
         },
-    };
-
-    let mut bytes = Vec::new();
-    let msg = Message::from(bn);
-    msg.compact_encode(&mut bytes)?;
-    Ok(bytes)
+        operation_name: s.name.to_string(),
+        references: vec![],
+        flags: 1,
+        start_time: (s.begin_unix_time_ns / 1_000) as i64,
+        duration: (s.duration_ns / 1_000) as i64,
+        tags: s
+            .properties
+            .iter()
+            .map(|(k, v)| Tag::String {
+                key: k.to_string(),
+                value: v.to_string(),
+            })
+            .collect(),
+        logs: s
+            .events
+            .iter()
+            .map(|event| Log {
+                timestamp: (event.timestamp_unix_ns / 1_000) as i64,
+                fields: event
+                    .properties
+                    .iter()
+                    .map(|(k, v)| Tag::String {
+                        key: k.to_string(),
+                        value: v.to_string(),
+                    })
+                    .collect(),
+            })
+            .collect(),
+    })
 }
 
 pub async fn report(
+    service_name: String,
     agent: SocketAddr,
-    bytes: &[u8],
+    spans: Vec<JaegerSpan>,
 ) -> Result<(), Box<dyn Error + Send + Sync + 'static>> {
+    let bytes = serialize(service_name, spans)?;
+
     let local_addr: SocketAddr = if agent.is_ipv4() {
         "0.0.0.0:0"
     } else {
@@ -146,15 +117,18 @@ pub async fn report(
     .unwrap();
 
     let udp = tokio::net::UdpSocket::bind(local_addr).await?;
-    udp.send_to(bytes, agent).await?;
+    udp.send_to(&bytes, agent).await?;
 
     Ok(())
 }
 
 pub fn report_blocking(
+    service_name: String,
     agent: SocketAddr,
-    bytes: &[u8],
+    spans: Vec<JaegerSpan>,
 ) -> Result<(), Box<dyn Error + Send + Sync + 'static>> {
+    let bytes = serialize(service_name, spans)?;
+
     let local_addr: SocketAddr = if agent.is_ipv4() {
         "0.0.0.0:0"
     } else {
@@ -164,7 +138,28 @@ pub fn report_blocking(
     .unwrap();
 
     let udp = std::net::UdpSocket::bind(local_addr)?;
-    udp.send_to(bytes, agent)?;
+    udp.send_to(&bytes, agent)?;
 
     Ok(())
+}
+
+fn serialize(
+    service_name: String,
+    spans: Vec<JaegerSpan>,
+) -> Result<Vec<u8>, Box<dyn Error + Send + Sync + 'static>> {
+    let bn = EmitBatchNotification {
+        batch: Batch {
+            process: Process {
+                service_name,
+                tags: vec![],
+            },
+            spans,
+        },
+    };
+
+    let mut bytes = Vec::new();
+    let msg = Message::from(bn);
+    msg.compact_encode(&mut bytes)?;
+
+    Ok(bytes)
 }

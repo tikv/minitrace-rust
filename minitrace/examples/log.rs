@@ -48,9 +48,9 @@ fn main() {
 
     let spans = block_on(collector.collect());
 
-    let bytes = minitrace_jaeger::encode(String::from("log"), rand::random(), 0, 0, &spans)
-        .expect("encode error");
+    let jaeger_spans = minitrace_jaeger::convert(&spans, 0, rand::random(), 0).collect();
 
     let socket = SocketAddr::new("127.0.0.1".parse().unwrap(), 6831);
-    minitrace_jaeger::report_blocking(socket, &bytes).expect("report error");
+    minitrace_jaeger::report_blocking("log".to_string(), socket, jaeger_spans)
+        .expect("report error");
 }

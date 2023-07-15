@@ -55,25 +55,28 @@ async fn main() {
     let spans = collector.collect().await;
 
     // Report to Jaeger
-    let bytes =
-        minitrace_jaeger::encode("asynchronous".to_owned(), rand::random(), 0, 0, &spans).unwrap();
-    minitrace_jaeger::report("127.0.0.1:6831".parse().unwrap(), &bytes)
-        .await
-        .ok();
+    let jaeger_spans = minitrace_jaeger::convert(&spans, 0, rand::random(), 0).collect();
+    minitrace_jaeger::report(
+        "asynchronous".to_string(),
+        "127.0.0.1:6831".parse().unwrap(),
+        jaeger_spans,
+    )
+    .await
+    .ok();
 
     // Report to Datadog
-    let bytes = minitrace_datadog::encode(
+    let datadog_spans = minitrace_datadog::convert(
+        &spans,
+        0,
+        rand::random(),
+        0,
         "asynchronous",
         "db",
         "select",
         0,
-        rand::random(),
-        0,
-        0,
-        &spans,
     )
-    .unwrap();
-    minitrace_datadog::report("127.0.0.1:8126".parse().unwrap(), bytes)
+    .collect();
+    minitrace_datadog::report("127.0.0.1:8126".parse().unwrap(), datadog_spans)
         .await
         .ok();
 
@@ -83,8 +86,11 @@ async fn main() {
         Some(env!("CARGO_PKG_VERSION")),
         None,
     );
-    let span_data = minitrace_opentelemetry::convert(
+    let otlp_spans = minitrace_opentelemetry::convert(
+        &spans,
+        0,
         rand::random(),
+        0u64.to_le_bytes(),
         opentelemetry::trace::TraceState::default(),
         opentelemetry::trace::Status::Ok,
         opentelemetry::trace::SpanKind::Server,
@@ -93,10 +99,8 @@ async fn main() {
             opentelemetry::KeyValue::new("service.name", "asynchronous"),
         ])),
         instrumentation_lib,
-        0u64.to_le_bytes(),
-        0,
-        &spans,
-    );
+    )
+    .collect();
     let mut exporter = opentelemetry_otlp::SpanExporter::new_tonic(
         opentelemetry_otlp::ExportConfig {
             endpoint: "http://127.0.0.1:4317".to_string(),
@@ -106,6 +110,6 @@ async fn main() {
         opentelemetry_otlp::TonicConfig::default(),
     )
     .unwrap();
-    exporter.export(span_data).await.ok();
+    exporter.export(otlp_spans).await.ok();
     exporter.force_flush().await.ok();
 }

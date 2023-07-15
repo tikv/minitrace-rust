@@ -24,25 +24,25 @@
 //! let spans = block_on(collector.collect());
 //!
 //! // encode trace
-//! const ERROR_CODE: i32 = 0;
+//! const NODE_ID: u32 = 42;
 //! const TRACE_ID: u64 = 42;
-//! const SPAN_ID_PREFIX: u32 = 42;
 //! const ROOT_PARENT_SPAN_ID: u64 = 0;
-//! let bytes = minitrace_datadog::encode(
+//! const ERROR_CODE: i32 = 0;
+//! let datadog_spans = minitrace_datadog::convert(
+//!     &spans,
+//!     NODE_ID,
+//!     TRACE_ID,
+//!     ROOT_PARENT_SPAN_ID,
 //!     "service_name",
 //!     "trace_type",
 //!     "resource",
 //!     ERROR_CODE,
-//!     TRACE_ID,
-//!     ROOT_PARENT_SPAN_ID,
-//!     SPAN_ID_PREFIX,
-//!     &spans,
 //! )
-//! .expect("encode error");
+//! .collect();
 //!
 //! // report trace
 //! let socket = SocketAddr::new("127.0.0.1".parse().unwrap(), 8126);
-//! minitrace_datadog::report_blocking(socket, bytes).expect("report error");
+//! minitrace_datadog::report_blocking(socket, datadog_spans).expect("report error");
 //! ```
 
 use std::collections::HashMap;
@@ -54,17 +54,18 @@ use rmp_serde::Serializer;
 use serde::Serialize;
 
 #[allow(clippy::too_many_arguments)]
-pub fn encode(
-    service_name: &str,
-    trace_type: &str,
-    resource: &str,
-    error_code: i32,
+pub fn convert<'a>(
+    spans: &'a [SpanRecord],
+    // A unique node id in the cluster to avoid span id conflict
+    node_id: u32,
     trace_id: u64,
     root_parent_span_id: u64,
-    span_id_prefix: u32,
-    spans: &[SpanRecord],
-) -> Result<Vec<u8>, Box<dyn Error + Send + Sync + 'static>> {
-    let spans = spans.iter().map(|s| MPSpan {
+    service_name: &'a str,
+    trace_type: &'a str,
+    resource: &'a str,
+    error_code: i32,
+) -> impl Iterator<Item = MPSpan<'a>> + 'a {
+    spans.iter().map(move |s| MPSpan {
         name: s.name,
         service: service_name,
         trace_type,
@@ -77,27 +78,22 @@ pub fn encode(
             Some(s.properties.iter().map(|(k, v)| (*k, v.as_ref())).collect())
         },
         error_code,
-        span_id: (span_id_prefix as u64) << 32 | s.id as u64,
+        span_id: (node_id as u64) << 32 | s.id as u64,
         trace_id,
         parent_id: if s.parent_id == 0 {
             root_parent_span_id
         } else {
-            (span_id_prefix as u64) << 32 | s.parent_id as u64
+            (node_id as u64) << 32 | s.parent_id as u64
         },
-    });
-
-    let mut buf = vec![0b10010001];
-    spans
-        .collect::<Vec<_>>()
-        .serialize(&mut Serializer::new(&mut buf).with_struct_map())?;
-
-    Ok(buf)
+    })
 }
 
 pub fn report_blocking(
     agent: SocketAddr,
-    bytes: Vec<u8>,
+    spans: Vec<MPSpan>,
 ) -> Result<(), Box<dyn Error + Send + Sync + 'static>> {
+    let bytes = serialize(spans)?;
+
     let client = reqwest::blocking::Client::new();
     let rep = client
         .post(format!("http://{}/v0.4/traces", agent))
@@ -116,8 +112,10 @@ pub fn report_blocking(
 
 pub async fn report(
     agent: SocketAddr,
-    bytes: Vec<u8>,
+    spans: Vec<MPSpan<'_>>,
 ) -> Result<(), Box<dyn Error + Send + Sync + 'static>> {
+    let bytes = serialize(spans)?;
+
     let client = reqwest::Client::new();
     let rep = client
         .post(&format!("http://{}/v0.4/traces", agent))
@@ -136,7 +134,7 @@ pub async fn report(
 }
 
 #[derive(Serialize)]
-struct MPSpan<'a> {
+pub struct MPSpan<'a> {
     name: &'a str,
     service: &'a str,
     #[serde(rename = "type")]
@@ -150,4 +148,11 @@ struct MPSpan<'a> {
     span_id: u64,
     trace_id: u64,
     parent_id: u64,
+}
+
+fn serialize(spans: Vec<MPSpan>) -> Result<Vec<u8>, Box<dyn Error + Send + Sync + 'static>> {
+    let mut buf = vec![0b10010001];
+    spans.serialize(&mut Serializer::new(&mut buf).with_struct_map())?;
+
+    Ok(buf)
 }

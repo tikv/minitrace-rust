@@ -13,6 +13,8 @@ use crate::util::CollectToken;
 
 #[allow(dead_code)]
 mod global_collector;
+use futures::Future;
+use futures::FutureExt;
 #[cfg(not(test))]
 pub(crate) use global_collector::GlobalCollect;
 #[cfg(test)]
@@ -97,11 +99,14 @@ impl Collector {
     /// work are moved to a background thread, and thus, we have to wait for the background thread to send
     /// the result back. It usually takes 10 milliseconds because the background thread wakes up and processes
     /// messages every 10 milliseconds.
-    pub async fn collect(mut self) -> Vec<SpanRecord> {
-        match self.collect_id.take() {
-            Some(collect_id) => self.collect.commit_collect(collect_id).await,
-            None => Vec::default(),
+    pub fn collect(mut self) -> Collected {
+        let (tx, rx) = futures::channel::oneshot::channel();
+
+        if let Some(collect_id) = self.collect_id.take() {
+            self.collect.commit_collect(collect_id, tx);
         }
+
+        Collected { rx }
     }
 }
 
@@ -110,6 +115,23 @@ impl Drop for Collector {
         if let Some(collect_id) = self.collect_id {
             self.collect.drop_collect(collect_id);
         }
+    }
+}
+
+/// The future of [`Collector::collect()`].
+pub struct Collected {
+    rx: futures::channel::oneshot::Receiver<Vec<SpanRecord>>,
+}
+
+impl Future for Collected {
+    type Output = Vec<SpanRecord>;
+
+    fn poll(
+        mut self: std::pin::Pin<&mut Self>,
+        cx: &mut std::task::Context<'_>,
+    ) -> std::task::Poll<Self::Output> {
+        let spans = futures::ready!(self.rx.poll_unpin(cx)).unwrap_or_default();
+        std::task::Poll::Ready(spans)
     }
 }
 
@@ -163,12 +185,15 @@ mod tests {
         mock.expect_commit_collect()
             .times(1)
             .in_sequence(&mut seq)
-            .with(predicate::eq(42_u32))
-            .return_const(vec![SpanRecord {
-                id: 9527,
-                name: "span",
-                ..SpanRecord::default()
-            }]);
+            .with(predicate::eq(42_u32), predicate::always())
+            .returning(|_, tx| {
+                tx.send(vec![SpanRecord {
+                    id: 9527,
+                    name: "span",
+                    ..SpanRecord::default()
+                }])
+                .unwrap();
+            });
         mock.expect_submit_spans().times(0);
         mock.expect_drop_collect().times(0);
 

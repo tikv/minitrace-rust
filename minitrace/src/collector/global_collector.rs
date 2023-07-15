@@ -63,13 +63,15 @@ impl GlobalCollect {
         collect_id
     }
 
-    pub async fn commit_collect(&self, collect_id: u32) -> Vec<SpanRecord> {
-        let (tx, rx) = futures::channel::oneshot::channel();
+    pub fn commit_collect(
+        &self,
+        collect_id: u32,
+        tx: futures::channel::oneshot::Sender<Vec<SpanRecord>>,
+    ) {
         force_send_command(CollectCommand::CommitCollect(CommitCollect {
             collect_id,
             tx,
         }));
-        rx.await.unwrap_or_else(|_| Vec::new())
     }
 
     pub fn drop_collect(&self, collect_id: u32) {

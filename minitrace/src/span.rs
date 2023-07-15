@@ -301,8 +301,10 @@ mod tests {
         mock.expect_commit_collect()
             .times(1)
             .in_sequence(&mut seq)
-            .with(predicate::eq(42_u32))
-            .return_const(vec![]);
+            .with(predicate::eq(42_u32), predicate::always())
+            .returning(|_, tx| {
+                tx.send(vec![]).unwrap();
+            });
         mock.expect_drop_collect().times(0);
 
         routine(Arc::new(mock));
@@ -373,8 +375,10 @@ root []
         mock.expect_commit_collect()
             .times(5)
             .in_sequence(&mut seq)
-            .with(predicate::in_iter([1_u32, 2, 3, 4, 5]))
-            .return_const(vec![]);
+            .with(predicate::in_iter([1_u32, 2, 3, 4, 5]), predicate::always())
+            .returning(|_, tx| {
+                tx.send(vec![]).unwrap();
+            });
         mock.expect_drop_collect().times(0);
 
         routine(Arc::new(mock));
@@ -465,8 +469,10 @@ parent5 []
         mock.expect_commit_collect()
             .times(5)
             .in_sequence(&mut seq)
-            .with(predicate::in_iter([1_u32, 2, 3, 4, 5]))
-            .return_const(vec![]);
+            .with(predicate::in_iter([1_u32, 2, 3, 4, 5]), predicate::always())
+            .returning(|_, tx| {
+                tx.send(vec![]).unwrap();
+            });
         mock.expect_drop_collect().times(0);
 
         routine(Arc::new(mock));
@@ -537,8 +543,10 @@ parent5 []
         mock.expect_commit_collect()
             .times(1)
             .in_sequence(&mut seq)
-            .with(predicate::eq(42_u32))
-            .return_const(vec![]);
+            .with(predicate::eq(42_u32), predicate::always())
+            .returning(|_, tx| {
+                tx.send(vec![]).unwrap();
+            });
         mock.expect_drop_collect().times(0);
 
         routine(Arc::new(mock));

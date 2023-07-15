@@ -279,6 +279,7 @@
 //!   //         duration_ns: 200741472,
 //!   //         name: "root",
 //!   //         properties: [],
+//!   //         events: [],
 //!   //     },
 //!   //     SpanRecord {
 //!   //         id: 2,
@@ -287,6 +288,7 @@
 //!   //         duration_ns: 100084126,
 //!   //         name: "do_something",
 //!   //         properties: [],
+//!   //         events: [],
 //!   //     },
 //!   //     SpanRecord {
 //!   //         id: 3,
@@ -295,6 +297,7 @@
 //!   //         duration_ns: 100306947,
 //!   //         name: "do_something_async",
 //!   //         properties: [],
+//!   //         events: [],
 //!   //     },
 //!   // ]
 //!   ```
