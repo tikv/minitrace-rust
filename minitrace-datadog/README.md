@@ -36,23 +36,23 @@ drop(root_span);
 let spans = block_on(collector.collect());
 
 // encode trace
-const ERROR_CODE: i32 = 0;
+const NODE_ID: u32 = 42;
 const TRACE_ID: u64 = 42;
-const SPAN_ID_PREFIX: u32 = 42;
 const ROOT_PARENT_SPAN_ID: u64 = 0;
-let bytes = minitrace_datadog::encode(
+const ERROR_CODE: i32 = 0;
+let datadog_spans = minitrace_datadog::convert(
+    &spans,
+    NODE_ID,
+    TRACE_ID,
+    ROOT_PARENT_SPAN_ID,
     "service_name",
     "trace_type",
     "resource",
     ERROR_CODE,
-    TRACE_ID,
-    ROOT_PARENT_SPAN_ID,
-    SPAN_ID_PREFIX,
-    &spans,
 )
-.expect("encode error");
+.collect();
 
 // report trace
 let socket = SocketAddr::new("127.0.0.1".parse().unwrap(), 8126);
-minitrace_datadog::report_blocking(socket, bytes).expect("report error");
+minitrace_datadog::report_blocking(socket, datadog_spans).expect("report error");
 ```

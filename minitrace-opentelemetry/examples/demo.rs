@@ -22,8 +22,11 @@ async fn main() {
         Some(env!("CARGO_PKG_VERSION")),
         None,
     );
-    let span_data = minitrace_opentelemetry::convert(
+    let otlp_spans = minitrace_opentelemetry::convert(
+        &spans,
+        0,
         rand::random(),
+        0u64.to_le_bytes(),
         opentelemetry::trace::TraceState::default(),
         opentelemetry::trace::Status::Ok,
         opentelemetry::trace::SpanKind::Server,
@@ -32,10 +35,8 @@ async fn main() {
             opentelemetry::KeyValue::new("service.name", "example"),
         ])),
         instrumentation_lib,
-        0u64.to_le_bytes(),
-        0,
-        &spans,
-    );
+    )
+    .collect();
     let mut exporter = opentelemetry_otlp::SpanExporter::new_tonic(
         opentelemetry_otlp::ExportConfig {
             endpoint: "http://127.0.0.1:4317".to_string(),
@@ -45,6 +46,6 @@ async fn main() {
         opentelemetry_otlp::TonicConfig::default(),
     )
     .unwrap();
-    exporter.export(span_data).await.ok();
+    exporter.export(otlp_spans).await.ok();
     exporter.force_flush().await.ok();
 }
