@@ -45,19 +45,16 @@ fn bench_trace_wide(c: &mut Criterion) {
     for len in &[1, 10, 100, 1000, 10000] {
         group.bench_function(format!("with-collect-{}", len), |b| {
             b.iter(|| {
-                {
-                    let (root_span, collector) = Span::root("root");
-                    let _sg = root_span.set_local_parent();
-                    dummy_iter(*len - 1);
-                    collector
-                }
-                .collect()
+                let root = Span::root("root", SpanContext::new(TraceId(12), SpanId::default()));
+                let _sg = root.set_local_parent();
+                dummy_iter(*len - 1);
             })
         });
         group.bench_function(format!("without-collect-{}", len), |b| {
             b.iter(|| {
-                let (root_span, _) = Span::root("root");
-                let _sg = root_span.set_local_parent();
+                let root: Span =
+                    Span::root("root", SpanContext::new(TraceId(12), SpanId::default()));
+                let _sg = root.set_local_parent();
                 dummy_iter(*len - 1);
             })
         });
@@ -88,19 +85,15 @@ fn bench_trace_deep(c: &mut Criterion) {
     for len in &[1, 10, 100, 1000] {
         group.bench_function(format!("with-collect-{}", len), |b| {
             b.iter(|| {
-                {
-                    let (root_span, collector) = Span::root("root");
-                    let _sg = root_span.set_local_parent();
-                    dummy_rec(*len - 1);
-                    collector
-                }
-                .collect()
+                let root = Span::root("root", SpanContext::new(TraceId(12), SpanId::default()));
+                let _sg = root.set_local_parent();
+                dummy_rec(*len - 1);
             })
         });
         group.bench_function(format!("without-collect-{}", len), |b| {
             b.iter(|| {
-                let (root_span, _) = Span::root("root");
-                let _sg = root_span.set_local_parent();
+                let root = Span::root("root", SpanContext::new(TraceId(12), SpanId::default()));
+                let _sg = root.set_local_parent();
                 dummy_rec(*len - 1);
             })
         });
@@ -121,12 +114,8 @@ fn bench_trace_future(c: &mut Criterion) {
     for len in &[1, 10, 100, 1000, 10000] {
         group.bench_function(len.to_string(), |b| {
             b.iter(|| {
-                {
-                    let (root_span, collector) = Span::root("root");
-                    futures::executor::block_on(f(*len).in_span(root_span));
-                    collector
-                }
-                .collect()
+                let root = Span::root("root", SpanContext::new(TraceId(12), SpanId::default()));
+                futures::executor::block_on(f(*len).in_span(root));
             })
         });
     }

@@ -74,9 +74,10 @@ mod tests {
 
     use super::*;
     use crate::collector::CollectTokenItem;
+    use crate::collector::SpanId;
     use crate::local::local_span_stack::LocalSpanStack;
-    use crate::local::span_id::SpanId;
     use crate::local::LocalCollector;
+    use crate::prelude::TraceId;
     use crate::util::tree::tree_str_from_raw_spans;
 
     #[test]
@@ -84,7 +85,8 @@ mod tests {
         let stack = Rc::new(RefCell::new(LocalSpanStack::with_capacity(16)));
 
         let token = CollectTokenItem {
-            parent_id_of_roots: SpanId::new(9527),
+            trace_id: TraceId(1234),
+            parent_id: SpanId::default(),
             collect_id: 42,
         };
         let collector = LocalCollector::new(Some(token.into()), stack.clone());
@@ -120,7 +122,8 @@ span1 []
         let stack = Rc::new(RefCell::new(LocalSpanStack::with_capacity(16)));
 
         let token = CollectTokenItem {
-            parent_id_of_roots: SpanId::new(9527),
+            trace_id: TraceId(1234),
+            parent_id: SpanId::default(),
             collect_id: 42,
         };
         let collector = LocalCollector::new(Some(token.into()), stack.clone());

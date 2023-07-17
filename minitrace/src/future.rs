@@ -10,22 +10,20 @@
 //! ```
 //! use minitrace::prelude::*;
 //!
-//! let collector = {
-//!     let (root, collector) = Span::root("root");
+//! let root = Span::root("root", SpanContext::new(TraceId(12), SpanId::default()));
 //!
-//!     // To trace a task
-//!     let task = async {
-//!         async {
-//!             // some work
-//!         }
-//!         .enter_on_poll("future is polled")
-//!         .await;
+//! // To trace a task
+//! let task = async {
+//!     async {
+//!         // some work
 //!     }
-//!     .in_span(Span::enter_with_parent("task", &root));
+//!     .enter_on_poll("future is polled")
+//!     .await;
+//! }
+//! .in_span(Span::enter_with_parent("task", &root));
 //!
 //!     # let runtime = tokio::runtime::Runtime::new().unwrap();
-//!     runtime.spawn(task);
-//! };
+//! runtime.spawn(task);
 //! ```
 //!
 //! [`in_span()`]:(FutureExt::in_span)
@@ -52,7 +50,7 @@ pub trait FutureExt: std::future::Future + Sized {
     /// # async fn main() {
     /// use minitrace::prelude::*;
     ///
-    /// let (root, _collector) = Span::root("Root");
+    /// let root = Span::root("Root", SpanContext::new(TraceId(12), SpanId::default()));
     /// let task = async { 42 }.in_span(Span::enter_with_parent("Task", &root));
     ///
     /// tokio::spawn(task);
@@ -77,11 +75,8 @@ pub trait FutureExt: std::future::Future + Sized {
     /// # async fn main() {
     /// use minitrace::prelude::*;
     ///
-    /// let (root, _collector) = Span::root("Root");
-    ///
-    /// let fut = async { 9527 };
-    ///
-    /// let task = async { fut.enter_on_poll("Sub Task").await }
+    /// let root = Span::root("Root", SpanContext::new(TraceId(12), SpanId::default()));
+    /// let task = async { async { 9527 }.enter_on_poll("Sub Task").await }
     ///     .in_span(Span::enter_with_parent("Task", &root));
     ///
     /// tokio::spawn(task);

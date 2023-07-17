@@ -3,6 +3,7 @@
 use criterion::criterion_group;
 use criterion::criterion_main;
 use criterion::Criterion;
+use minitrace::collector::Reporter;
 
 fn init_opentelemetry() {
     use tracing_subscriber::prelude::*;
@@ -12,6 +13,21 @@ fn init_opentelemetry() {
         .with(opentelemetry)
         .try_init()
         .unwrap();
+}
+
+fn init_minitrace() {
+    struct DummyReporter;
+
+    impl Reporter for DummyReporter {
+        fn report(
+            &mut self,
+            _spans: &[minitrace::prelude::SpanRecord],
+        ) -> Result<(), Box<dyn std::error::Error>> {
+            Ok(())
+        }
+    }
+
+    minitrace::set_reporter(DummyReporter, minitrace::collector::Config::default());
 }
 
 fn opentelemetry_harness(n: usize) {
@@ -55,19 +71,15 @@ fn minitrace_harness(n: usize) {
         }
     }
 
-    let _spans = {
-        let (root_span, collector) = Span::root("parent");
-        let _g = root_span.set_local_parent();
+    let root = Span::root("parent", SpanContext::new(TraceId(12), SpanId::default()));
+    let _g = root.set_local_parent();
 
-        dummy_minitrace(n);
-
-        collector
-    }
-    .collect();
+    dummy_minitrace(n);
 }
 
 fn tracing_comparison(c: &mut Criterion) {
     init_opentelemetry();
+    init_minitrace();
 
     let mut bgroup = c.benchmark_group("compare");
 

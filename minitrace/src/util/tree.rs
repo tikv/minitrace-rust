@@ -6,9 +6,9 @@ use std::collections::HashMap;
 use std::fmt::Display;
 use std::fmt::Formatter;
 
+use crate::collector::SpanId;
 use crate::collector::SpanRecord;
 use crate::collector::SpanSet;
-use crate::local::span_id::SpanId;
 use crate::util::CollectToken;
 use crate::util::RawSpans;
 
@@ -117,7 +117,7 @@ impl Tree {
                 match span_set {
                     SpanSet::Span(span) => {
                         let parent_id = if span.parent_id == SpanId::default() {
-                            item.parent_id_of_roots
+                            item.parent_id
                         } else {
                             span.parent_id
                         };
@@ -134,7 +134,7 @@ impl Tree {
                     SpanSet::LocalSpans(spans) => {
                         for span in spans.spans.iter() {
                             let parent_id = if span.parent_id == SpanId::default() {
-                                item.parent_id_of_roots
+                                item.parent_id
                             } else {
                                 span.parent_id
                             };
@@ -152,7 +152,7 @@ impl Tree {
                     SpanSet::SharedLocalSpans(spans) => {
                         for span in spans.spans.iter() {
                             let parent_id = if span.parent_id == SpanId::default() {
-                                item.parent_id_of_roots
+                                item.parent_id
                             } else {
                                 span.parent_id
                             };
@@ -189,18 +189,15 @@ impl Tree {
 
         children.insert(SpanId::default(), ("", vec![], vec![]));
         for span in &span_records {
-            children.insert(
-                SpanId::new(span.id),
-                (span.name, vec![], span.properties.clone()),
-            );
+            children.insert(span.span_id, (span.name, vec![], span.properties.clone()));
         }
         for span in &span_records {
             children
-                .get_mut(&SpanId::new(span.parent_id))
+                .get_mut(&span.parent_id)
                 .as_mut()
                 .unwrap()
                 .1
-                .push(SpanId::new(span.id));
+                .push(span.span_id);
         }
 
         let mut t = Self::build_tree(SpanId::default(), &mut children);

@@ -19,19 +19,21 @@
 //!
 //!   ```
 //!   use minitrace::prelude::*;
-//!   use futures::executor::block_on;
+//!   use minitrace::collector::TerminalReporter;
+//!   use minitrace::collector::Config;
 //!
-//!   let (root, collector) = Span::root("root");
+//!   minitrace::set_reporter(TerminalReporter, Config::default());
 //!
 //!   {
-//!       let _child_span = Span::enter_with_parent("a child span", &root);
-//!       // some work
+//!       let root = Span::root("root", SpanContext::new(TraceId(12), SpanId::default()));
+//!       {
+//!           let _child_span = Span::enter_with_parent("a child span", &root);
+//!
+//!           // some work
+//!       }
 //!   }
 //!
-//!   drop(root);
-//!   let records: Vec<SpanRecord> = block_on(collector.collect());
-//!
-//!   println!("{records:#?}");
+//!   // Prints:
 //!   // [
 //!   //     SpanRecord {
 //!   //         id: 1,
@@ -67,17 +69,21 @@
 //!
 //!   ```
 //!   use minitrace::prelude::*;
-//!   use futures::executor::block_on;
+//!   use minitrace::collector::TerminalReporter;
+//!   use minitrace::collector::Config;
 //!
-//!   let (root, collector) = Span::root("root");
+//!   minitrace::set_reporter(TerminalReporter, Config::default());
 //!
 //!   {
-//!       let _guard = root.set_local_parent();
-//!
-//!       // The parent of this span is `root`.
-//!       let _span1 = LocalSpan::enter_with_local_parent("a child span");
-//!
-//!       foo();
+//!       let root = Span::root("root", SpanContext::new(TraceId(12), SpanId::default()));
+//!       {
+//!           let _guard = root.set_local_parent();
+//!    
+//!           // The parent of this span is `root`.
+//!           let _span1 = LocalSpan::enter_with_local_parent("a child span");
+//!    
+//!           foo();
+//!       }
 //!   }
 //!
 //!   fn foo() {
@@ -85,10 +91,7 @@
 //!       let _span2 = LocalSpan::enter_with_local_parent("a child span of child span");
 //!   }
 //!
-//!   drop(root);
-//!   let records: Vec<SpanRecord> = block_on(collector.collect());
-//!
-//!   println!("{records:#?}");
+//!   // Prints:
 //!   // [
 //!   //     SpanRecord {
 //!   //         id: 1,
@@ -127,22 +130,24 @@
 //!
 //!   ```
 //!   use minitrace::prelude::*;
-//!   use futures::executor::block_on;
+//!   use minitrace::collector::TerminalReporter;
+//!   use minitrace::collector::Config;
 //!
-//!   let (mut root, collector) = Span::root("root");
-//!   root.add_property(|| ("key", "value".to_owned()));
+//!   minitrace::set_reporter(TerminalReporter, Config::default());
 //!
 //!   {
-//!       let _guard = root.set_local_parent();
+//!       let mut root = Span::root("root", SpanContext::new(TraceId(12), SpanId::default()));
+//!       root.add_property(|| ("key", "value".to_owned()));
+//!       {
+//!           let _guard = root.set_local_parent();
+//!           let mut span1 = LocalSpan::enter_with_local_parent("a child span");
+//!           span1.add_property(|| ("key", "value".to_owned()));
 //!
-//!       let mut span1 = LocalSpan::enter_with_local_parent("a child span");
-//!       span1.add_property(|| ("key", "value".to_owned()));
+//!           // some work
+//!       }
 //!   }
 //!
-//!   drop(root);
-//!   let records: Vec<SpanRecord> = block_on(collector.collect());
-//!
-//!   println!("{records:#?}");
+//!   // Prints:
 //!   // [
 //!   //     SpanRecord {
 //!   //         id: 1,
@@ -183,23 +188,25 @@
 //!
 //!   ```
 //!   use minitrace::prelude::*;
-//!   use futures::executor::block_on;
+//!   use minitrace::collector::TerminalReporter;
+//!   use minitrace::collector::Config;
 //!
-//!   let (mut root, collector) = Span::root("root");
-//!
-//!   Event::add_to_parent("event in root", &root, || []);
+//!   minitrace::set_reporter(TerminalReporter, Config::default());
 //!
 //!   {
-//!       let _guard = root.set_local_parent();
-//!       let mut span1 = LocalSpan::enter_with_local_parent("a child span");
+//!       let root = Span::root("root", SpanContext::new(TraceId(12), SpanId::default()));
 //!
-//!       Event::add_to_local_parent("event in span1", || [("key", "value".to_owned())]);
+//!       Event::add_to_parent("event in root", &root, || []);
+//!
+//!       {
+//!           let _guard = root.set_local_parent();
+//!           let mut span1 = LocalSpan::enter_with_local_parent("a child span");
+//!    
+//!           Event::add_to_local_parent("event in span1", || [("key", "value".to_owned())]);
+//!       }
 //!   }
 //!
-//!   drop(root);
-//!   let records: Vec<SpanRecord> = block_on(collector.collect());
-//!
-//!   println!("{records:#?}");
+//!   // Prints:
 //!   // [
 //!   //     SpanRecord {
 //!   //         id: 1,
@@ -247,6 +254,8 @@
 //!
 //!   ```
 //!   use minitrace::prelude::*;
+//!   use minitrace::collector::TerminalReporter;
+//!   use minitrace::collector::Config;
 //!   use futures::executor::block_on;
 //!
 //!   #[trace]
@@ -259,18 +268,19 @@
 //!       futures_timer::Delay::new(std::time::Duration::from_millis(i)).await;
 //!   }
 //!
-//!   let (root, collector) = Span::root("root");
+//!   minitrace::set_reporter(TerminalReporter, Config::default());
 //!
 //!   {
-//!       let _g = root.set_local_parent();
-//!       do_something(100);
-//!       block_on(do_something_async(100));
+//!       let root = Span::root("root", SpanContext::new(TraceId(12), SpanId::default()));
+//!       {
+//!           let _g = root.set_local_parent();
+//!
+//!           do_something(100);
+//!           block_on(do_something_async(100));
+//!       }
 //!   }
 //!
-//!   drop(root);
-//!   let records: Vec<SpanRecord> = block_on(collector.collect());
-//!
-//!   println!("{records:#?}");
+//!   // Prints:
 //!   // [
 //!   //     SpanRecord {
 //!   //         id: 1,
@@ -382,17 +392,20 @@ pub mod util;
 /// [`in_span()`]: crate::future::FutureExt::in_span
 pub use minitrace_macro::trace;
 
+pub use crate::collector::global_collector::set_reporter;
 pub use crate::event::Event;
 pub use crate::span::Span;
 
 pub mod prelude {
     //! A "prelude" for crates using the `minitrace` crate.
     #[doc(no_inline)]
-    pub use crate::collector::CollectArgs;
+    pub use crate::collector::SpanContext;
     #[doc(no_inline)]
-    pub use crate::collector::Collector;
+    pub use crate::collector::SpanId;
     #[doc(no_inline)]
     pub use crate::collector::SpanRecord;
+    #[doc(no_inline)]
+    pub use crate::collector::TraceId;
     #[doc(no_inline)]
     pub use crate::event::Event;
     #[doc(no_inline)]

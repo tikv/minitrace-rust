@@ -13,36 +13,26 @@
 //! ```no_run
 //! use std::net::SocketAddr;
 //!
-//! use futures::executor::block_on;
+//! use minitrace::collector::Config;
 //! use minitrace::prelude::*;
 //!
-//! // start trace
-//! let (root_span, collector) = Span::root("root");
+//! // Initialize reporter
+//! let reporter =
+//!     minitrace_jaeger::JaegerReporter::new("127.0.0.1:6831".parse().unwrap(), "asynchronous")
+//!         .unwrap();
+//! minitrace::set_reporter(reporter, Config::default());
 //!
-//! // finish trace
-//! drop(root_span);
-//!
-//! // collect spans
-//! let spans = block_on(collector.collect());
-//!
-//! // encode trace
-//! const NODE_ID: u32 = 42;
-//! const TRACE_ID: u64 = 42;
-//! const ROOT_PARENT_SPAN_ID: u64 = 0;
-//! let jaeger_spans =
-//!     minitrace_jaeger::convert(&spans, NODE_ID, TRACE_ID, ROOT_PARENT_SPAN_ID).collect();
-//!
-//! // report trace
-//! let socket = SocketAddr::new("127.0.0.1".parse().unwrap(), 6831);
-//! minitrace_jaeger::report_blocking("service name".to_string(), socket, jaeger_spans)
-//!     .expect("report error");
+//! // Start trace
+//! let root = Span::root("root", SpanContext::new(TraceId(42), SpanId::default()));
 //! ```
 
 mod thrift;
 
 use std::error::Error;
 use std::net::SocketAddr;
+use std::net::UdpSocket;
 
+use minitrace::collector::Reporter;
 use minitrace::prelude::*;
 use thrift::Log;
 use thrift_codec::message::Message;
@@ -50,45 +40,51 @@ use thrift_codec::CompactEncode;
 
 use crate::thrift::Batch;
 use crate::thrift::EmitBatchNotification;
+use crate::thrift::JaegerSpan;
 use crate::thrift::Process;
-use crate::thrift::Span as JaegerSpan;
 use crate::thrift::Tag;
 
-pub fn convert(
-    spans: &[SpanRecord],
-    // A unique node id in the cluster to avoid span id conflict
-    node_id: u32,
-    trace_id: u64,
-    root_parent_span_id: u64,
-) -> impl Iterator<Item = JaegerSpan> + '_ {
-    spans.iter().map(move |s| JaegerSpan {
-        trace_id_low: trace_id as i64,
-        trace_id_high: 0,
-        span_id: (node_id as i64) << 32 | s.id as i64,
-        parent_span_id: if s.parent_id == 0 {
-            root_parent_span_id as i64
+pub struct JaegerReporter {
+    agent_addr: SocketAddr,
+    service_name: String,
+    socket: UdpSocket,
+}
+
+impl JaegerReporter {
+    pub fn new(
+        agent_addr: SocketAddr,
+        service_name: impl Into<String>,
+    ) -> Result<Self, Box<dyn Error + Send + Sync + 'static>> {
+        let local_addr: SocketAddr = if agent_addr.is_ipv4() {
+            "0.0.0.0:0"
         } else {
-            (node_id as i64) << 32 | s.parent_id as i64
-        },
-        operation_name: s.name.to_string(),
-        references: vec![],
-        flags: 1,
-        start_time: (s.begin_unix_time_ns / 1_000) as i64,
-        duration: (s.duration_ns / 1_000) as i64,
-        tags: s
-            .properties
+            "[::]:0"
+        }
+        .parse()
+        .unwrap();
+        let socket = std::net::UdpSocket::bind(local_addr)?;
+
+        Ok(Self {
+            agent_addr,
+            service_name: service_name.into(),
+            socket,
+        })
+    }
+
+    fn convert(&self, spans: &[SpanRecord]) -> Vec<JaegerSpan> {
+        spans
             .iter()
-            .map(|(k, v)| Tag::String {
-                key: k.to_string(),
-                value: v.to_string(),
-            })
-            .collect(),
-        logs: s
-            .events
-            .iter()
-            .map(|event| Log {
-                timestamp: (event.timestamp_unix_ns / 1_000) as i64,
-                fields: event
+            .map(move |s| JaegerSpan {
+                trace_id_high: (s.trace_id.0 >> 64) as i64,
+                trace_id_low: s.trace_id.0 as i64,
+                span_id: s.span_id.0 as i64,
+                parent_span_id: s.parent_id.0 as i64,
+                operation_name: s.name.to_string(),
+                references: vec![],
+                flags: 1,
+                start_time: (s.begin_unix_time_ns / 1_000) as i64,
+                duration: (s.duration_ns / 1_000) as i64,
+                tags: s
                     .properties
                     .iter()
                     .map(|(k, v)| Tag::String {
@@ -96,70 +92,49 @@ pub fn convert(
                         value: v.to_string(),
                     })
                     .collect(),
+                logs: s
+                    .events
+                    .iter()
+                    .map(|event| Log {
+                        timestamp: (event.timestamp_unix_ns / 1_000) as i64,
+                        fields: event
+                            .properties
+                            .iter()
+                            .map(|(k, v)| Tag::String {
+                                key: k.to_string(),
+                                value: v.to_string(),
+                            })
+                            .collect(),
+                    })
+                    .collect(),
             })
-            .collect(),
-    })
-}
-
-pub async fn report(
-    service_name: String,
-    agent: SocketAddr,
-    spans: Vec<JaegerSpan>,
-) -> Result<(), Box<dyn Error + Send + Sync + 'static>> {
-    let bytes = serialize(service_name, spans)?;
-
-    let local_addr: SocketAddr = if agent.is_ipv4() {
-        "0.0.0.0:0"
-    } else {
-        "[::]:0"
+            .collect()
     }
-    .parse()
-    .unwrap();
 
-    let udp = tokio::net::UdpSocket::bind(local_addr).await?;
-    udp.send_to(&bytes, agent).await?;
-
-    Ok(())
-}
-
-pub fn report_blocking(
-    service_name: String,
-    agent: SocketAddr,
-    spans: Vec<JaegerSpan>,
-) -> Result<(), Box<dyn Error + Send + Sync + 'static>> {
-    let bytes = serialize(service_name, spans)?;
-
-    let local_addr: SocketAddr = if agent.is_ipv4() {
-        "0.0.0.0:0"
-    } else {
-        "[::]:0"
-    }
-    .parse()
-    .unwrap();
-
-    let udp = std::net::UdpSocket::bind(local_addr)?;
-    udp.send_to(&bytes, agent)?;
-
-    Ok(())
-}
-
-fn serialize(
-    service_name: String,
-    spans: Vec<JaegerSpan>,
-) -> Result<Vec<u8>, Box<dyn Error + Send + Sync + 'static>> {
-    let bn = EmitBatchNotification {
-        batch: Batch {
-            process: Process {
-                service_name,
-                tags: vec![],
+    fn serialize(&self, spans: Vec<JaegerSpan>) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
+        let bn = EmitBatchNotification {
+            batch: Batch {
+                process: Process {
+                    service_name: self.service_name.clone(),
+                    tags: vec![],
+                },
+                spans,
             },
-            spans,
-        },
-    };
+        };
 
-    let mut bytes = Vec::new();
-    let msg = Message::from(bn);
-    msg.compact_encode(&mut bytes)?;
+        let mut bytes = Vec::new();
+        let msg = Message::from(bn);
+        msg.compact_encode(&mut bytes)?;
 
-    Ok(bytes)
+        Ok(bytes)
+    }
+}
+
+impl Reporter for JaegerReporter {
+    fn report(&mut self, spans: &[SpanRecord]) -> Result<(), Box<dyn std::error::Error>> {
+        let jaeger_spans = self.convert(&spans);
+        let bytes = self.serialize(jaeger_spans)?;
+        self.socket.send_to(&bytes, self.agent_addr)?;
+        Ok(())
+    }
 }

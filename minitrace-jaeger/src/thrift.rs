@@ -116,9 +116,9 @@ impl From<SpanRef> for Struct {
     }
 }
 
-/// `Span` represents a named unit of work performed by a service.
+/// `JaegerSpan` represents a named unit of work performed by a service.
 #[derive(Debug, Clone)]
-pub struct Span {
+pub struct JaegerSpan {
     /// The least significant 64 bits of a trace id.
     pub trace_id_low: i64,
 
@@ -157,8 +157,8 @@ pub struct Span {
     pub logs: Vec<Log>,
 }
 
-impl From<Span> for Struct {
-    fn from(f: Span) -> Self {
+impl From<JaegerSpan> for Struct {
+    fn from(f: JaegerSpan) -> Self {
         let mut fields = Vec::with_capacity(11);
         fields.push(Field::new(1, f.trace_id_low));
         fields.push(Field::new(2, f.trace_id_high));
@@ -220,7 +220,7 @@ impl From<Process> for Struct {
 #[derive(Debug, Clone)]
 pub struct Batch {
     pub process: Process,
-    pub spans: Vec<Span>,
+    pub spans: Vec<JaegerSpan>,
 }
 
 impl From<Batch> for Struct {

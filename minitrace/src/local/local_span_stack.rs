@@ -131,7 +131,8 @@ pub struct SpanLineHandle {
 mod tests {
     use super::*;
     use crate::collector::CollectTokenItem;
-    use crate::local::span_id::SpanId;
+    use crate::collector::SpanId;
+    use crate::prelude::TraceId;
     use crate::util::tree::tree_str_from_raw_spans;
 
     #[test]
@@ -139,7 +140,8 @@ mod tests {
         let mut span_stack = LocalSpanStack::with_capacity(16);
 
         let token1 = CollectTokenItem {
-            parent_id_of_roots: SpanId::new(9527),
+            trace_id: TraceId(1234),
+            parent_id: SpanId::default(),
             collect_id: 42,
         };
         let span_line1 = span_stack.register_span_line(Some(token1.into())).unwrap();
@@ -154,7 +156,8 @@ mod tests {
             }
 
             let token2 = CollectTokenItem {
-                parent_id_of_roots: SpanId::new(9528),
+                trace_id: TraceId(1235),
+                parent_id: SpanId::default(),
                 collect_id: 48,
             };
             let span_line2 = span_stack.register_span_line(Some(token2.into())).unwrap();
@@ -200,7 +203,8 @@ span1 []
                 let span_line3 = span_stack
                     .register_span_line(Some(
                         CollectTokenItem {
-                            parent_id_of_roots: SpanId::new(9527),
+                            trace_id: TraceId(1234),
+                            parent_id: SpanId::default(),
                             collect_id: 42,
                         }
                         .into(),
@@ -213,7 +217,8 @@ span1 []
                             span_stack
                                 .register_span_line(Some(
                                     CollectTokenItem {
-                                        parent_id_of_roots: SpanId::new(9528),
+                                        trace_id: TraceId(1235),
+                                        parent_id: SpanId::default(),
                                         collect_id: 43
                                     }
                                     .into()
@@ -231,7 +236,8 @@ span1 []
                             span_stack
                                 .register_span_line(Some(
                                     CollectTokenItem {
-                                        parent_id_of_roots: SpanId::new(9529),
+                                        trace_id: TraceId(1236),
+                                        parent_id: SpanId::default(),
                                         collect_id: 44
                                     }
                                     .into()
@@ -254,7 +260,8 @@ span1 []
         let mut span_stack = LocalSpanStack::with_capacity(16);
         assert!(span_stack.current_collect_token().is_none());
         let token1 = CollectTokenItem {
-            parent_id_of_roots: SpanId::new(1),
+            trace_id: TraceId(1),
+            parent_id: SpanId(1),
             collect_id: 1,
         };
         let span_line1 = span_stack.register_span_line(Some(token1.into())).unwrap();
@@ -266,7 +273,8 @@ span1 []
             assert!(span_stack.current_collect_token().is_none());
             {
                 let token3 = CollectTokenItem {
-                    parent_id_of_roots: SpanId::new(3),
+                    trace_id: TraceId(3),
+                    parent_id: SpanId(3),
                     collect_id: 3,
                 };
                 let span_line3 = span_stack.register_span_line(Some(token3.into())).unwrap();
@@ -279,7 +287,8 @@ span1 []
             let _ = span_stack.unregister_and_collect(span_line2).unwrap();
 
             let token4 = CollectTokenItem {
-                parent_id_of_roots: SpanId::new(4),
+                trace_id: TraceId(4),
+                parent_id: SpanId(4),
                 collect_id: 4,
             };
             let span_line4 = span_stack.register_span_line(Some(token4.into())).unwrap();
@@ -305,7 +314,8 @@ span1 []
             let span_line2 = span_stack
                 .register_span_line(Some(
                     CollectTokenItem {
-                        parent_id_of_roots: SpanId::new(9527),
+                        trace_id: TraceId(1234),
+                        parent_id: SpanId::default(),
                         collect_id: 42,
                     }
                     .into(),
@@ -327,7 +337,8 @@ span1 []
             let span_line2 = span_stack
                 .register_span_line(Some(
                     CollectTokenItem {
-                        parent_id_of_roots: SpanId::new(9527),
+                        trace_id: TraceId(1234),
+                        parent_id: SpanId::default(),
                         collect_id: 42,
                     }
                     .into(),
@@ -349,7 +360,8 @@ span1 []
             let span_line2 = span_stack
                 .register_span_line(Some(
                     CollectTokenItem {
-                        parent_id_of_roots: SpanId::new(9527),
+                        trace_id: TraceId(1234),
+                        parent_id: SpanId::default(),
                         collect_id: 42,
                     }
                     .into(),

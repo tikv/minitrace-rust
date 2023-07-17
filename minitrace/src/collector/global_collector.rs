@@ -6,6 +6,7 @@ use std::sync::atomic::Ordering;
 use std::sync::Arc;
 use std::time::Duration;
 
+use log::error;
 use minstant::Anchor;
 use once_cell::sync::Lazy;
 use parking_lot::Mutex;
@@ -16,11 +17,12 @@ use crate::collector::command::CommitCollect;
 use crate::collector::command::DropCollect;
 use crate::collector::command::StartCollect;
 use crate::collector::command::SubmitSpans;
-use crate::collector::CollectArgs;
+use crate::collector::Config;
+use crate::collector::SpanId;
 use crate::collector::SpanRecord;
 use crate::collector::SpanSet;
+use crate::collector::TraceId;
 use crate::local::raw_span::RawSpan;
-use crate::local::span_id::SpanId;
 use crate::local::LocalSpans;
 use crate::util::spsc::Receiver;
 use crate::util::spsc::Sender;
@@ -49,29 +51,29 @@ fn force_send_command(cmd: CollectCommand) {
     COMMAND_SENDER.with(|sender| sender.force_send(cmd));
 }
 
+pub fn set_reporter(reporter: impl Reporter, config: Config) {
+    let mut global_collector = GLOBAL_COLLECTOR.lock();
+    global_collector.config = config;
+    global_collector.reporter = Some(Box::leak(Box::new(reporter)));
+}
+
+pub trait Reporter: Send + 'static {
+    fn report(&mut self, spans: &[SpanRecord]) -> Result<(), Box<dyn std::error::Error>>;
+}
+
 #[derive(Default, Clone)]
 pub(crate) struct GlobalCollect;
 
 #[cfg_attr(test, mockall::automock)]
 impl GlobalCollect {
-    pub fn start_collect(&self, collect_args: CollectArgs) -> u32 {
+    pub fn start_collect(&self) -> u32 {
         let collect_id = NEXT_COLLECT_ID.fetch_add(1, Ordering::Relaxed);
-        send_command(CollectCommand::StartCollect(StartCollect {
-            collect_id,
-            collect_args,
-        }));
+        send_command(CollectCommand::StartCollect(StartCollect { collect_id }));
         collect_id
     }
 
-    pub fn commit_collect(
-        &self,
-        collect_id: u32,
-        tx: futures::channel::oneshot::Sender<Vec<SpanRecord>>,
-    ) {
-        force_send_command(CollectCommand::CommitCollect(CommitCollect {
-            collect_id,
-            tx,
-        }));
+    pub fn commit_collect(&self, collect_id: u32) {
+        force_send_command(CollectCommand::CommitCollect(CommitCollect { collect_id }));
     }
 
     pub fn drop_collect(&self, collect_id: u32) {
@@ -84,13 +86,13 @@ impl GlobalCollect {
     //
     // Every root span can have multiple parents where mainly comes from `Span::enter_with_parents`.
     // Those parents are recorded into `CollectToken` which has several `CollectTokenItem`s. Look into
-    // a `CollectTokenItem`, `parent_id_of_roots` can be found.
+    // a `CollectTokenItem`, `parent_ids` can be found.
     //
     // For example, we have a `SpanSet::LocalSpans` and a `CollectToken` as follow:
     //
-    //     SpanSet::LocalSpans::spans                      CollectToken::parent_id_of_roots
+    //     SpanSet::LocalSpans::spans                      CollectToken::parent_ids
     //     +------+-----------+-----+                      +------------+--------------------+
-    //     |  id  | parent_id | ... |                      | collect_id | parent_id_of_roots |
+    //     |  id  | parent_id | ... |                      | collect_id | parent_ids |
     //     +------+-----------+-----+                      +------------+--------------------+
     //     |  43  |    545    | ... |                      |    1212    |          7         |
     //     |  15  |  default  | ... | <- root span         |    874     |         321        |
@@ -103,7 +105,7 @@ impl GlobalCollect {
     // So the expected further job mentioned above is:
     // * Copy `SpanSet` to the same number of copies as `CollectTokenItem`s, one `SpanSet` to one
     //   `CollectTokenItem`
-    // * Amend `raw_span.parent_id` of root spans in `SpanSet` to `parent_id_of_roots` of `CollectTokenItem`
+    // * Amend `raw_span.parent_id` of root spans in `SpanSet` to `parent_ids` of `CollectTokenItem`
     pub fn submit_spans(&self, spans: SpanSet, collect_token: CollectToken) {
         send_command(CollectCommand::SubmitSpans(SubmitSpans {
             spans,
@@ -115,16 +117,21 @@ impl GlobalCollect {
 enum SpanCollection {
     Owned {
         spans: SpanSet,
+        trace_id: TraceId,
         parent_id: SpanId,
     },
     Shared {
         spans: Arc<SpanSet>,
+        trace_id: TraceId,
         parent_id: SpanId,
     },
 }
 
 pub(crate) struct GlobalCollector {
-    active_collectors: HashMap<u32, (Vec<SpanCollection>, usize, CollectArgs)>,
+    config: Config,
+    reporter: Option<&'static mut dyn Reporter>,
+
+    active_collectors: HashMap<u32, (Vec<SpanCollection>, usize)>,
     rxs: Vec<Receiver<CollectCommand>>,
 
     // Vectors to be reused by collection loops. They must be empty outside of the `handle_commands` loop.
@@ -132,6 +139,7 @@ pub(crate) struct GlobalCollector {
     drop_collects: Vec<DropCollect>,
     commit_collects: Vec<CommitCollect>,
     submit_spans: Vec<SubmitSpans>,
+    committed_records: Vec<SpanRecord>,
 }
 
 impl GlobalCollector {
@@ -150,6 +158,9 @@ impl GlobalCollector {
             .unwrap();
 
         GlobalCollector {
+            config: Config::default().max_span_count(Some(0)),
+            reporter: None,
+
             active_collectors: HashMap::new(),
             rxs: Vec::new(),
 
@@ -157,6 +168,7 @@ impl GlobalCollector {
             drop_collects: Vec::new(),
             commit_collects: Vec::new(),
             submit_spans: Vec::new(),
+            committed_records: Vec::new(),
         }
     }
 
@@ -169,6 +181,7 @@ impl GlobalCollector {
         debug_assert!(self.drop_collects.is_empty());
         debug_assert!(self.commit_collects.is_empty());
         debug_assert!(self.submit_spans.is_empty());
+        debug_assert!(self.committed_records.is_empty());
 
         let start_collects = &mut self.start_collects;
         let drop_collects = &mut self.drop_collects;
@@ -193,13 +206,16 @@ impl GlobalCollector {
             }
         });
 
-        for StartCollect {
-            collect_id,
-            collect_args,
-        } in self.start_collects.drain(..)
-        {
-            self.active_collectors
-                .insert(collect_id, (Vec::new(), 0, collect_args));
+        if self.reporter.is_none() {
+            start_collects.clear();
+            drop_collects.clear();
+            commit_collects.clear();
+            submit_spans.clear();
+            return;
+        }
+
+        for StartCollect { collect_id } in self.start_collects.drain(..) {
+            self.active_collectors.insert(collect_id, (Vec::new(), 0));
         }
 
         for DropCollect { collect_id } in self.drop_collects.drain(..) {
@@ -215,33 +231,33 @@ impl GlobalCollector {
 
             if collect_token.len() == 1 {
                 let item = collect_token[0];
-                if let Some((buf, span_count, collect_args)) =
-                    self.active_collectors.get_mut(&item.collect_id)
-                {
+                if let Some((buf, span_count)) = self.active_collectors.get_mut(&item.collect_id) {
                     // The root span, i.e. the span whose parent id is `SpanId::default`, is intended to be kept.
-                    if *span_count < collect_args.max_span_count.unwrap_or(usize::MAX)
-                        || item.parent_id_of_roots == SpanId::default()
+                    if *span_count < self.config.max_span_count.unwrap_or(usize::MAX)
+                        || item.parent_id == SpanId::default()
                     {
                         *span_count += spans.len();
                         buf.push(SpanCollection::Owned {
                             spans,
-                            parent_id: item.parent_id_of_roots,
+                            trace_id: item.trace_id,
+                            parent_id: item.parent_id,
                         });
                     }
                 }
             } else {
                 let spans = Arc::new(spans);
                 for item in collect_token.iter() {
-                    if let Some((buf, span_count, collect_args)) =
+                    if let Some((buf, span_count)) =
                         self.active_collectors.get_mut(&item.collect_id)
                     {
                         // Multiple items in a collect token are built from `Span::enter_from_parents`,
                         // so relative span cannot be a root span.
-                        if *span_count < collect_args.max_span_count.unwrap_or(usize::MAX) {
+                        if *span_count < self.config.max_span_count.unwrap_or(usize::MAX) {
                             *span_count += spans.len();
                             buf.push(SpanCollection::Shared {
                                 spans: spans.clone(),
-                                parent_id: item.parent_id_of_roots,
+                                trace_id: item.trace_id,
+                                parent_id: item.parent_id,
                             });
                         }
                     }
@@ -249,59 +265,91 @@ impl GlobalCollector {
             }
         }
 
-        for CommitCollect { collect_id, tx } in self.commit_collects.drain(..) {
-            let records = self
-                .active_collectors
-                .remove(&collect_id)
-                .map(|(span_collections, span_count, _)| {
-                    merge_collection(span_collections, span_count)
-                })
-                .unwrap_or_else(Vec::new);
-            tx.send(records).ok();
+        for CommitCollect { collect_id } in self.commit_collects.drain(..) {
+            if let Some((span_collections, _)) = self.active_collectors.remove(&collect_id) {
+                let anchor: Anchor = Anchor::new();
+                let mut events: HashMap<SpanId, Vec<EventRecord>> = HashMap::new();
+
+                for span_collection in span_collections {
+                    match span_collection {
+                        SpanCollection::Owned {
+                            spans,
+                            trace_id,
+                            parent_id,
+                        } => match spans {
+                            SpanSet::Span(raw_span) => amend_span(
+                                &raw_span,
+                                trace_id,
+                                parent_id,
+                                &mut self.committed_records,
+                                &mut events,
+                                &anchor,
+                            ),
+                            SpanSet::LocalSpans(local_spans) => amend_local_span(
+                                &local_spans,
+                                trace_id,
+                                parent_id,
+                                &mut self.committed_records,
+                                &mut events,
+                                &anchor,
+                            ),
+                            SpanSet::SharedLocalSpans(local_spans) => amend_local_span(
+                                &local_spans,
+                                trace_id,
+                                parent_id,
+                                &mut self.committed_records,
+                                &mut events,
+                                &anchor,
+                            ),
+                        },
+                        SpanCollection::Shared {
+                            spans,
+                            trace_id,
+                            parent_id,
+                        } => match &*spans {
+                            SpanSet::Span(raw_span) => amend_span(
+                                raw_span,
+                                trace_id,
+                                parent_id,
+                                &mut self.committed_records,
+                                &mut events,
+                                &anchor,
+                            ),
+                            SpanSet::LocalSpans(local_spans) => amend_local_span(
+                                local_spans,
+                                trace_id,
+                                parent_id,
+                                &mut self.committed_records,
+                                &mut events,
+                                &anchor,
+                            ),
+                            SpanSet::SharedLocalSpans(local_spans) => amend_local_span(
+                                local_spans,
+                                trace_id,
+                                parent_id,
+                                &mut self.committed_records,
+                                &mut events,
+                                &anchor,
+                            ),
+                        },
+                    }
+                }
+
+                mount_events(&mut self.committed_records, events);
+            }
         }
-    }
-}
 
-fn merge_collection(span_collections: Vec<SpanCollection>, span_count: usize) -> Vec<SpanRecord> {
-    let anchor = Anchor::new();
-
-    let mut records = Vec::with_capacity(span_count);
-    let mut events: HashMap<SpanId, Vec<EventRecord>> = HashMap::new();
-
-    for span_collection in span_collections {
-        match span_collection {
-            SpanCollection::Owned { spans, parent_id } => match spans {
-                SpanSet::Span(raw_span) => {
-                    amend_span(&raw_span, parent_id, &mut records, &mut events, &anchor)
-                }
-                SpanSet::LocalSpans(local_spans) => {
-                    amend_local_span(&local_spans, parent_id, &mut records, &mut events, &anchor)
-                }
-                SpanSet::SharedLocalSpans(local_spans) => {
-                    amend_local_span(&local_spans, parent_id, &mut records, &mut events, &anchor)
-                }
-            },
-            SpanCollection::Shared { spans, parent_id } => match &*spans {
-                SpanSet::Span(raw_span) => {
-                    amend_span(raw_span, parent_id, &mut records, &mut events, &anchor)
-                }
-                SpanSet::LocalSpans(local_spans) => {
-                    amend_local_span(local_spans, parent_id, &mut records, &mut events, &anchor)
-                }
-                SpanSet::SharedLocalSpans(local_spans) => {
-                    amend_local_span(local_spans, parent_id, &mut records, &mut events, &anchor)
-                }
-            },
+        let reporter = self.reporter.as_mut().unwrap();
+        if let Err(err) = reporter.report(&self.committed_records) {
+            error!("report spans failed: {}", err);
         }
+        self.committed_records.clear();
     }
-
-    mount_events(&mut records, events);
-
-    records
 }
 
 fn amend_local_span(
     local_spans: &LocalSpans,
+    trace_id: TraceId,
     parent_id: SpanId,
     spans: &mut Vec<SpanRecord>,
     events: &mut HashMap<SpanId, Vec<EventRecord>>,
@@ -331,8 +379,9 @@ fn amend_local_span(
             span.end_instant.as_unix_nanos(anchor)
         };
         spans.push(SpanRecord {
-            id: span.id.0,
-            parent_id: parent_id.0,
+            trace_id: trace_id,
+            span_id: span.id,
+            parent_id: parent_id,
             begin_unix_time_ns,
             duration_ns: end_unix_time_ns.saturating_sub(begin_unix_time_ns),
             name: span.name,
@@ -344,6 +393,7 @@ fn amend_local_span(
 
 fn amend_span(
     raw_span: &RawSpan,
+    trace_id: TraceId,
     parent_id: SpanId,
     spans: &mut Vec<SpanRecord>,
     events: &mut HashMap<SpanId, Vec<EventRecord>>,
@@ -363,8 +413,9 @@ fn amend_span(
 
     let end_unix_time_ns = raw_span.end_instant.as_unix_nanos(anchor);
     spans.push(SpanRecord {
-        id: raw_span.id.0,
-        parent_id: parent_id.0,
+        trace_id,
+        span_id: raw_span.id,
+        parent_id: parent_id,
         begin_unix_time_ns,
         duration_ns: end_unix_time_ns.saturating_sub(begin_unix_time_ns),
         name: raw_span.name,
@@ -379,7 +430,7 @@ fn mount_events(records: &mut [SpanRecord], mut events: HashMap<SpanId, Vec<Even
             return;
         }
 
-        if let Some(event) = events.remove(&SpanId(record.id)) {
+        if let Some(event) = events.remove(&record.span_id) {
             if record.events.is_empty() {
                 record.events = event;
             } else {

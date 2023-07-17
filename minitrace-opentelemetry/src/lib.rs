@@ -15,69 +15,55 @@
 //! ## Report to OpenTelemetry Collector
 //!
 //! ```no_run
+//! use std::borrow::Cow;
 //! use std::time::Duration;
 //!
+//! use minitrace::collector::Config;
 //! use minitrace::prelude::*;
-//! use opentelemetry::sdk::export::trace::SpanExporter as _;
 //!
-//! # #[tokio::main]
-//! # async fn main() {
-//! // start trace
-//! let (root_span, collector) = Span::root("root");
-//!
-//! // finish trace
-//! drop(root_span);
-//!
-//! // collect spans
-//! let spans = collector.collect().await;
-//!
-//! // report trace
-//! let instrumentation_lib = opentelemetry::InstrumentationLibrary::new(
-//!     "example-crate",
-//!     Some(env!("CARGO_PKG_VERSION")),
-//!     None,
-//! );
-//! let otlp_spans = minitrace_opentelemetry::convert(
-//!     &spans,
-//!     0,
-//!     rand::random(),
-//!     0u64.to_le_bytes(),
-//!     opentelemetry::trace::TraceState::default(),
-//!     opentelemetry::trace::Status::Ok,
+//! // Initialize reporter
+//! let reporter = minitrace_opentelemetry::OpenTelemetryReporter::new(
+//!     opentelemetry_otlp::SpanExporter::new_tonic(
+//!         opentelemetry_otlp::ExportConfig {
+//!             endpoint: "http://127.0.0.1:4317".to_string(),
+//!             protocol: opentelemetry_otlp::Protocol::Grpc,
+//!             timeout: Duration::from_secs(
+//!                 opentelemetry_otlp::OTEL_EXPORTER_OTLP_TIMEOUT_DEFAULT,
+//!             ),
+//!         },
+//!         opentelemetry_otlp::TonicConfig::default(),
+//!     )
+//!     .unwrap(),
 //!     opentelemetry::trace::SpanKind::Server,
-//!     true,
-//!     std::borrow::Cow::Owned(opentelemetry::sdk::Resource::new([
-//!         opentelemetry::KeyValue::new("service.name", "example"),
+//!     Cow::Owned(opentelemetry::sdk::Resource::new([
+//!         opentelemetry::KeyValue::new("service.name", "asynchronous"),
 //!     ])),
-//!     instrumentation_lib,
-//! )
-//! .collect();
-//! let mut exporter = opentelemetry_otlp::SpanExporter::new_tonic(
-//!     opentelemetry_otlp::ExportConfig {
-//!         endpoint: "http://127.0.0.1:4317".to_string(),
-//!         protocol: opentelemetry_otlp::Protocol::Grpc,
-//!         timeout: Duration::from_secs(opentelemetry_otlp::OTEL_EXPORTER_OTLP_TIMEOUT_DEFAULT),
-//!     },
-//!     opentelemetry_otlp::TonicConfig::default(),
-//! )
-//! .unwrap();
-//! exporter.export(otlp_spans).await.ok();
-//! exporter.force_flush().await.ok();
-//! # }
+//!     opentelemetry::InstrumentationLibrary::new(
+//!         "example-crate",
+//!         Some(env!("CARGO_PKG_VERSION")),
+//!         None,
+//!     ),
+//! );
+//! minitrace::set_reporter(reporter, Config::default());
+//!
+//! // Start trace
+//! let root = Span::root("root", SpanContext::new(TraceId(42), SpanId::default()));
+//! ```
 
 use std::borrow::Cow;
 use std::time::Duration;
 use std::time::UNIX_EPOCH;
 
 use minitrace::collector::EventRecord;
+use minitrace::collector::Reporter;
 use minitrace::prelude::*;
 use opentelemetry::sdk::export::trace::SpanData;
+use opentelemetry::sdk::export::trace::SpanExporter;
 use opentelemetry::sdk::trace::EvictedHashMap;
 use opentelemetry::sdk::trace::EvictedQueue;
 use opentelemetry::sdk::Resource;
 use opentelemetry::trace::Event;
 use opentelemetry::trace::SpanContext;
-use opentelemetry::trace::SpanId;
 use opentelemetry::trace::SpanKind;
 use opentelemetry::trace::Status;
 use opentelemetry::trace::TraceFlags;
@@ -85,67 +71,85 @@ use opentelemetry::trace::TraceState;
 use opentelemetry::InstrumentationLibrary;
 use opentelemetry::KeyValue;
 
-#[allow(clippy::too_many_arguments)]
-pub fn convert<'a>(
-    spans: &'a [SpanRecord],
-    // A unique node id in the cluster to avoid span id conflict
-    node_id: u32,
-    trace_id: [u8; 16],
-    root_parent_span_id: [u8; 8],
-    trace_state: TraceState,
-    status: Status,
+pub struct OpenTelemetryReporter {
+    opentelemetry_exporter: Box<dyn SpanExporter>,
     span_kind: SpanKind,
-    sampled: bool,
     resource: Cow<'static, Resource>,
     instrumentation_lib: InstrumentationLibrary,
-) -> impl Iterator<Item = SpanData> + 'a {
-    spans.iter().map(move |span| SpanData {
-        span_context: SpanContext::new(
-            opentelemetry::trace::TraceId::from_bytes(trace_id),
-            SpanId::from_bytes(((node_id as u64) << 32 | span.id as u64).to_le_bytes()),
-            TraceFlags::default().with_sampled(sampled),
-            false,
-            trace_state.clone(),
-        ),
-        parent_span_id: if span.parent_id == 0 {
-            SpanId::from_bytes(root_parent_span_id)
-        } else {
-            SpanId::from_bytes(((node_id as u64) << 32 | span.parent_id as u64).to_le_bytes())
-        },
-        name: span.name.into(),
-        start_time: UNIX_EPOCH + Duration::from_nanos(span.begin_unix_time_ns),
-        end_time: UNIX_EPOCH + Duration::from_nanos(span.begin_unix_time_ns + span.duration_ns),
-        attributes: convert_properties(&span.properties),
-        events: convert_events(&span.events),
-        links: EvictedQueue::new(0),
-        status: status.clone(),
-        span_kind: span_kind.clone(),
-        resource: resource.clone(),
-        instrumentation_lib: instrumentation_lib.clone(),
-    })
 }
 
-fn convert_properties(properties: &[(&'static str, String)]) -> EvictedHashMap {
-    let mut map = EvictedHashMap::new(u32::MAX, properties.len());
-    for (k, v) in properties {
-        map.insert(KeyValue::new(*k, v.clone()));
+impl OpenTelemetryReporter {
+    pub fn new(
+        opentelemetry_exporter: impl SpanExporter + 'static,
+        span_kind: SpanKind,
+        resource: Cow<'static, Resource>,
+        instrumentation_lib: InstrumentationLibrary,
+    ) -> Self {
+        OpenTelemetryReporter {
+            opentelemetry_exporter: Box::new(opentelemetry_exporter),
+            span_kind,
+            resource,
+            instrumentation_lib,
+        }
     }
-    map
+
+    fn convert(&self, spans: &[SpanRecord]) -> Vec<SpanData> {
+        spans
+            .iter()
+            .map(move |span| SpanData {
+                span_context: SpanContext::new(
+                    span.trace_id.0.to_be_bytes().into(),
+                    span.span_id.0.to_be_bytes().into(),
+                    TraceFlags::default(),
+                    false,
+                    TraceState::default(),
+                ),
+                parent_span_id: span.parent_id.0.to_be_bytes().into(),
+                name: span.name.into(),
+                start_time: UNIX_EPOCH + Duration::from_nanos(span.begin_unix_time_ns),
+                end_time: UNIX_EPOCH
+                    + Duration::from_nanos(span.begin_unix_time_ns + span.duration_ns),
+                attributes: Self::convert_properties(&span.properties),
+                events: Self::convert_events(&span.events),
+                links: EvictedQueue::new(0),
+                status: Status::default(),
+                span_kind: self.span_kind.clone(),
+                resource: self.resource.clone(),
+                instrumentation_lib: self.instrumentation_lib.clone(),
+            })
+            .collect()
+    }
+
+    fn convert_properties(properties: &[(&'static str, String)]) -> EvictedHashMap {
+        let mut map = EvictedHashMap::new(u32::MAX, properties.len());
+        for (k, v) in properties {
+            map.insert(KeyValue::new(*k, v.clone()));
+        }
+        map
+    }
+
+    fn convert_events(events: &[EventRecord]) -> EvictedQueue<Event> {
+        let mut queue = EvictedQueue::new(u32::MAX);
+        queue.extend(events.iter().map(|event| {
+            Event::new(
+                event.name,
+                UNIX_EPOCH + Duration::from_nanos(event.timestamp_unix_ns),
+                event
+                    .properties
+                    .iter()
+                    .map(|(k, v)| KeyValue::new(*k, v.clone()))
+                    .collect(),
+                0,
+            )
+        }));
+        queue
+    }
 }
 
-fn convert_events(events: &[EventRecord]) -> EvictedQueue<Event> {
-    let mut queue = EvictedQueue::new(u32::MAX);
-    queue.extend(events.iter().map(|event| {
-        Event::new(
-            event.name,
-            UNIX_EPOCH + Duration::from_nanos(event.timestamp_unix_ns),
-            event
-                .properties
-                .iter()
-                .map(|(k, v)| KeyValue::new(*k, v.clone()))
-                .collect(),
-            0,
-        )
-    }));
-    queue
+impl Reporter for OpenTelemetryReporter {
+    fn report(&mut self, spans: &[SpanRecord]) -> Result<(), Box<dyn std::error::Error>> {
+        let opentelemetry_spans = self.convert(&spans);
+        futures::executor::block_on(self.opentelemetry_exporter.export(opentelemetry_spans))?;
+        Ok(())
+    }
 }

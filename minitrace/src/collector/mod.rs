@@ -2,27 +2,38 @@
 
 //! Collector and the collected spans.
 
-pub(crate) mod command;
+#![cfg_attr(test, allow(dead_code))]
 
+pub(crate) mod command;
+pub(crate) mod global_collector;
+pub(crate) mod id;
+mod terminal_reporter;
+mod test_reporter;
+
+use std::rc::Rc;
 use std::sync::Arc;
 
-use crate::local::raw_span::RawSpan;
-use crate::local::span_id::SpanId;
-use crate::local::LocalSpans;
-use crate::util::CollectToken;
-
-#[allow(dead_code)]
-mod global_collector;
-use futures::Future;
-use futures::FutureExt;
 #[cfg(not(test))]
 pub(crate) use global_collector::GlobalCollect;
 #[cfg(test)]
 pub(crate) use global_collector::MockGlobalCollect;
+pub use global_collector::Reporter;
+pub use id::SpanId;
+pub use id::TraceId;
+pub use terminal_reporter::TerminalReporter;
+#[doc(hidden)]
+pub use test_reporter::TestReporter;
+
+use crate::local::local_span_stack::LOCAL_SPAN_STACK;
+use crate::local::raw_span::RawSpan;
+use crate::local::LocalSpans;
+use crate::util::CollectToken;
+use crate::Span;
 #[cfg(test)]
 pub(crate) type GlobalCollect = Arc<MockGlobalCollect>;
 
 #[doc(hidden)]
+#[derive(Debug)]
 pub enum SpanSet {
     Span(RawSpan),
     LocalSpans(LocalSpans),
@@ -32,8 +43,9 @@ pub enum SpanSet {
 /// A span record been collected.
 #[derive(Clone, Debug, Default)]
 pub struct SpanRecord {
-    pub id: u32,
-    pub parent_id: u32,
+    pub trace_id: TraceId,
+    pub span_id: SpanId,
+    pub parent_id: SpanId,
     pub begin_unix_time_ns: u64,
     pub duration_ns: u64,
     pub name: &'static str,
@@ -52,33 +64,23 @@ pub struct EventRecord {
 #[doc(hidden)]
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
 pub struct CollectTokenItem {
-    pub parent_id_of_roots: SpanId,
+    pub trace_id: TraceId,
+    pub parent_id: SpanId,
     pub collect_id: u32,
 }
 
-/// The collector for collecting all spans of a request.
-///
-/// A [`Collector`] is provided when starting a root [`Span`](crate::Span) by calling [`Span::root()`](crate::Span::root).
-///
-/// # Examples
-///
-/// ```
-/// use futures::executor::block_on;
-/// use minitrace::prelude::*;
-///
-/// let (root, collector) = Span::root("root");
-/// drop(root);
-///
-/// let records: Vec<SpanRecord> = block_on(collector.collect());
-/// ```
-pub struct Collector {
+/// `Collector` collects all spans associated to a root span.
+pub(crate) struct Collector {
     collect_id: Option<u32>,
     collect: GlobalCollect,
 }
 
 impl Collector {
-    pub(crate) fn start_collect(args: CollectArgs, collect: GlobalCollect) -> (Self, CollectToken) {
-        let collect_id = collect.start_collect(args);
+    pub(crate) fn start_collect(
+        parent: SpanContext,
+        collect: GlobalCollect,
+    ) -> (Self, CollectToken) {
+        let collect_id = collect.start_collect();
 
         (
             Collector {
@@ -86,27 +88,18 @@ impl Collector {
                 collect,
             },
             CollectTokenItem {
-                parent_id_of_roots: SpanId::default(),
+                trace_id: parent.trace_id,
+                parent_id: parent.span_id,
                 collect_id,
             }
             .into(),
         )
     }
 
-    /// Stop the trace and collect all span been recorded.
-    ///
-    /// To extremely eliminate the overhead of tracing, the heavy computation and thread synchronization
-    /// work are moved to a background thread, and thus, we have to wait for the background thread to send
-    /// the result back. It usually takes 10 milliseconds because the background thread wakes up and processes
-    /// messages every 10 milliseconds.
-    pub fn collect(mut self) -> Collected {
-        let (tx, rx) = futures::channel::oneshot::channel();
-
+    pub(crate) fn collect(mut self) {
         if let Some(collect_id) = self.collect_id.take() {
-            self.collect.commit_collect(collect_id, tx);
+            self.collect.commit_collect(collect_id);
         }
-
-        Collected { rx }
     }
 }
 
@@ -118,34 +111,48 @@ impl Drop for Collector {
     }
 }
 
-/// The future of [`Collector::collect()`].
-pub struct Collected {
-    rx: futures::channel::oneshot::Receiver<Vec<SpanRecord>>,
+#[derive(Clone, Copy, Debug, Default)]
+pub struct SpanContext {
+    pub trace_id: TraceId,
+    pub span_id: SpanId,
 }
 
-impl Future for Collected {
-    type Output = Vec<SpanRecord>;
+impl SpanContext {
+    pub fn new(trace_id: TraceId, span_id: SpanId) -> Self {
+        Self { trace_id, span_id }
+    }
 
-    fn poll(
-        mut self: std::pin::Pin<&mut Self>,
-        cx: &mut std::task::Context<'_>,
-    ) -> std::task::Poll<Self::Output> {
-        let spans = futures::ready!(self.rx.poll_unpin(cx)).unwrap_or_default();
-        std::task::Poll::Ready(spans)
+    pub fn from_span(span: &Span) -> Option<Self> {
+        let inner = span.inner.as_ref()?;
+        let collect_token = inner.issue_collect_token().next()?;
+
+        Some(Self {
+            trace_id: collect_token.trace_id,
+            span_id: collect_token.parent_id,
+        })
+    }
+
+    pub fn from_local() -> Option<Self> {
+        let stack = LOCAL_SPAN_STACK.with(Rc::clone);
+        let mut stack = stack.borrow_mut();
+        let collect_token = stack.current_collect_token()?[0];
+
+        Some(Self {
+            trace_id: collect_token.trace_id,
+            span_id: collect_token.parent_id,
+        })
     }
 }
 
-/// Arguments for the collector.
-///
-/// Customize collection behavior through [`Span::root_with_args()`](crate::Span::root_with_args).
+/// Configuration of the behavior of the global collector.
 #[must_use]
 #[derive(Default, Debug, Copy, Clone, Eq, PartialEq)]
-pub struct CollectArgs {
+pub struct Config {
     pub(crate) max_span_count: Option<usize>,
 }
 
-impl CollectArgs {
-    /// A soft limit for the span collection in background, usually used to avoid out-of-memory.
+impl Config {
+    /// A soft limit for the span collection for a trace, usually used to avoid out-of-memory.
     ///
     /// # Notice
     ///
@@ -154,10 +161,11 @@ impl CollectArgs {
     /// # Examples
     ///
     /// ```
+    /// use minitrace::collector::Config;
     /// use minitrace::prelude::*;
     ///
-    /// let args = CollectArgs::default().max_span_count(Some(100));
-    /// let (root, collector) = Span::root_with_args("root", args);
+    /// let config = Config::default().max_span_count(Some(100));
+    /// minitrace::set_reporter(minitrace::collector::TerminalReporter, config);
     /// ```
     pub fn max_span_count(self, max_span_count: Option<usize>) -> Self {
         Self { max_span_count }
@@ -166,7 +174,6 @@ impl CollectArgs {
 
 #[cfg(test)]
 mod tests {
-    use futures::executor::block_on;
     use mockall::predicate;
     use mockall::Sequence;
 
@@ -180,33 +187,24 @@ mod tests {
         mock.expect_start_collect()
             .times(1)
             .in_sequence(&mut seq)
-            .with(predicate::eq(CollectArgs::default()))
             .return_const(42_u32);
         mock.expect_commit_collect()
             .times(1)
             .in_sequence(&mut seq)
-            .with(predicate::eq(42_u32), predicate::always())
-            .returning(|_, tx| {
-                tx.send(vec![SpanRecord {
-                    id: 9527,
-                    name: "span",
-                    ..SpanRecord::default()
-                }])
-                .unwrap();
-            });
+            .with(predicate::eq(42_u32))
+            .return_const(());
         mock.expect_submit_spans().times(0);
         mock.expect_drop_collect().times(0);
 
         let mock = Arc::new(mock);
-        let (collector, token) = Collector::start_collect(CollectArgs::default(), mock);
+        let (collector, token) =
+            Collector::start_collect(SpanContext::new(TraceId(12), SpanId::default()), mock);
+        collector.collect();
         assert_eq!(token.into_inner().1.as_slice(), &[CollectTokenItem {
-            parent_id_of_roots: SpanId::default(),
+            trace_id: TraceId(12),
+            parent_id: SpanId::default(),
             collect_id: 42
         }]);
-        let spans = block_on(collector.collect());
-        assert_eq!(spans.len(), 1);
-        assert_eq!(spans[0].id, 9527);
-        assert_eq!(spans[0].name, "span");
     }
 
     #[test]
@@ -226,9 +224,11 @@ mod tests {
         mock.expect_submit_spans().times(0);
 
         let mock = Arc::new(mock);
-        let (_collector, token) = Collector::start_collect(CollectArgs::default(), mock);
+        let (_collector, token) =
+            Collector::start_collect(SpanContext::new(TraceId(12), SpanId::default()), mock);
         assert_eq!(token.into_inner().1.as_slice(), &[CollectTokenItem {
-            parent_id_of_roots: SpanId::default(),
+            trace_id: TraceId(12),
+            parent_id: SpanId::default(),
             collect_id: 42
         }]);
     }

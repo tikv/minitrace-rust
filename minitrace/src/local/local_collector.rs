@@ -35,11 +35,8 @@ use crate::util::RawSpans;
 /// let local_spans = collector.collect();
 ///
 /// // Mount the local spans to a parent
-/// let (root, collector) = Span::root("root");
+/// let root = Span::root("root", SpanContext::new(TraceId(12), SpanId::default()));
 /// root.push_child_spans(Arc::new(local_spans));
-/// drop(root);
-///
-/// let records: Vec<SpanRecord> = block_on(collector.collect());
 /// ```
 ///
 /// [`Span`]: crate::Span
@@ -131,7 +128,8 @@ impl Drop for LocalCollector {
 mod tests {
     use super::*;
     use crate::collector::CollectTokenItem;
-    use crate::local::span_id::SpanId;
+    use crate::collector::SpanId;
+    use crate::prelude::TraceId;
     use crate::util::tree::tree_str_from_raw_spans;
 
     #[test]
@@ -142,7 +140,8 @@ mod tests {
         let span1 = stack.borrow_mut().enter_span("span1").unwrap();
         {
             let token2 = CollectTokenItem {
-                parent_id_of_roots: SpanId::new(9527),
+                trace_id: TraceId(1234),
+                parent_id: SpanId::default(),
                 collect_id: 42,
             };
             let collector2 = LocalCollector::new(Some(token2.into()), stack.clone());
@@ -179,7 +178,8 @@ span1 []
         let span1 = stack.borrow_mut().enter_span("span1").unwrap();
         {
             let token2 = CollectTokenItem {
-                parent_id_of_roots: SpanId::new(9527),
+                trace_id: TraceId(1234),
+                parent_id: SpanId::default(),
                 collect_id: 42,
             };
             let collector2 = LocalCollector::new(Some(token2.into()), stack.clone());
