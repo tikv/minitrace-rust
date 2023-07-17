@@ -132,7 +132,7 @@ impl JaegerReporter {
 
 impl Reporter for JaegerReporter {
     fn report(&mut self, spans: &[SpanRecord]) -> Result<(), Box<dyn std::error::Error>> {
-        let jaeger_spans = self.convert(&spans);
+        let jaeger_spans = self.convert(spans);
         let bytes = self.serialize(jaeger_spans)?;
         self.socket.send_to(&bytes, self.agent_addr)?;
         Ok(())

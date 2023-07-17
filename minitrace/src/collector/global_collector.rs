@@ -379,9 +379,9 @@ fn amend_local_span(
             span.end_instant.as_unix_nanos(anchor)
         };
         spans.push(SpanRecord {
-            trace_id: trace_id,
+            trace_id,
             span_id: span.id,
-            parent_id: parent_id,
+            parent_id,
             begin_unix_time_ns,
             duration_ns: end_unix_time_ns.saturating_sub(begin_unix_time_ns),
             name: span.name,
@@ -415,7 +415,7 @@ fn amend_span(
     spans.push(SpanRecord {
         trace_id,
         span_id: raw_span.id,
-        parent_id: parent_id,
+        parent_id,
         begin_unix_time_ns,
         duration_ns: end_unix_time_ns.saturating_sub(begin_unix_time_ns),
         name: raw_span.name,

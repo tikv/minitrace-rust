@@ -148,7 +148,7 @@ impl OpenTelemetryReporter {
 
 impl Reporter for OpenTelemetryReporter {
     fn report(&mut self, spans: &[SpanRecord]) -> Result<(), Box<dyn std::error::Error>> {
-        let opentelemetry_spans = self.convert(&spans);
+        let opentelemetry_spans = self.convert(spans);
         futures::executor::block_on(self.opentelemetry_exporter.export(opentelemetry_spans))?;
         Ok(())
     }

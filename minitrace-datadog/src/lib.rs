@@ -89,7 +89,7 @@ impl DatadogReporter {
 
 impl Reporter for DatadogReporter {
     fn report(&mut self, spans: &[SpanRecord]) -> Result<(), Box<dyn std::error::Error>> {
-        let datadog_spans = self.convert(&spans);
+        let datadog_spans = self.convert(spans);
         if let Ok(bytes) = self.serialize(datadog_spans) {
             let client = reqwest::blocking::Client::new();
             let _rep = client
