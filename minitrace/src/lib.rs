@@ -3,7 +3,7 @@
 //! A high-performance, ergonomic, library-level timeline tracing library for Rust.
 //!
 //! Most tracing libraries are designed for instrumenting executables. However, in many cases,
-//! libraries also need to be instrumented for tracing purposes. The minitrace crate is designed
+//! libraries also need to be instrumented for tracing purposes. `minitrace` is designed
 //! to be used in libraries. It is lightweight and has zero overhead when it is not enabled in
 //! the executable.
 //!
@@ -11,7 +11,7 @@
 //!
 //! ### In libraries
 //!
-//! Libraries should link to the minitrace crate without enabling any extra features.
+//! Libraries should link to `minitrace` without enabling any extra features.
 //!
 //! ```toml
 //! [dependencies]
@@ -59,7 +59,7 @@
 //!
 //! ### In executables
 //!
-//! Executables should link to the minitrace crate with the `report` feature enabled. Alternatively, you
+//! Executables should link to `minitrace` with the `report` feature enabled. Alternatively, you
 //! can also statically disable minitrace by not enabling the `report` feature.
 //!
 //! ```toml
@@ -87,7 +87,7 @@
 //!
 //! # Concepts
 //!
-//! The basic use of the minitrace crate is through three types: [`Span`], [`LocalSpan`], and [`Event`] where
+//! The basic use of `minitrace` is through three types: [`Span`], [`LocalSpan`], and [`Event`] where
 //! each represents a different type of tracing record. Additionally, the macro [`trace`] is available to automatically
 //! manages these three types for you. Finally, if you're using `Future`, the necessary utilities are provided by
 //! [`FutureExt`] to instrument it.
@@ -101,7 +101,7 @@
 //! - A set of key-value properties
 //! - A reference to a parent `Span`
 //!
-//! We create a [`Span`] to start clocking and drop it to record it.
+//! We create a [`Span`] to start clocking and drop it to record the duration.
 //!
 //! A new `Span` can be started through [`Span::root()`], you need to provide the trace id and the parent span id from
 //! a remote source. If there's no remote parent span, the parent span id is typically set to its default value of zero.
@@ -121,7 +121,7 @@
 //!     {
 //!         let _child_span = Span::enter_with_parent("a child span", &root);
 //!
-//!         // some work
+//!         // Perform some work
 //!     }
 //! }
 //!
@@ -265,21 +265,21 @@
 //!
 //! `minitrace` is designed to be fast and lightweight. Four scenarios are considered:
 //!
-//! - **No Tracing**: The `minitrace` crate is not linked to to the executable. The `minitrace` crate
+//! - **No Tracing**: `minitrace` is not linked to to the executable. `minitrace`
 //! in this case will be completely removed from the executable and libaries, and there is absolutely
 //! zero overhead. So feel free to use `minitrace` in your libraries.
 //!
-//! - **Sample Tracing**: The `minitrace` crate is enabled in the executable, but only a small
-//! portion of the traces are enabled via [`Span::root`], while the other portion start with a
-//! placeholder [`Span::noop`]. The overhead in this case is very small - merely an integer load,
+//! - **Sample Tracing**: `minitrace` is enabled in the executable, but only a small
+//! portion of the traces are enabled via [`Span::root()`], while the other portion start with a
+//! placeholder [`Span::noop()`]. The overhead in this case is very small - merely an integer load,
 //! comparison and jump.
 //!
-//! - **Full Tracing with Tail Sampling**: The `minitrace` crate is enabled in the executable, and
+//! - **Full Tracing with Tail Sampling**: `minitrace` is enabled in the executable, and
 //! all traces are enabled. However, only a select few abnormal tracing records (e.g., P99) are
-//! reported. Normal traces can be dismissed by using [`Span::cancel`] to avoid reporting. This could
+//! reported. Normal traces can be dismissed by using [`Span::cancel()`] to avoid reporting. This could
 //! be useful when you are interested in examining program's tail latency.
 //!
-//! - **Full Tracing**: The `minitrace` crate is enabled in the executable, and all traces are
+//! - **Full Tracing**: `minitrace` is enabled in the executable, and all traces are
 //! enabled. All tracing records are reported. `minitrace` performs 10x to 100x faster than other
 //! tracing libraries in this case.
 //!
@@ -291,6 +291,8 @@
 //! [`trace`]: crate::trace
 //! [`LocalCollector`]: crate::local::LocalCollector
 //! [`Span::root()`]: crate::Span::root
+//! [`Span::noop()`]: crate::Span::noop
+//! [`Span::cancel()`]: crate::Span::cancel
 //! [`Span::enter_with_parent()`]: crate::Span::enter_with_parent
 //! [`Span::set_local_parent()`]: crate::Span::set_local_parent
 //! [`LocalSpan::enter_with_local_parent()`]: crate::local::LocalSpan::enter_with_local_parent
@@ -305,6 +307,7 @@
 #![allow(clippy::arc_with_non_send_sync)]
 #![allow(clippy::needless_doctest_main)]
 #![cfg_attr(not(feature = "report"), allow(dead_code))]
+#![cfg_attr(not(feature = "report"), allow(unused_mut))]
 #![cfg_attr(not(feature = "report"), allow(unused_imports))]
 #![cfg_attr(not(feature = "report"), allow(unused_variables))]
 
@@ -316,12 +319,13 @@ mod span;
 #[doc(hidden)]
 pub mod util;
 
-/// An attribute-macro to help get rid of boilerplate.
+/// An attribute macro designed to eliminate boilerplate code.
 ///
-/// The span name is the function name by default. It can be customized by passing a string literal.
+/// By default, the span name is the function name. This can be customized by passing a string
+/// literal as an argument.
 ///
-/// [`trace`] always require an local parent in the context. Make sure that the caller
-/// is within the scope of [`Span::set_local_parent()`].
+/// The `#[trace]` attribute requires a local parent context to function correctly. Ensure that
+/// the function annotated with `#[trace]` is called within the scope of [`Span::set_local_parent()`].
 ///
 /// # Examples
 ///
@@ -330,40 +334,40 @@ pub mod util;
 ///
 /// #[trace]
 /// fn foo() {
-///     // some work
+///     // Perform some work
 /// }
 ///
 /// #[trace]
 /// async fn bar() {
-///     // some work
+///     // Perform some work
 /// }
 ///
-/// #[trace("qux", enter_on_poll = true)]
+/// #[trace(name = "qux", enter_on_poll = true)]
 /// async fn qux() {
-///     // some work
+///     // Perform some work
 /// }
 /// ```
 ///
-/// The examples above will be translated into:
+/// The code snippets above are equivalent to:
 ///
 /// ```
 /// # use minitrace::prelude::*;
 /// # use minitrace::local::LocalSpan;
 /// fn foo() {
 ///     let __guard = LocalSpan::enter_with_local_parent("foo");
-///     // some work
+///     // Perform some work
 /// }
 ///
 /// fn bar() -> impl core::future::Future<Output = ()> {
 ///     async {
-///         // some work
+///         // Perform some work
 ///     }
 ///     .in_span(Span::enter_with_local_parent("bar"))
 /// }
 ///
 /// fn qux() -> impl core::future::Future<Output = ()> {
 ///     async {
-///         // some work
+///         // Perform some work
 ///     }
 ///     .enter_on_poll("qux")
 /// }
@@ -380,7 +384,7 @@ pub use crate::event::Event;
 pub use crate::span::Span;
 
 pub mod prelude {
-    //! A "prelude" for crates using the `minitrace` crate.
+    //! A "prelude" for crates using `minitrace`.
     #[doc(no_inline)]
     pub use crate::collector::SpanContext;
     #[doc(no_inline)]

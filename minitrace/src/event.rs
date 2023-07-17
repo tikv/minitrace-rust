@@ -5,7 +5,7 @@ use std::rc::Rc;
 use crate::local::local_span_stack::LOCAL_SPAN_STACK;
 use crate::Span;
 
-/// `Event`s represent single points in time where something occurred during the execution of a program.
+/// Represents single points in time where something occurred during the execution of a program.
 ///
 /// An `Event` can be compared to a log record in unstructured logging, but with two key differences:
 ///
@@ -23,8 +23,7 @@ impl Event {
     {
         #[cfg(feature = "report")]
         {
-            let mut span = Span::enter_with_parent(name, parent);
-            span.add_properties(properties);
+            let mut span = Span::enter_with_parent(name, parent).with_properties(properties);
             if let Some(mut inner) = span.inner.take() {
                 inner.raw_span.is_event = true;
                 inner.submit_spans();

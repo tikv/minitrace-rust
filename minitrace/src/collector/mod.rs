@@ -177,7 +177,7 @@ pub struct Config {
 impl Config {
     /// A soft limit for the span collection for a trace, usually used to avoid out-of-memory.
     ///
-    /// # Notice
+    /// # Note
     ///
     /// Root span will always be collected. The eventually collected spans may exceed the limit.
     ///
@@ -229,7 +229,7 @@ impl Config {
     /// - When the specified time duration between two batch reports is met.
     /// - When the number of spans in a batch hits its limit.
     ///
-    /// # Notice
+    /// # Note
     ///
     /// The eventually spans being reported may exceed the limit.
     ///

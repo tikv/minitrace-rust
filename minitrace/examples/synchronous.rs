@@ -29,8 +29,8 @@ async fn main() {
         let root = Span::root("root", parent);
 
         let _g = root.set_local_parent();
-        let mut span = LocalSpan::enter_with_local_parent("a span");
-        span.add_property(|| ("a property", "a value".to_owned()));
+        let _span = LocalSpan::enter_with_local_parent("a span")
+            .with_property(|| ("a property", "a value".to_owned()));
 
         for i in 1..=10 {
             func1(i);
@@ -88,9 +88,9 @@ impl ReportAll {
 
 impl Reporter for ReportAll {
     fn report(&mut self, spans: &[SpanRecord]) -> Result<(), Box<dyn std::error::Error>> {
-        self.jaeger.report(spans)?;
-        self.datadog.report(spans)?;
-        self.opentelemetry.report(spans)?;
+        self.jaeger.report(spans).ok();
+        self.datadog.report(spans).ok();
+        self.opentelemetry.report(spans).ok();
         Ok(())
     }
 }

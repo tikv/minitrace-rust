@@ -13,13 +13,13 @@ fn four_spans() {
     {
         // wide
         for _ in 0..2 {
-            let mut span = LocalSpan::enter_with_local_parent("iter-span");
-            span.add_property(|| ("tmp_property", "tmp_value".into()));
+            let _span = LocalSpan::enter_with_local_parent("iter-span")
+                .with_property(|| ("tmp_property", "tmp_value".into()));
         }
     }
 
     {
-        #[trace("rec-span")]
+        #[trace(name = "rec-span")]
         fn rec(mut i: u32) {
             i -= 1;
 
@@ -382,7 +382,7 @@ fn test_macro() {
 
     #[async_trait]
     impl Foo for Bar {
-        #[trace("run")]
+        #[trace(name = "run")]
         async fn run(&self, millis: &u64) {
             let _g = Span::enter_with_local_parent("run-inner");
             work(millis).await;

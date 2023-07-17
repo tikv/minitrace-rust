@@ -11,6 +11,8 @@ extern crate proc_macro;
 #[macro_use]
 extern crate proc_macro_error;
 
+use std::collections::HashSet;
+
 use proc_macro2::Span;
 use proc_macro2::TokenStream;
 use proc_macro2::TokenTree;
@@ -29,26 +31,38 @@ struct Args {
 
 impl Args {
     fn parse(default_name: String, input: AttributeArgs) -> Args {
-        let (name, next) = match input.get(0) {
-            Some(arg0) => match arg0 {
-                NestedMeta::Lit(Lit::Str(name)) => (name.value(), input.get(1)),
-                _ => (default_name, input.get(0)),
-            },
-            None => (default_name, None),
-        };
-        let enter_on_poll = match next {
-            Some(arg1) => match arg1 {
+        if input.len() > 2 {
+            abort_call_site!("too many arguments");
+        }
+
+        let mut args = HashSet::new();
+        let mut name = default_name;
+        let mut enter_on_poll = false;
+
+        for arg in &input {
+            match arg {
+                NestedMeta::Meta(Meta::NameValue(MetaNameValue {
+                    path,
+                    lit: Lit::Str(s),
+                    ..
+                })) if path.is_ident("name") => {
+                    name = s.value();
+                    args.insert("name");
+                }
                 NestedMeta::Meta(Meta::NameValue(MetaNameValue {
                     path,
                     lit: Lit::Bool(b),
                     ..
-                })) if path.is_ident("enter_on_poll") => b.value(),
-                _ => abort!(arg1.span(), "expected `enter_on_poll = <bool>`"),
-            },
-            None => false,
-        };
-        if input.len() > 2 {
-            abort_call_site!("too many arguments");
+                })) if path.is_ident("enter_on_poll") => {
+                    enter_on_poll = b.value;
+                    args.insert("enter_on_poll");
+                }
+                _ => abort_call_site!("invalid argument"),
+            }
+        }
+
+        if args.len() != input.len() {
+            abort_call_site!("duplicated arguments");
         }
 
         Args {

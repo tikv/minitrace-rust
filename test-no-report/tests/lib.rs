@@ -11,9 +11,9 @@ fn test_no_report() {
     use minitrace::local::LocalCollector;
     use minitrace::prelude::*;
 
-    let mut root = Span::root("root", SpanContext::new(TraceId(0), SpanId(0)));
-    root.add_property(|| ("k", "v".to_string()));
-    root.add_properties(|| [("k", "v".to_string())]);
+    let mut root = Span::root("root", SpanContext::new(TraceId(0), SpanId(0)))
+        .with_property(|| ("k1", "v1".to_string()))
+        .with_properties(|| [("k2", "v2".to_string())]);
 
     Event::add_to_parent("event", &root, || []);
     Event::add_to_local_parent("event", || []);
@@ -22,9 +22,9 @@ fn test_no_report() {
 
     Event::add_to_local_parent("event", || []);
 
-    let mut span1 = LocalSpan::enter_with_local_parent("span1");
-    span1.add_property(|| ("k", "v".to_string()));
-    span1.add_properties(|| [("k", "v".to_string())]);
+    let _span1 = LocalSpan::enter_with_local_parent("span1")
+        .with_property(|| ("k", "v".to_string()))
+        .with_properties(|| [("k", "v".to_string())]);
 
     let _span2 = LocalSpan::enter_with_local_parent("span2");
 

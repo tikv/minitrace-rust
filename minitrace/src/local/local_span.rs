@@ -7,6 +7,9 @@ use crate::local::local_span_line::LocalSpanHandle;
 use crate::local::local_span_stack::LocalSpanStack;
 use crate::local::local_span_stack::LOCAL_SPAN_STACK;
 
+/// An optimized [`Span`] for tracing operations within a single thread.
+///
+/// [`Span`]: crate::Span
 #[must_use]
 pub struct LocalSpan {
     #[cfg(feature = "report")]
@@ -19,6 +22,21 @@ struct LocalSpanInner {
 }
 
 impl LocalSpan {
+    /// Create a new child span associated with the current local span in the current thread, and then
+    /// it will become the new local parent.
+    ///
+    /// If no local span is active, this function is no-op.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use minitrace::prelude::*;
+    ///
+    /// let root = Span::root("root", SpanContext::new(TraceId(12), SpanId::default()));
+    /// let _g = root.set_local_parent();
+    ///
+    /// let child = Span::enter_with_local_parent("child");
+    /// ```
     #[inline]
     pub fn enter_with_local_parent(name: &'static str) -> Self {
         #[cfg(not(feature = "report"))]
@@ -33,14 +51,40 @@ impl LocalSpan {
         }
     }
 
+    /// Add a single property to the `LocalSpan` and return the modified `LocalSpan`.
+    ///
+    /// A property is an arbitrary key-value pair associated with a span.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use minitrace::prelude::*;
+    ///
+    /// let span = LocalSpan::enter_with_local_parent("a child span")
+    ///     .with_property(|| ("key", "value".to_string()));
+    /// ```
     #[inline]
-    pub fn add_property<F>(&mut self, property: F)
+    pub fn with_property<F>(self, property: F) -> Self
     where F: FnOnce() -> (&'static str, String) {
-        self.add_properties(|| [property()]);
+        self.with_properties(|| [property()])
     }
 
+    /// Add multiple properties to the `LocalSpan` and return the modified `LocalSpan`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use minitrace::prelude::*;
+    ///
+    /// let span = LocalSpan::enter_with_local_parent("a child span").with_properties(|| {
+    ///     vec![
+    ///         ("key1", "value1".to_string()),
+    ///         ("key2", "value2".to_string()),
+    ///     ]
+    /// });
+    /// ```
     #[inline]
-    pub fn add_properties<I, F>(&mut self, properties: F)
+    pub fn with_properties<I, F>(self, properties: F) -> Self
     where
         I: IntoIterator<Item = (&'static str, String)>,
         F: FnOnce() -> I,
@@ -50,6 +94,8 @@ impl LocalSpan {
             let span_stack = &mut *stack.borrow_mut();
             span_stack.add_properties(span_handle, properties);
         }
+
+        self
     }
 }
 
@@ -107,8 +153,8 @@ mod tests {
         {
             let _g = LocalSpan::enter_with_stack("span1", stack.clone());
             {
-                let mut span = LocalSpan::enter_with_stack("span2", stack);
-                span.add_property(|| ("k1", "v1".to_owned()));
+                let _span = LocalSpan::enter_with_stack("span2", stack)
+                    .with_property(|| ("k1", "v1".to_owned()));
             }
         }
 
@@ -125,8 +171,8 @@ span1 []
 
     #[test]
     fn local_span_noop() {
-        let mut span1 = LocalSpan::enter_with_local_parent("span1");
-        span1.add_property(|| ("k1", "v1".to_string()));
+        let _span1 =
+            LocalSpan::enter_with_local_parent("span1").with_property(|| ("k1", "v1".to_string()));
     }
 
     #[test]
@@ -145,8 +191,8 @@ span1 []
         {
             let span1 = LocalSpan::enter_with_stack("span1", stack.clone());
             {
-                let mut span2 = LocalSpan::enter_with_stack("span2", stack);
-                span2.add_property(|| ("k1", "v1".to_owned()));
+                let _span2 = LocalSpan::enter_with_stack("span2", stack)
+                    .with_property(|| ("k1", "v1".to_owned()));
 
                 drop(span1);
             }

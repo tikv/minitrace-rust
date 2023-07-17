@@ -50,6 +50,38 @@ struct LocalCollectorInner {
     span_line_handle: SpanLineHandle,
 }
 
+/// A collection of [`LocalSpan`] instances.
+///
+/// This struct is typically used to group together multiple `LocalSpan` instances that have been
+/// collected from a [`LocalCollector`]. These spans can then be associated with a parent span using
+/// the [`Span::push_child_spans()`] method on the parent span.
+///
+/// Internally, it is implemented as an `Arc<LocalSpan>`, which allows it to be cloned and shared
+/// across threads at a low cost.
+///
+/// # Examples
+///
+/// ```
+/// use minitrace::local::LocalCollector;
+/// use minitrace::local::LocalSpans;
+/// use minitrace::prelude::*;
+///
+/// // Collect local spans manually without a parent
+/// let collector = LocalCollector::start();
+/// let span = LocalSpan::enter_with_local_parent("a child span");
+/// drop(span);
+///
+/// // Collect local spans into a LocalSpans instance
+/// let local_spans: LocalSpans = collector.collect();
+///
+/// // Attach the local spans to a parent
+/// let root = Span::root("root", SpanContext::new(TraceId(12), SpanId::default()));
+/// root.push_child_spans(local_spans);
+/// ```
+///
+/// [`Span::push_child_spans()`]: crate::Span::push_child_spans()
+/// [`LocalSpan`]: crate::local::LocalSpan
+/// [`LocalCollector`]: crate::local::LocalCollector
 #[derive(Debug, Clone)]
 pub struct LocalSpans {
     #[cfg(feature = "report")]

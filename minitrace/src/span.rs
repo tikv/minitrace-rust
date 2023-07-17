@@ -37,6 +37,14 @@ pub(crate) struct SpanInner {
 
 impl Span {
     /// Create a place-holder span that never starts recording.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use minitrace::prelude::*;
+    ///
+    /// let mut root = Span::noop();
+    /// ```
     #[inline]
     pub fn noop() -> Self {
         Self {
@@ -45,6 +53,17 @@ impl Span {
         }
     }
 
+    /// Create a new trace and return its root span.
+    ///
+    /// Once dropped, the root span automatically submits all associated child spans to the reporter.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use minitrace::prelude::*;
+    ///
+    /// let mut root = Span::root("root", SpanContext::new(TraceId(12), SpanId::default()));
+    /// ```
     #[inline]
     pub fn root(
         name: &'static str,
@@ -65,12 +84,42 @@ impl Span {
         }
     }
 
+    /// Dismisses the trace, preventing the reporting of any span records associated with it.
+    ///
+    /// This is particularly useful when focusing on the tail latency of a program. For instant,
+    /// you can dismiss all traces finishes within the 99th percentile.
+    ///
+    /// # Note
+    ///
+    /// This method only dismisses the entire trace when called on the root span.
+    /// If called on a non-root span, it will only cancel the reporting of that specific span.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use minitrace::prelude::*;
+    ///
+    /// let mut root = Span::root("root", SpanContext::new(TraceId(12), SpanId::default()));
+    ///
+    /// // ..
+    ///
+    /// root.cancel();
     #[inline]
     pub fn cancel(&mut self) {
         #[cfg(feature = "report")]
         self.inner.take();
     }
 
+    /// Create a new child span associated with the specified parent span.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use minitrace::prelude::*;
+    ///
+    /// let root = Span::root("root", SpanContext::new(TraceId(12), SpanId::default()));
+    ///
+    /// let child = Span::enter_with_parent("child", &root);
     #[inline]
     pub fn enter_with_parent(name: &'static str, parent: &Span) -> Self {
         #[cfg(not(feature = "report"))]
@@ -92,6 +141,23 @@ impl Span {
         }
     }
 
+    /// Create a new child span associated with multiple parent spans.
+    ///
+    /// This function is particularly useful when a single operation amalgamates multiple requests.
+    /// It enables the creation of a unique child span that is interconnected with all the parent spans
+    /// related to the requests, thereby obviating the need to generate individual child spans for each parent span.
+    ///
+    /// The newly created child span, and its children, will have a replica for each trace of parent spans.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use minitrace::prelude::*;
+    ///
+    /// let parent1 = Span::root("parent1", SpanContext::new(TraceId(12), SpanId::default()));
+    /// let parent2 = Span::root("parent2", SpanContext::new(TraceId(12), SpanId::default()));
+    ///
+    /// let child = Span::enter_with_parents("child", [&parent1, &parent2]);
     #[inline]
     pub fn enter_with_parents<'a>(
         name: &'static str,
@@ -116,6 +182,20 @@ impl Span {
         }
     }
 
+    /// Create a new child span associated with the current local span in the current thread.
+    ///
+    /// If no local span is active, this function returns a no-op span.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use minitrace::prelude::*;
+    ///
+    /// let root = Span::root("root", SpanContext::new(TraceId(12), SpanId::default()));
+    /// let _g = root.set_local_parent();
+    ///
+    /// let child = Span::enter_with_local_parent("child");
+    /// ```
     #[inline]
     pub fn enter_with_local_parent(
         name: &'static str,
@@ -136,6 +216,27 @@ impl Span {
         }
     }
 
+    /// Sets the current `Span` as the local parent for the current thread.
+    ///
+    /// This method is used to establish a `Span` as the local parent within the current scope.
+    ///
+    /// A local parent is necessary for creating a [`LocalSpan`] using [`LocalSpan::enter_with_local_parent()`].
+    /// If no local parent is set, `enter_with_local_parent()` will not perform any action.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use minitrace::prelude::*;
+    ///
+    /// let root = Span::root("root", SpanContext::new(TraceId(12), SpanId::default()));
+    /// let _guard = root.set_local_parent(); // root is now the local parent
+    ///
+    /// // Now we can create a LocalSpan with root as the local parent.
+    /// let _span = LocalSpan::enter_with_local_parent("a child span");
+    /// ```
+    ///
+    /// [`LocalSpan`]: crate::local::LocalSpan
+    /// [`LocalSpan::enter_with_local_parent()`]: crate::local::LocalSpan::enter_with_local_parent
     pub fn set_local_parent(&self) -> Option<impl Drop> {
         #[cfg(not(feature = "report"))]
         {
@@ -148,14 +249,41 @@ impl Span {
         }
     }
 
+    /// Add a single property to the `Span` and return the modified `Span`.
+    ///
+    /// A property is an arbitrary key-value pair associated with a span.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use minitrace::prelude::*;
+    ///
+    /// let root = Span::root("root", SpanContext::new(TraceId(12), SpanId::default()))
+    ///     .with_property(|| ("key", "value".to_string()));
+    /// ```
     #[inline]
-    pub fn add_property<F>(&mut self, property: F)
+    pub fn with_property<F>(self, property: F) -> Self
     where F: FnOnce() -> (&'static str, String) {
-        self.add_properties(move || [property()]);
+        self.with_properties(move || [property()])
     }
 
+    /// Add multiple properties to the `Span` and return the modified `Span`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use minitrace::prelude::*;
+    ///
+    /// let root = Span::root("root", SpanContext::new(TraceId(12), SpanId::default()))
+    ///     .with_properties(|| {
+    ///         vec![
+    ///             ("key1", "value1".to_string()),
+    ///             ("key2", "value2".to_string()),
+    ///         ]
+    ///     });
+    /// ```
     #[inline]
-    pub fn add_properties<I, F>(&mut self, properties: F)
+    pub fn with_properties<I, F>(mut self, properties: F) -> Self
     where
         I: IntoIterator<Item = (&'static str, String)>,
         F: FnOnce() -> I,
@@ -164,8 +292,36 @@ impl Span {
         if let Some(inner) = self.inner.as_mut() {
             inner.add_properties(properties);
         }
+
+        self
     }
 
+    /// Attach a collection of [`LocalSpan`] instances as child spans to the current span.
+    ///
+    /// This method allows you to associate previously collected `LocalSpan` instances with the current span.
+    /// This is particularly useful when the `LocalSpan` instances were initiated before their parent span,
+    /// and were collected manually using a [`LocalCollector`].
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use minitrace::local::LocalCollector;
+    /// use minitrace::prelude::*;
+    ///
+    /// // Collect local spans manually without a parent
+    /// let collector = LocalCollector::start();
+    /// let span = LocalSpan::enter_with_local_parent("a child span");
+    /// drop(span);
+    /// let local_spans = collector.collect();
+    ///
+    /// // Attach the local spans to a parent
+    /// let root = Span::root("root", SpanContext::new(TraceId(12), SpanId::default()));
+    /// root.push_child_spans(local_spans);
+    /// ```
+    ///
+    /// [`LocalSpan`]: crate::local::LocalSpan
+    /// [`LocalSpans`]: crate::local::LocalSpans
+    /// [`LocalCollector`]: crate::local::LocalCollector
     #[inline]
     pub fn push_child_spans(&self, local_spans: LocalSpans) {
         #[cfg(feature = "report")]
@@ -326,8 +482,8 @@ mod tests {
         let routine = |collect| {
             let parent_ctx = SpanContext::new(TraceId(12), SpanId::default());
             let root = Span::root("root", parent_ctx, collect);
-            let mut child1 = Span::enter_with_parent("child1", &root);
-            child1.add_properties(|| [("k1", "v1".to_owned())]);
+            let child1 = Span::enter_with_parent("child1", &root)
+                .with_properties(|| [("k1", "v1".to_owned())]);
             let grandchild = Span::enter_with_parent("grandchild", &child1);
             let child2 = Span::enter_with_parent("child2", &root);
 
@@ -388,12 +544,12 @@ root []
             let parent4 = Span::root("parent4", parent_ctx, collect.clone());
             let parent5 = Span::root("parent5", parent_ctx, collect.clone());
             let child1 = Span::enter_with_parent("child1", &parent5);
-            let mut child2 = Span::enter_with_parents(
+            let child2 = Span::enter_with_parents(
                 "child2",
                 [&parent1, &parent2, &parent3, &parent4, &parent5, &child1],
                 collect,
-            );
-            child2.add_property(|| ("k1", "v1".to_owned()));
+            )
+            .with_property(|| ("k1", "v1".to_owned()));
 
             crossbeam::scope(move |scope| {
                 let mut rng = thread_rng();
