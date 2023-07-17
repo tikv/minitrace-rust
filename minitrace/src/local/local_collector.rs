@@ -2,6 +2,7 @@
 
 use std::cell::RefCell;
 use std::rc::Rc;
+use std::sync::Arc;
 
 use minstant::Instant;
 
@@ -22,8 +23,6 @@ use crate::util::RawSpans;
 /// # Examples
 ///
 /// ```
-/// use std::sync::Arc;
-///
 /// use futures::executor::block_on;
 /// use minitrace::local::LocalCollector;
 /// use minitrace::prelude::*;
@@ -36,7 +35,7 @@ use crate::util::RawSpans;
 ///
 /// // Mount the local spans to a parent
 /// let root = Span::root("root", SpanContext::new(TraceId(12), SpanId::default()));
-/// root.push_child_spans(Arc::new(local_spans));
+/// root.push_child_spans(local_spans);
 /// ```
 ///
 /// [`Span`]: crate::Span
@@ -59,8 +58,20 @@ pub struct LocalSpans {
 
 impl LocalCollector {
     pub fn start() -> Self {
-        let stack = LOCAL_SPAN_STACK.with(Rc::clone);
-        Self::new(None, stack)
+        #[cfg(not(feature = "report"))]
+        {
+            LocalCollector { inner: None }
+        }
+
+        #[cfg(feature = "report")]
+        {
+            let stack = LOCAL_SPAN_STACK.with(Rc::clone);
+            Self::new(None, stack)
+        }
+    }
+
+    pub fn collect(self) -> Arc<LocalSpans> {
+        Arc::new(self.collect_spans_and_token().0)
     }
 }
 
@@ -80,10 +91,6 @@ impl LocalCollector {
                 span_line_handle,
             }),
         }
-    }
-
-    pub fn collect(self) -> LocalSpans {
-        self.collect_spans_and_token().0
     }
 
     pub(crate) fn collect_spans_and_token(mut self) -> (LocalSpans, Option<CollectToken>) {
@@ -163,7 +170,7 @@ span2 []
         stack.borrow_mut().exit_span(span1);
         let spans = collector1.collect();
         assert_eq!(
-            tree_str_from_raw_spans(spans.spans),
+            tree_str_from_raw_spans(spans.spans.iter().cloned().collect()),
             r"
 span1 []
 "
@@ -192,7 +199,7 @@ span1 []
         stack.borrow_mut().exit_span(span1);
         let spans = collector1.collect();
         assert_eq!(
-            tree_str_from_raw_spans(spans.spans),
+            tree_str_from_raw_spans(spans.spans.iter().cloned().collect()),
             r"
 span1 []
 "

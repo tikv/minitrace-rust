@@ -46,5 +46,5 @@ fn main() {
         plus(1, 2).unwrap();
     };
 
-    minitrace::flush();    
+    minitrace::flush();
 }

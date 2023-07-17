@@ -17,9 +17,11 @@ use std::sync::Arc;
 pub(crate) use global_collector::GlobalCollect;
 #[cfg(test)]
 pub(crate) use global_collector::MockGlobalCollect;
+#[cfg(feature = "report")]
 pub use global_collector::Reporter;
 pub use id::SpanId;
 pub use id::TraceId;
+#[cfg(feature = "report")]
 pub use terminal_reporter::TerminalReporter;
 #[doc(hidden)]
 pub use test_reporter::TestReporter;
@@ -123,24 +125,40 @@ impl SpanContext {
     }
 
     pub fn from_span(span: &Span) -> Option<Self> {
-        let inner = span.inner.as_ref()?;
-        let collect_token = inner.issue_collect_token().next()?;
+        #[cfg(not(feature = "report"))]
+        {
+            None
+        }
 
-        Some(Self {
-            trace_id: collect_token.trace_id,
-            span_id: collect_token.parent_id,
-        })
+        #[cfg(feature = "report")]
+        {
+            let inner = span.inner.as_ref()?;
+            let collect_token = inner.issue_collect_token().next()?;
+
+            Some(Self {
+                trace_id: collect_token.trace_id,
+                span_id: collect_token.parent_id,
+            })
+        }
     }
 
     pub fn from_local() -> Option<Self> {
-        let stack = LOCAL_SPAN_STACK.with(Rc::clone);
-        let mut stack = stack.borrow_mut();
-        let collect_token = stack.current_collect_token()?[0];
+        #[cfg(not(feature = "report"))]
+        {
+            None
+        }
 
-        Some(Self {
-            trace_id: collect_token.trace_id,
-            span_id: collect_token.parent_id,
-        })
+        #[cfg(feature = "report")]
+        {
+            let stack = LOCAL_SPAN_STACK.with(Rc::clone);
+            let mut stack = stack.borrow_mut();
+            let collect_token = stack.current_collect_token()?[0];
+
+            Some(Self {
+                trace_id: collect_token.trace_id,
+                span_id: collect_token.parent_id,
+            })
+        }
     }
 }
 

@@ -21,11 +21,14 @@ impl Event {
         I: IntoIterator<Item = (&'static str, String)>,
         F: FnOnce() -> I,
     {
-        let mut span = Span::enter_with_parent(name, parent);
-        span.add_properties(properties);
-        if let Some(mut inner) = span.inner.take() {
-            inner.raw_span.is_event = true;
-            inner.submit_spans();
+        #[cfg(feature = "report")]
+        {
+            let mut span = Span::enter_with_parent(name, parent);
+            span.add_properties(properties);
+            if let Some(mut inner) = span.inner.take() {
+                inner.raw_span.is_event = true;
+                inner.submit_spans();
+            }
         }
     }
 
@@ -35,8 +38,11 @@ impl Event {
         I: IntoIterator<Item = (&'static str, String)>,
         F: FnOnce() -> I,
     {
-        let stack = LOCAL_SPAN_STACK.with(Rc::clone);
-        let mut stack = stack.borrow_mut();
-        stack.add_event(name, properties);
+        #[cfg(feature = "report")]
+        {
+            let stack = LOCAL_SPAN_STACK.with(Rc::clone);
+            let mut stack = stack.borrow_mut();
+            stack.add_event(name, properties);
+        }
     }
 }

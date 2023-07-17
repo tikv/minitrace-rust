@@ -3,7 +3,7 @@ name = "minitrace-opentelemetry"
 version = "0.4.1"
 authors = ["The TiKV Project Authors"]
 license = "Apache-2.0"
-edition = "2018"
+edition = "2021"
 description = "Jaeger reporter for minitrace-rust"
 homepage = "https://github.com/tikv/minitrace-rust"
 repository = "https://github.com/tikv/minitrace-rust"
@@ -13,7 +13,7 @@ keywords = ["tracing", "span", "datadog", "jaeger", "opentelemetry"]
 
 [dependencies]
 futures = { version = "0.3", features = ["executor"] }
-minitrace = { path = "../minitrace" }
+minitrace = { path = "../minitrace", features = ["report"] }
 opentelemetry = { version = "0.19", features = ["trace"] }
 
 [dev-dependencies]

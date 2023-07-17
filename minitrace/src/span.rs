@@ -22,6 +22,7 @@ use crate::util::CollectToken;
 /// A thread-safe span.
 #[must_use]
 pub struct Span {
+    #[cfg(feature = "report")]
     pub(crate) inner: Option<SpanInner>,
 }
 
@@ -37,7 +38,10 @@ impl Span {
     /// Create a place-holder span that never starts recording.
     #[inline]
     pub fn noop() -> Self {
-        Self { inner: None }
+        Self {
+            #[cfg(feature = "report")]
+            inner: None,
+        }
     }
 
     #[inline]
@@ -46,27 +50,44 @@ impl Span {
         parent: SpanContext,
         #[cfg(test)] collect: GlobalCollect,
     ) -> Self {
-        #[cfg(not(test))]
-        let collect = GlobalCollect;
-        let (collector, token) = Collector::start_collect(parent, collect.clone());
-        Self::new(token, name, Some(collector), collect)
+        #[cfg(not(feature = "report"))]
+        {
+            Self::noop()
+        }
+
+        #[cfg(feature = "report")]
+        {
+            #[cfg(not(test))]
+            let collect = GlobalCollect;
+            let (collector, token) = Collector::start_collect(parent, collect.clone());
+            Self::new(token, name, Some(collector), collect)
+        }
     }
 
     #[inline]
     pub fn cancel(&mut self) {
+        #[cfg(feature = "report")]
         self.inner.take();
     }
 
     #[inline]
     pub fn enter_with_parent(name: &'static str, parent: &Span) -> Self {
-        match &parent.inner {
-            Some(_inner) => Self::enter_with_parents(
-                name,
-                [parent],
-                #[cfg(test)]
-                _inner.collect.clone(),
-            ),
-            None => Span::noop(),
+        #[cfg(not(feature = "report"))]
+        {
+            Self::noop()
+        }
+
+        #[cfg(feature = "report")]
+        {
+            match &parent.inner {
+                Some(_inner) => Self::enter_with_parents(
+                    name,
+                    [parent],
+                    #[cfg(test)]
+                    _inner.collect.clone(),
+                ),
+                None => Span::noop(),
+            }
         }
     }
 
@@ -76,14 +97,22 @@ impl Span {
         parents: impl IntoIterator<Item = &'a Span>,
         #[cfg(test)] collect: GlobalCollect,
     ) -> Self {
-        #[cfg(not(test))]
-        let collect = GlobalCollect;
-        let token = parents
-            .into_iter()
-            .filter_map(|span| span.inner.as_ref())
-            .flat_map(|inner| inner.issue_collect_token())
-            .collect();
-        Self::new(token, name, None, collect)
+        #[cfg(not(feature = "report"))]
+        {
+            Self::noop()
+        }
+
+        #[cfg(feature = "report")]
+        {
+            #[cfg(not(test))]
+            let collect = GlobalCollect;
+            let token = parents
+                .into_iter()
+                .filter_map(|span| span.inner.as_ref())
+                .flat_map(|inner| inner.issue_collect_token())
+                .collect();
+            Self::new(token, name, None, collect)
+        }
     }
 
     #[inline]
@@ -91,14 +120,31 @@ impl Span {
         name: &'static str,
         #[cfg(test)] collect: GlobalCollect,
     ) -> Self {
-        #[cfg(not(test))]
-        let collect = GlobalCollect;
-        LOCAL_SPAN_STACK
-            .with(move |stack| Self::enter_with_stack(name, &mut (*stack).borrow_mut(), collect))
+        #[cfg(not(feature = "report"))]
+        {
+            Self::noop()
+        }
+
+        #[cfg(feature = "report")]
+        {
+            #[cfg(not(test))]
+            let collect = GlobalCollect;
+            LOCAL_SPAN_STACK.with(move |stack| {
+                Self::enter_with_stack(name, &mut (*stack).borrow_mut(), collect)
+            })
+        }
     }
 
     pub fn set_local_parent(&self) -> Option<impl Drop> {
-        LOCAL_SPAN_STACK.with(|s| self.attach_into_stack(s))
+        #[cfg(not(feature = "report"))]
+        {
+            None::<Span>
+        }
+
+        #[cfg(feature = "report")]
+        {
+            LOCAL_SPAN_STACK.with(|s| self.attach_into_stack(s))
+        }
     }
 
     #[inline]
@@ -113,6 +159,7 @@ impl Span {
         I: IntoIterator<Item = (&'static str, String)>,
         F: FnOnce() -> I,
     {
+        #[cfg(feature = "report")]
         if let Some(inner) = self.inner.as_mut() {
             inner.add_properties(properties);
         }
@@ -120,16 +167,20 @@ impl Span {
 
     #[inline]
     pub fn push_child_spans(&self, local_spans: Arc<LocalSpans>) {
-        if local_spans.spans.is_empty() {
-            return;
-        }
+        #[cfg(feature = "report")]
+        {
+            if local_spans.spans.is_empty() {
+                return;
+            }
 
-        if let Some(inner) = self.inner.as_ref() {
-            inner.push_child_spans(local_spans)
+            if let Some(inner) = self.inner.as_ref() {
+                inner.push_child_spans(local_spans)
+            }
         }
     }
 }
 
+#[cfg(feature = "report")]
 impl Span {
     #[inline]
     fn new(
@@ -173,6 +224,7 @@ impl Span {
     }
 }
 
+#[cfg(feature = "report")]
 impl SpanInner {
     #[inline]
     fn add_properties<I, F>(&mut self, properties: F)
@@ -233,6 +285,7 @@ impl SpanInner {
 
 impl Drop for Span {
     fn drop(&mut self) {
+        #[cfg(feature = "report")]
         if let Some(mut inner) = self.inner.take() {
             let collector = inner.collector.take();
             let end_instant = Instant::now();
@@ -432,7 +485,7 @@ parent5 []
             {
                 let _s = LocalSpan::enter_with_stack("child", stack);
             }
-            let spans = Arc::new(collector.collect());
+            let spans = collector.collect();
 
             for parent in [&parent1, &parent2, &parent3, &parent4, &parent5] {
                 parent.push_child_spans(spans.clone());

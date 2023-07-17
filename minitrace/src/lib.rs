@@ -77,34 +77,6 @@
 //!   minitrace::flush();
 //!   ```
 //!
-//!
-//! ## Property
-//!
-//!   Property is an arbitrary custom kev-value pair associated to a span.
-//!
-//!   ```
-//!   use minitrace::prelude::*;
-//!   use minitrace::collector::TerminalReporter;
-//!   use minitrace::collector::Config;
-//!
-//!   minitrace::set_reporter(TerminalReporter, Config::default());
-//!
-//!   {
-//!       let mut root = Span::root("root", SpanContext::new(TraceId(12), SpanId::default()));
-//!       root.add_property(|| ("key", "value".to_owned()));
-//!       {
-//!           let _guard = root.set_local_parent();
-//!           let mut span1 = LocalSpan::enter_with_local_parent("a child span");
-//!           span1.add_property(|| ("key", "value".to_owned()));
-//!
-//!           // some work
-//!       }
-//!   }
-//!
-//!   minitrace::flush();
-//!   ```
-//!
-//!
 //! ## Event
 //!
 //!   [`Event`] represent single points in time where something occurred during the execution of a program.
@@ -172,20 +144,20 @@
 //!
 //!   minitrace::flush();
 //!   ```
-//! 
-//! 
+//!
+//!
 //! ## Reporter
 //!
-//!   A [`Reporter`] is responsible for collecting and reporting the span records. 
+//!   A [`Reporter`] is responsible for collecting and reporting the span records.
 // As Spans and Events transpire, they are gathered by minitrace's global collector. They are then reported to a remote collector agent such as Jaeger, using the [`Reporter`].
 
 // Executables should choose a reporter implementation and initialize it early in the runtime of the program. Any tracing records generated before the implementation is initialized will be ignored.
 
 // If no reporter implementation is selected, the facade falls back to a “noop” implementation that ignores all log messages. The overhead zero.
-//!
 //!   ```
 //!   use minitrace::collector::TerminalReporter;
-//! 
+//!   use minitrace::collector::Config;
+//!
 //!   minitrace::set_reporter(TerminalReporter, Config::default());
 //!
 //!   minitrace::flush();
@@ -208,6 +180,9 @@
 // TODO: remove me once https://github.com/rust-lang/rust-clippy/issues/11076 is released
 #![allow(unknown_lints)]
 #![allow(clippy::arc_with_non_send_sync)]
+#![cfg_attr(not(feature = "report"), allow(dead_code))]
+#![cfg_attr(not(feature = "report"), allow(unused_imports))]
+#![cfg_attr(not(feature = "report"), allow(unused_variables))]
 
 pub mod collector;
 mod event;
@@ -273,7 +248,9 @@ pub mod util;
 /// [`in_span()`]: crate::future::FutureExt::in_span
 pub use minitrace_macro::trace;
 
+#[cfg(feature = "report")]
 pub use crate::collector::global_collector::flush;
+#[cfg(feature = "report")]
 pub use crate::collector::global_collector::set_reporter;
 pub use crate::event::Event;
 pub use crate::span::Span;

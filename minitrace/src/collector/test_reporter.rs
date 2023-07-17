@@ -4,7 +4,7 @@ use std::sync::Arc;
 
 use parking_lot::Mutex;
 
-use super::Reporter;
+use super::global_collector::Reporter;
 use super::SpanRecord;
 
 pub struct TestReporter {

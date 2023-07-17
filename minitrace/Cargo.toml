@@ -11,6 +11,9 @@ documentation = "https://docs.rs/minitrace"
 readme = "../README.md"
 keywords = ["tracing", "span", "datadog", "jaeger", "opentelemetry"]
 
+[features]
+report = []
+
 [dependencies]
 defer = "0.1"
 futures = "0.3"

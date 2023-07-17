@@ -1,6 +1,6 @@
 // Copyright 2023 TiKV Project Authors. Licensed under Apache-2.0.
 
-use super::Reporter;
+use super::global_collector::Reporter;
 use super::SpanRecord;
 
 pub struct TerminalReporter;

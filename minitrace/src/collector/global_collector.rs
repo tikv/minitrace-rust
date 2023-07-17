@@ -148,7 +148,15 @@ pub(crate) struct GlobalCollector {
 }
 
 impl GlobalCollector {
+    #[allow(unreachable_code)]
     fn start() -> Self {
+        #[cfg(not(feature = "report"))]
+        {
+            unreachable!(
+                "Global collector should not be invoked because feature \"report\" is not enabled."
+            )
+        }
+
         std::thread::Builder::new()
             .name("minitrace".to_string())
             .spawn(move || {
