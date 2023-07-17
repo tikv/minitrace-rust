@@ -12,6 +12,7 @@ mod test_reporter;
 
 use std::rc::Rc;
 use std::sync::Arc;
+use std::time::Duration;
 
 #[cfg(feature = "report")]
 pub use console_reporter::ConsoleReporter;
@@ -164,9 +165,11 @@ impl SpanContext {
 
 /// Configuration of the behavior of the global collector.
 #[must_use]
-#[derive(Default, Debug, Copy, Clone, Eq, PartialEq)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub struct Config {
-    pub(crate) max_span_count: Option<usize>,
+    pub(crate) max_span_per_trace: Option<usize>,
+    pub(crate) batch_report_interval: Duration,
+    pub(crate) batch_report_max_count: Option<usize>,
 }
 
 impl Config {
@@ -182,11 +185,38 @@ impl Config {
     /// use minitrace::collector::Config;
     /// use minitrace::prelude::*;
     ///
-    /// let config = Config::default().max_span_count(Some(100));
+    /// let config = Config::default().max_span_per_trace(Some(100));
     /// minitrace::set_reporter(minitrace::collector::ConsoleReporter, config);
     /// ```
-    pub fn max_span_count(self, max_span_count: Option<usize>) -> Self {
-        Self { max_span_count }
+    pub fn max_span_per_trace(self, max_span_per_trace: Option<usize>) -> Self {
+        Self {
+            max_span_per_trace,
+            ..self
+        }
+    }
+
+    pub fn batch_report_interval(self, batch_report_interval: Duration) -> Self {
+        Self {
+            batch_report_interval,
+            ..self
+        }
+    }
+
+    pub fn batch_report_max_count(self, batch_report_max_count: Option<usize>) -> Self {
+        Self {
+            batch_report_max_count,
+            ..self
+        }
+    }
+}
+
+impl Default for Config {
+    fn default() -> Self {
+        Self {
+            max_span_per_trace: None,
+            batch_report_interval: Duration::from_millis(500),
+            batch_report_max_count: None,
+        }
     }
 }
 

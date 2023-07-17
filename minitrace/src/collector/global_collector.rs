@@ -55,6 +55,7 @@ fn send_command(cmd: CollectCommand) {
 fn force_send_command(cmd: CollectCommand) {
     COMMAND_SENDER.with(|sender| sender.force_send(cmd));
 }
+
 pub fn set_reporter(reporter: impl Reporter, config: Config) {
     let mut global_collector = GLOBAL_COLLECTOR.lock();
     global_collector.config = config;
@@ -63,7 +64,7 @@ pub fn set_reporter(reporter: impl Reporter, config: Config) {
 
 pub fn flush() {
     let mut global_collector = GLOBAL_COLLECTOR.lock();
-    global_collector.handle_commands();
+    global_collector.handle_commands(true);
 }
 
 pub trait Reporter: Send + 'static {
@@ -141,13 +142,14 @@ pub(crate) struct GlobalCollector {
     reporter: Option<Box<dyn Reporter>>,
 
     active_collectors: HashMap<u32, (Vec<SpanCollection>, usize)>,
+    committed_records: Vec<SpanRecord>,
+    last_report: std::time::Instant,
 
     // Vectors to be reused by collection loops. They must be empty outside of the `handle_commands` loop.
     start_collects: Vec<StartCollect>,
     drop_collects: Vec<DropCollect>,
     commit_collects: Vec<CommitCollect>,
     submit_spans: Vec<SubmitSpans>,
-    committed_records: Vec<SpanRecord>,
 }
 
 impl GlobalCollector {
@@ -165,7 +167,7 @@ impl GlobalCollector {
             .spawn(move || {
                 loop {
                     let begin_instant = std::time::Instant::now();
-                    GLOBAL_COLLECTOR.lock().handle_commands();
+                    GLOBAL_COLLECTOR.lock().handle_commands(false);
                     std::thread::sleep(
                         COLLECT_LOOP_INTERVAL.saturating_sub(begin_instant.elapsed()),
                     );
@@ -174,25 +176,25 @@ impl GlobalCollector {
             .unwrap();
 
         GlobalCollector {
-            config: Config::default().max_span_count(Some(0)),
+            config: Config::default().max_span_per_trace(Some(0)),
             reporter: None,
 
             active_collectors: HashMap::new(),
+            committed_records: Vec::new(),
+            last_report: std::time::Instant::now(),
 
             start_collects: Vec::new(),
             drop_collects: Vec::new(),
             commit_collects: Vec::new(),
             submit_spans: Vec::new(),
-            committed_records: Vec::new(),
         }
     }
 
-    fn handle_commands(&mut self) {
+    fn handle_commands(&mut self, flush: bool) {
         debug_assert!(self.start_collects.is_empty());
         debug_assert!(self.drop_collects.is_empty());
         debug_assert!(self.commit_collects.is_empty());
         debug_assert!(self.submit_spans.is_empty());
-        debug_assert!(self.committed_records.is_empty());
 
         let start_collects = &mut self.start_collects;
         let drop_collects = &mut self.drop_collects;
@@ -200,24 +202,27 @@ impl GlobalCollector {
         let submit_spans = &mut self.submit_spans;
         let committed_records = &mut self.committed_records;
 
-        SPSC_RXS.lock().retain_mut(|rx| {
-            loop {
-                match rx.try_recv() {
-                    Ok(Some(CollectCommand::StartCollect(cmd))) => start_collects.push(cmd),
-                    Ok(Some(CollectCommand::DropCollect(cmd))) => drop_collects.push(cmd),
-                    Ok(Some(CollectCommand::CommitCollect(cmd))) => commit_collects.push(cmd),
-                    Ok(Some(CollectCommand::SubmitSpans(cmd))) => submit_spans.push(cmd),
-                    Ok(None) => {
-                        return true;
-                    }
-                    Err(_) => {
-                        // Channel disconnected. It must be because the sender thread has stopped.
-                        return false;
+        {
+            SPSC_RXS.lock().retain_mut(|rx| {
+                loop {
+                    match rx.try_recv() {
+                        Ok(Some(CollectCommand::StartCollect(cmd))) => start_collects.push(cmd),
+                        Ok(Some(CollectCommand::DropCollect(cmd))) => drop_collects.push(cmd),
+                        Ok(Some(CollectCommand::CommitCollect(cmd))) => commit_collects.push(cmd),
+                        Ok(Some(CollectCommand::SubmitSpans(cmd))) => submit_spans.push(cmd),
+                        Ok(None) => {
+                            return true;
+                        }
+                        Err(_) => {
+                            // Channel disconnected. It must be because the sender thread has stopped.
+                            return false;
+                        }
                     }
                 }
-            }
-        });
+            });
+        }
 
+        // If the reporter is not set, global collectior only clears the channel and then dismiss all messages.
         if self.reporter.is_none() {
             start_collects.clear();
             drop_collects.clear();
@@ -245,7 +250,7 @@ impl GlobalCollector {
                 let item = collect_token[0];
                 if let Some((buf, span_count)) = self.active_collectors.get_mut(&item.collect_id) {
                     // The root span, i.e. the span whose parent id is `SpanId::default`, is intended to be kept.
-                    if *span_count < self.config.max_span_count.unwrap_or(usize::MAX)
+                    if *span_count < self.config.max_span_per_trace.unwrap_or(usize::MAX)
                         || item.parent_id == SpanId::default()
                     {
                         *span_count += spans.len();
@@ -264,7 +269,7 @@ impl GlobalCollector {
                     {
                         // Multiple items in a collect token are built from `Span::enter_from_parents`,
                         // so relative span cannot be a root span.
-                        if *span_count < self.config.max_span_count.unwrap_or(usize::MAX) {
+                        if *span_count < self.config.max_span_per_trace.unwrap_or(usize::MAX) {
                             *span_count += spans.len();
                             buf.push(SpanCollection::Shared {
                                 spans: spans.clone(),
@@ -277,10 +282,12 @@ impl GlobalCollector {
             }
         }
 
-        for CommitCollect { collect_id } in self.commit_collects.drain(..) {
+        for CommitCollect { collect_id } in commit_collects.drain(..) {
             if let Some((span_collections, _)) = self.active_collectors.remove(&collect_id) {
                 let anchor: Anchor = Anchor::new();
                 let mut events: HashMap<SpanId, Vec<EventRecord>> = HashMap::new();
+
+                let committed_len = committed_records.len();
 
                 for span_collection in span_collections {
                     match span_collection {
@@ -347,13 +354,23 @@ impl GlobalCollector {
                     }
                 }
 
-                mount_events(committed_records, events);
+                mount_events(&mut committed_records[..committed_len], events);
             }
         }
 
-        let reporter = self.reporter.as_mut().unwrap();
-        if let Err(err) = reporter.report(committed_records.drain(..).as_slice()) {
-            error!("report spans failed: {}", err);
+        if self.last_report.elapsed() > self.config.batch_report_interval
+            || committed_records.len() > self.config.batch_report_max_count.unwrap_or(usize::MAX)
+            || flush
+        {
+            if let Err(err) = self
+                .reporter
+                .as_mut()
+                .unwrap()
+                .report(committed_records.drain(..).as_slice())
+            {
+                error!("report spans failed: {}", err);
+            }
+            self.last_report = std::time::Instant::now();
         }
     }
 }
