@@ -5,14 +5,16 @@
 #![cfg_attr(test, allow(dead_code))]
 
 pub(crate) mod command;
+mod console_reporter;
 pub(crate) mod global_collector;
 pub(crate) mod id;
-mod terminal_reporter;
 mod test_reporter;
 
 use std::rc::Rc;
 use std::sync::Arc;
 
+#[cfg(feature = "report")]
+pub use console_reporter::ConsoleReporter;
 #[cfg(not(test))]
 pub(crate) use global_collector::GlobalCollect;
 #[cfg(test)]
@@ -21,8 +23,6 @@ pub(crate) use global_collector::MockGlobalCollect;
 pub use global_collector::Reporter;
 pub use id::SpanId;
 pub use id::TraceId;
-#[cfg(feature = "report")]
-pub use terminal_reporter::TerminalReporter;
 #[doc(hidden)]
 pub use test_reporter::TestReporter;
 
@@ -183,7 +183,7 @@ impl Config {
     /// use minitrace::prelude::*;
     ///
     /// let config = Config::default().max_span_count(Some(100));
-    /// minitrace::set_reporter(minitrace::collector::TerminalReporter, config);
+    /// minitrace::set_reporter(minitrace::collector::ConsoleReporter, config);
     /// ```
     pub fn max_span_count(self, max_span_count: Option<usize>) -> Self {
         Self { max_span_count }

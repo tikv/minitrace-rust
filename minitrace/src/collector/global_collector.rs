@@ -200,6 +200,7 @@ impl GlobalCollector {
         let drop_collects = &mut self.drop_collects;
         let commit_collects = &mut self.commit_collects;
         let submit_spans = &mut self.submit_spans;
+        let committed_records = &mut self.committed_records;
 
         self.rxs.retain_mut(|rx| {
             loop {
@@ -294,7 +295,7 @@ impl GlobalCollector {
                                 &raw_span,
                                 trace_id,
                                 parent_id,
-                                &mut self.committed_records,
+                                committed_records,
                                 &mut events,
                                 &anchor,
                             ),
@@ -302,7 +303,7 @@ impl GlobalCollector {
                                 &local_spans,
                                 trace_id,
                                 parent_id,
-                                &mut self.committed_records,
+                                committed_records,
                                 &mut events,
                                 &anchor,
                             ),
@@ -310,7 +311,7 @@ impl GlobalCollector {
                                 &local_spans,
                                 trace_id,
                                 parent_id,
-                                &mut self.committed_records,
+                                committed_records,
                                 &mut events,
                                 &anchor,
                             ),
@@ -324,7 +325,7 @@ impl GlobalCollector {
                                 raw_span,
                                 trace_id,
                                 parent_id,
-                                &mut self.committed_records,
+                                committed_records,
                                 &mut events,
                                 &anchor,
                             ),
@@ -332,7 +333,7 @@ impl GlobalCollector {
                                 local_spans,
                                 trace_id,
                                 parent_id,
-                                &mut self.committed_records,
+                                committed_records,
                                 &mut events,
                                 &anchor,
                             ),
@@ -340,7 +341,7 @@ impl GlobalCollector {
                                 local_spans,
                                 trace_id,
                                 parent_id,
-                                &mut self.committed_records,
+                                committed_records,
                                 &mut events,
                                 &anchor,
                             ),
@@ -348,15 +349,14 @@ impl GlobalCollector {
                     }
                 }
 
-                mount_events(&mut self.committed_records, events);
+                mount_events(committed_records, events);
             }
         }
 
         let reporter = self.reporter.as_mut().unwrap();
-        if let Err(err) = reporter.report(&self.committed_records) {
+        if let Err(err) = reporter.report(committed_records.drain(..).as_slice()) {
             error!("report spans failed: {}", err);
         }
-        self.committed_records.clear();
     }
 }
 

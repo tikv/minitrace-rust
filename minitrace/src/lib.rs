@@ -22,10 +22,10 @@
 //!
 //!   ```
 //!   use minitrace::prelude::*;
-//!   use minitrace::collector::TerminalReporter;
+//!   use minitrace::collector::ConsoleReporter;
 //!   use minitrace::collector::Config;
 //!
-//!   minitrace::set_reporter(TerminalReporter, Config::default());
+//!   minitrace::set_reporter(ConsoleReporter, Config::default());
 //!
 //!   {
 //!       let root = Span::root("root", SpanContext::new(TraceId(12), SpanId::default()));
@@ -52,10 +52,10 @@
 //!
 //!   ```
 //!   use minitrace::prelude::*;
-//!   use minitrace::collector::TerminalReporter;
+//!   use minitrace::collector::ConsoleReporter;
 //!   use minitrace::collector::Config;
 //!
-//!   minitrace::set_reporter(TerminalReporter, Config::default());
+//!   minitrace::set_reporter(ConsoleReporter, Config::default());
 //!
 //!   {
 //!       let root = Span::root("root", SpanContext::new(TraceId(12), SpanId::default()));
@@ -84,10 +84,10 @@
 //!
 //!   ```
 //!   use minitrace::prelude::*;
-//!   use minitrace::collector::TerminalReporter;
+//!   use minitrace::collector::ConsoleReporter;
 //!   use minitrace::collector::Config;
 //!
-//!   minitrace::set_reporter(TerminalReporter, Config::default());
+//!   minitrace::set_reporter(ConsoleReporter, Config::default());
 //!
 //!   {
 //!       let root = Span::root("root", SpanContext::new(TraceId(12), SpanId::default()));
@@ -113,7 +113,7 @@
 //!
 //!   ```
 //!   use minitrace::prelude::*;
-//!   use minitrace::collector::TerminalReporter;
+//!   use minitrace::collector::ConsoleReporter;
 //!   use minitrace::collector::Config;
 //!   use futures::executor::block_on;
 //!
@@ -127,7 +127,7 @@
 //!       futures_timer::Delay::new(std::time::Duration::from_millis(i)).await;
 //!   }
 //!
-//!   minitrace::set_reporter(TerminalReporter, Config::default());
+//!   minitrace::set_reporter(ConsoleReporter, Config::default());
 //!
 //!   let root = Span::root("root", SpanContext::new(TraceId(12), SpanId::default()));
 //!   {
@@ -155,10 +155,10 @@
 
 // If no reporter implementation is selected, the facade falls back to a “noop” implementation that ignores all log messages. The overhead zero.
 //!   ```
-//!   use minitrace::collector::TerminalReporter;
+//!   use minitrace::collector::ConsoleReporter;
 //!   use minitrace::collector::Config;
 //!
-//!   minitrace::set_reporter(TerminalReporter, Config::default());
+//!   minitrace::set_reporter(ConsoleReporter, Config::default());
 //!
 //!   minitrace::flush();
 //!   ```

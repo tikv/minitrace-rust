@@ -1,7 +1,7 @@
 // Copyright 2023 TiKV Project Authors. Licensed under Apache-2.0.
 
 //! Test using minitrace without "report" feature, which means the minitrace is
-//! statically disabled 
+//! statically disabled
 
 #[test]
 fn main() {

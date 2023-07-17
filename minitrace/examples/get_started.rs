@@ -1,11 +1,11 @@
 // Copyright 2022 TiKV Project Authors. Licensed under Apache-2.0.
 
 use minitrace::collector::Config;
-use minitrace::collector::TerminalReporter;
+use minitrace::collector::ConsoleReporter;
 use minitrace::prelude::*;
 
 fn main() {
-    minitrace::set_reporter(TerminalReporter, Config::default());
+    minitrace::set_reporter(ConsoleReporter, Config::default());
 
     {
         let parent = SpanContext::new(TraceId(rand::random()), SpanId::default());

@@ -3,9 +3,9 @@
 use super::global_collector::Reporter;
 use super::SpanRecord;
 
-pub struct TerminalReporter;
+pub struct ConsoleReporter;
 
-impl Reporter for TerminalReporter {
+impl Reporter for ConsoleReporter {
     fn report(&mut self, spans: &[SpanRecord]) -> Result<(), Box<dyn std::error::Error>> {
         for span in spans {
             eprintln!("{:#?}", span);
