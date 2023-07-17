@@ -12,6 +12,7 @@ use crate::collector::GlobalCollect;
 use crate::collector::SpanContext;
 use crate::collector::SpanId;
 use crate::collector::SpanSet;
+use crate::local::local_collector::LocalSpansInner;
 use crate::local::local_span_stack::LocalSpanStack;
 use crate::local::local_span_stack::LOCAL_SPAN_STACK;
 use crate::local::raw_span::RawSpan;
@@ -166,15 +167,11 @@ impl Span {
     }
 
     #[inline]
-    pub fn push_child_spans(&self, local_spans: Arc<LocalSpans>) {
+    pub fn push_child_spans(&self, local_spans: LocalSpans) {
         #[cfg(feature = "report")]
         {
-            if local_spans.spans.is_empty() {
-                return;
-            }
-
             if let Some(inner) = self.inner.as_ref() {
-                inner.push_child_spans(local_spans)
+                inner.push_child_spans(local_spans.inner)
             }
         }
     }
@@ -248,13 +245,17 @@ impl SpanInner {
             let token = token.unwrap_or_else(|| [].iter().collect());
 
             if !spans.spans.is_empty() {
-                collect.submit_spans(SpanSet::LocalSpans(spans), token);
+                collect.submit_spans(SpanSet::LocalSpansInner(spans), token);
             }
         })
     }
 
     #[inline]
-    fn push_child_spans(&self, local_spans: Arc<LocalSpans>) {
+    fn push_child_spans(&self, local_spans: Arc<LocalSpansInner>) {
+        if local_spans.spans.is_empty() {
+            return;
+        }
+
         self.collect.submit_spans(
             SpanSet::SharedLocalSpans(local_spans),
             self.issue_collect_token().collect(),

@@ -1,10 +1,13 @@
 // Copyright 2023 TiKV Project Authors. Licensed under Apache-2.0.
 
-//! Test using minitrace without "report" feature, which means the minitrace is
-//! statically disabled
+// The libraries may have a trace instrument embedded in the code for tracing purposes. However,
+// if the executable does not enable minitrace, it will be statically disabled. This results in
+// zero overhead to the libraries, achieved through conditional compilation with the "report" feature.
+//
+// The following test is designed to confirm that minitrace compiles when it's statically disabled in the executable.
 
 #[test]
-fn main() {
+fn test_no_report() {
     use minitrace::local::LocalCollector;
     use minitrace::prelude::*;
 

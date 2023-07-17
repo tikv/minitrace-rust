@@ -42,6 +42,7 @@ use crate::util::RawSpans;
 /// [`LocalSpan`]: crate::local::LocalSpan
 #[must_use]
 pub struct LocalCollector {
+    #[cfg(feature = "report")]
     inner: Option<LocalCollectorInner>,
 }
 
@@ -50,17 +51,23 @@ struct LocalCollectorInner {
     span_line_handle: SpanLineHandle,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct LocalSpans {
-    pub(crate) spans: RawSpans,
-    pub(crate) end_time: Instant,
+    #[cfg(feature = "report")]
+    pub(crate) inner: Arc<LocalSpansInner>,
+}
+
+#[derive(Debug)]
+pub struct LocalSpansInner {
+    pub spans: RawSpans,
+    pub end_time: Instant,
 }
 
 impl LocalCollector {
     pub fn start() -> Self {
         #[cfg(not(feature = "report"))]
         {
-            LocalCollector { inner: None }
+            LocalCollector {}
         }
 
         #[cfg(feature = "report")]
@@ -70,11 +77,22 @@ impl LocalCollector {
         }
     }
 
-    pub fn collect(self) -> Arc<LocalSpans> {
-        Arc::new(self.collect_spans_and_token().0)
+    pub fn collect(self) -> LocalSpans {
+        #[cfg(not(feature = "report"))]
+        {
+            LocalSpans {}
+        }
+
+        #[cfg(feature = "report")]
+        {
+            LocalSpans {
+                inner: Arc::new(self.collect_spans_and_token().0),
+            }
+        }
     }
 }
 
+#[cfg(feature = "report")]
 impl LocalCollector {
     pub(crate) fn new(
         collect_token: Option<CollectToken>,
@@ -93,7 +111,7 @@ impl LocalCollector {
         }
     }
 
-    pub(crate) fn collect_spans_and_token(mut self) -> (LocalSpans, Option<CollectToken>) {
+    pub(crate) fn collect_spans_and_token(mut self) -> (LocalSpansInner, Option<CollectToken>) {
         let (spans, collect_token) = self
             .inner
             .take()
@@ -109,7 +127,7 @@ impl LocalCollector {
             .unwrap_or_default();
 
         (
-            LocalSpans {
+            LocalSpansInner {
                 spans,
                 end_time: Instant::now(),
             },
@@ -120,6 +138,7 @@ impl LocalCollector {
 
 impl Drop for LocalCollector {
     fn drop(&mut self) {
+        #[cfg(feature = "report")]
         if let Some(LocalCollectorInner {
             stack,
             span_line_handle,
@@ -170,7 +189,7 @@ span2 []
         stack.borrow_mut().exit_span(span1);
         let spans = collector1.collect();
         assert_eq!(
-            tree_str_from_raw_spans(spans.spans.iter().cloned().collect()),
+            tree_str_from_raw_spans(spans.inner.spans.iter().cloned().collect()),
             r"
 span1 []
 "
@@ -199,7 +218,7 @@ span1 []
         stack.borrow_mut().exit_span(span1);
         let spans = collector1.collect();
         assert_eq!(
-            tree_str_from_raw_spans(spans.spans.iter().cloned().collect()),
+            tree_str_from_raw_spans(spans.inner.spans.iter().cloned().collect()),
             r"
 span1 []
 "

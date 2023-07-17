@@ -22,8 +22,8 @@ use crate::collector::SpanId;
 use crate::collector::SpanRecord;
 use crate::collector::SpanSet;
 use crate::collector::TraceId;
+use crate::local::local_collector::LocalSpansInner;
 use crate::local::raw_span::RawSpan;
-use crate::local::LocalSpans;
 use crate::util::spsc::Receiver;
 use crate::util::spsc::Sender;
 use crate::util::spsc::{self};
@@ -98,9 +98,9 @@ impl GlobalCollect {
     // Those parents are recorded into `CollectToken` which has several `CollectTokenItem`s. Look into
     // a `CollectTokenItem`, `parent_ids` can be found.
     //
-    // For example, we have a `SpanSet::LocalSpans` and a `CollectToken` as follow:
+    // For example, we have a `SpanSet::LocalSpansInner` and a `CollectToken` as follow:
     //
-    //     SpanSet::LocalSpans::spans                      CollectToken::parent_ids
+    //     SpanSet::LocalSpansInner::spans                      CollectToken::parent_ids
     //     +------+-----------+-----+                      +------------+--------------------+
     //     |  id  | parent_id | ... |                      | collect_id | parent_ids |
     //     +------+-----------+-----+                      +------------+--------------------+
@@ -176,7 +176,7 @@ impl GlobalCollector {
             .unwrap();
 
         GlobalCollector {
-            config: Config::default().max_span_per_trace(Some(0)),
+            config: Config::default().max_spans_per_trace(Some(0)),
             reporter: None,
 
             active_collectors: HashMap::new(),
@@ -250,7 +250,7 @@ impl GlobalCollector {
                 let item = collect_token[0];
                 if let Some((buf, span_count)) = self.active_collectors.get_mut(&item.collect_id) {
                     // The root span, i.e. the span whose parent id is `SpanId::default`, is intended to be kept.
-                    if *span_count < self.config.max_span_per_trace.unwrap_or(usize::MAX)
+                    if *span_count < self.config.max_spans_per_trace.unwrap_or(usize::MAX)
                         || item.parent_id == SpanId::default()
                     {
                         *span_count += spans.len();
@@ -269,7 +269,7 @@ impl GlobalCollector {
                     {
                         // Multiple items in a collect token are built from `Span::enter_from_parents`,
                         // so relative span cannot be a root span.
-                        if *span_count < self.config.max_span_per_trace.unwrap_or(usize::MAX) {
+                        if *span_count < self.config.max_spans_per_trace.unwrap_or(usize::MAX) {
                             *span_count += spans.len();
                             buf.push(SpanCollection::Shared {
                                 spans: spans.clone(),
@@ -304,7 +304,7 @@ impl GlobalCollector {
                                 &mut events,
                                 &anchor,
                             ),
-                            SpanSet::LocalSpans(local_spans) => amend_local_span(
+                            SpanSet::LocalSpansInner(local_spans) => amend_local_span(
                                 &local_spans,
                                 trace_id,
                                 parent_id,
@@ -334,7 +334,7 @@ impl GlobalCollector {
                                 &mut events,
                                 &anchor,
                             ),
-                            SpanSet::LocalSpans(local_spans) => amend_local_span(
+                            SpanSet::LocalSpansInner(local_spans) => amend_local_span(
                                 local_spans,
                                 trace_id,
                                 parent_id,
@@ -359,7 +359,7 @@ impl GlobalCollector {
         }
 
         if self.last_report.elapsed() > self.config.batch_report_interval
-            || committed_records.len() > self.config.batch_report_max_count.unwrap_or(usize::MAX)
+            || committed_records.len() > self.config.batch_report_max_spans.unwrap_or(usize::MAX)
             || flush
         {
             if let Err(err) = self
@@ -376,7 +376,7 @@ impl GlobalCollector {
 }
 
 fn amend_local_span(
-    local_spans: &LocalSpans,
+    local_spans: &LocalSpansInner,
     trace_id: TraceId,
     parent_id: SpanId,
     spans: &mut Vec<SpanRecord>,
@@ -471,7 +471,7 @@ fn mount_events(records: &mut [SpanRecord], mut events: HashMap<SpanId, Vec<Even
 impl SpanSet {
     fn len(&self) -> usize {
         match self {
-            SpanSet::LocalSpans(local_spans) => local_spans.spans.len(),
+            SpanSet::LocalSpansInner(local_spans) => local_spans.spans.len(),
             SpanSet::SharedLocalSpans(local_spans) => local_spans.spans.len(),
             SpanSet::Span(_) => 1,
         }

@@ -566,7 +566,7 @@ root []
 
 #[test]
 #[serial]
-fn max_span_per_trace() {
+fn max_spans_per_trace() {
     #[trace]
     fn recursive(n: usize) {
         if n > 1 {
@@ -575,7 +575,7 @@ fn max_span_per_trace() {
     }
 
     let (reporter, collected_spans) = TestReporter::new();
-    minitrace::set_reporter(reporter, Config::default().max_span_per_trace(Some(5)));
+    minitrace::set_reporter(reporter, Config::default().max_spans_per_trace(Some(5)));
 
     {
         let root = Span::root("root", SpanContext::new(TraceId(12), SpanId::default()));

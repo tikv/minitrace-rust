@@ -92,7 +92,7 @@ impl Tree {
                             .or_default()
                             .insert(span.id, (span.name, vec![], span.properties.clone()));
                     }
-                    SpanSet::LocalSpans(spans) => {
+                    SpanSet::LocalSpansInner(spans) => {
                         for span in spans.spans.iter() {
                             collect
                                 .entry(item.collect_id)
@@ -131,7 +131,7 @@ impl Tree {
                             .1
                             .push(span.id);
                     }
-                    SpanSet::LocalSpans(spans) => {
+                    SpanSet::LocalSpansInner(spans) => {
                         for span in spans.spans.iter() {
                             let parent_id = if span.parent_id == SpanId::default() {
                                 item.parent_id

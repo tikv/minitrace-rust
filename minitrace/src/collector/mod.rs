@@ -27,9 +27,9 @@ pub use id::TraceId;
 #[doc(hidden)]
 pub use test_reporter::TestReporter;
 
+use crate::local::local_collector::LocalSpansInner;
 use crate::local::local_span_stack::LOCAL_SPAN_STACK;
 use crate::local::raw_span::RawSpan;
-use crate::local::LocalSpans;
 use crate::util::CollectToken;
 use crate::Span;
 #[cfg(test)]
@@ -39,8 +39,8 @@ pub(crate) type GlobalCollect = Arc<MockGlobalCollect>;
 #[derive(Debug)]
 pub enum SpanSet {
     Span(RawSpan),
-    LocalSpans(LocalSpans),
-    SharedLocalSpans(Arc<LocalSpans>),
+    LocalSpansInner(LocalSpansInner),
+    SharedLocalSpans(Arc<LocalSpansInner>),
 }
 
 /// A span record been collected.
@@ -167,9 +167,9 @@ impl SpanContext {
 #[must_use]
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub struct Config {
-    pub(crate) max_span_per_trace: Option<usize>,
+    pub(crate) max_spans_per_trace: Option<usize>,
     pub(crate) batch_report_interval: Duration,
-    pub(crate) batch_report_max_count: Option<usize>,
+    pub(crate) batch_report_max_spans: Option<usize>,
 }
 
 impl Config {
@@ -185,12 +185,12 @@ impl Config {
     /// use minitrace::collector::Config;
     /// use minitrace::prelude::*;
     ///
-    /// let config = Config::default().max_span_per_trace(Some(100));
+    /// let config = Config::default().max_spans_per_trace(Some(100));
     /// minitrace::set_reporter(minitrace::collector::ConsoleReporter, config);
     /// ```
-    pub fn max_span_per_trace(self, max_span_per_trace: Option<usize>) -> Self {
+    pub fn max_spans_per_trace(self, max_spans_per_trace: Option<usize>) -> Self {
         Self {
-            max_span_per_trace,
+            max_spans_per_trace,
             ..self
         }
     }
@@ -202,9 +202,9 @@ impl Config {
         }
     }
 
-    pub fn batch_report_max_count(self, batch_report_max_count: Option<usize>) -> Self {
+    pub fn batch_report_max_spans(self, batch_report_max_spans: Option<usize>) -> Self {
         Self {
-            batch_report_max_count,
+            batch_report_max_spans,
             ..self
         }
     }
@@ -213,9 +213,9 @@ impl Config {
 impl Default for Config {
     fn default() -> Self {
         Self {
-            max_span_per_trace: None,
+            max_spans_per_trace: None,
             batch_report_interval: Duration::from_millis(500),
-            batch_report_max_count: None,
+            batch_report_max_spans: None,
         }
     }
 }
