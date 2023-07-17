@@ -264,17 +264,14 @@ impl SpanInner {
 
     #[inline]
     pub(crate) fn issue_collect_token(&self) -> impl Iterator<Item = CollectTokenItem> + '_ {
-        self.collect_token.iter().map(
-            move |CollectTokenItem {
-                      trace_id,
-                      collect_id,
-                      ..
-                  }| CollectTokenItem {
-                trace_id: *trace_id,
+        self.collect_token
+            .iter()
+            .map(move |collect_item| CollectTokenItem {
+                trace_id: collect_item.trace_id,
                 parent_id: self.raw_span.id,
-                collect_id: *collect_id,
-            },
-        )
+                collect_id: collect_item.collect_id,
+                is_root: false,
+            })
     }
 
     #[inline]

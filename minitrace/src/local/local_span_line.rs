@@ -75,6 +75,7 @@ impl SpanLine {
                     trace_id: item.trace_id,
                     parent_id: self.span_queue.current_span_id().unwrap_or(item.parent_id),
                     collect_id: item.collect_id,
+                    is_root: false,
                 })
                 .collect()
         })
@@ -133,11 +134,13 @@ span1 []
             trace_id: TraceId(1234),
             parent_id: SpanId::default(),
             collect_id: 42,
+            is_root: false,
         };
         let token2 = CollectTokenItem {
             trace_id: TraceId(1235),
             parent_id: SpanId::default(),
             collect_id: 43,
+            is_root: false,
         };
         let token = [token1, token2].iter().collect();
         let mut span_line = SpanLine::new(16, 1, Some(token));
@@ -153,11 +156,13 @@ span1 []
                 trace_id: TraceId(1234),
                 parent_id: span_line.span_queue.current_span_id().unwrap(),
                 collect_id: 42,
+                is_root: false,
             },
             CollectTokenItem {
                 trace_id: TraceId(1235),
                 parent_id: span_line.span_queue.current_span_id().unwrap(),
                 collect_id: 43,
+                is_root: false,
             }
         ]);
         span_line.finish_span(span);
@@ -200,6 +205,7 @@ span []
             trace_id: TraceId(1234),
             parent_id: SpanId::default(),
             collect_id: 42,
+            is_root: false,
         };
         let mut span_line1 = SpanLine::new(16, 1, Some(item.into()));
         let mut span_line2 = SpanLine::new(16, 2, None);

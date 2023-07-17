@@ -143,6 +143,7 @@ mod tests {
             trace_id: TraceId(1234),
             parent_id: SpanId::default(),
             collect_id: 42,
+            is_root: false,
         };
         let span_line1 = span_stack.register_span_line(Some(token1.into())).unwrap();
         {
@@ -159,6 +160,7 @@ mod tests {
                 trace_id: TraceId(1235),
                 parent_id: SpanId::default(),
                 collect_id: 48,
+                is_root: false,
             };
             let span_line2 = span_stack.register_span_line(Some(token2.into())).unwrap();
             {
@@ -206,6 +208,7 @@ span1 []
                             trace_id: TraceId(1234),
                             parent_id: SpanId::default(),
                             collect_id: 42,
+                            is_root: false,
                         }
                         .into(),
                     ))
@@ -219,7 +222,8 @@ span1 []
                                     CollectTokenItem {
                                         trace_id: TraceId(1235),
                                         parent_id: SpanId::default(),
-                                        collect_id: 43
+                                        collect_id: 43,
+                                        is_root: false,
                                     }
                                     .into()
                                 ))
@@ -238,7 +242,8 @@ span1 []
                                     CollectTokenItem {
                                         trace_id: TraceId(1236),
                                         parent_id: SpanId::default(),
-                                        collect_id: 44
+                                        collect_id: 44,
+                                        is_root: false,
                                     }
                                     .into()
                                 ))
@@ -263,6 +268,7 @@ span1 []
             trace_id: TraceId(1),
             parent_id: SpanId(1),
             collect_id: 1,
+            is_root: false,
         };
         let span_line1 = span_stack.register_span_line(Some(token1.into())).unwrap();
         assert_eq!(span_stack.current_collect_token().unwrap().as_slice(), &[
@@ -276,6 +282,7 @@ span1 []
                     trace_id: TraceId(3),
                     parent_id: SpanId(3),
                     collect_id: 3,
+                    is_root: false,
                 };
                 let span_line3 = span_stack.register_span_line(Some(token3.into())).unwrap();
                 assert_eq!(span_stack.current_collect_token().unwrap().as_slice(), &[
@@ -290,6 +297,7 @@ span1 []
                 trace_id: TraceId(4),
                 parent_id: SpanId(4),
                 collect_id: 4,
+                is_root: false,
             };
             let span_line4 = span_stack.register_span_line(Some(token4.into())).unwrap();
             assert_eq!(span_stack.current_collect_token().unwrap().as_slice(), &[
@@ -317,6 +325,7 @@ span1 []
                         trace_id: TraceId(1234),
                         parent_id: SpanId::default(),
                         collect_id: 42,
+                        is_root: false,
                     }
                     .into(),
                 ))
@@ -340,6 +349,7 @@ span1 []
                         trace_id: TraceId(1234),
                         parent_id: SpanId::default(),
                         collect_id: 42,
+                        is_root: false,
                     }
                     .into(),
                 ))
@@ -363,6 +373,7 @@ span1 []
                         trace_id: TraceId(1234),
                         parent_id: SpanId::default(),
                         collect_id: 42,
+                        is_root: false,
                     }
                     .into(),
                 ))

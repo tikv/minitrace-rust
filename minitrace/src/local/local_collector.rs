@@ -15,15 +15,14 @@ use crate::util::RawSpans;
 /// A collector to collect [`LocalSpan`].
 ///
 /// [`LocalCollector`] allows to collect [`LocalSpan`] manually without a local parent. The collected [`LocalSpan`] can later be
-/// mounted to a parent.
+/// attached to a parent.
 ///
-/// At most time, [`Span`] and [`LocalSpan`] are sufficient. Use [`LocalCollector`] when the span may start before the parent
-/// span. Sometimes it is useful to trace the preceding task that is blocking the current request.
+/// Generally, [`Span`] and [`LocalSpan`] are sufficient. However, use [`LocalCollector`] when the span might initiate before its
+/// parent span. This is particularly useful for tracing prior tasks that may be obstructing the current request.
 ///
 /// # Examples
 ///
 /// ```
-/// use futures::executor::block_on;
 /// use minitrace::local::LocalCollector;
 /// use minitrace::prelude::*;
 ///
@@ -33,7 +32,7 @@ use crate::util::RawSpans;
 /// drop(span);
 /// let local_spans = collector.collect();
 ///
-/// // Mount the local spans to a parent
+/// // Attach the local spans to a parent
 /// let root = Span::root("root", SpanContext::new(TraceId(12), SpanId::default()));
 /// root.push_child_spans(local_spans);
 /// ```
@@ -169,6 +168,7 @@ mod tests {
                 trace_id: TraceId(1234),
                 parent_id: SpanId::default(),
                 collect_id: 42,
+                is_root: false,
             };
             let collector2 = LocalCollector::new(Some(token2.into()), stack.clone());
             let span2 = stack.borrow_mut().enter_span("span2").unwrap();
@@ -207,6 +207,7 @@ span1 []
                 trace_id: TraceId(1234),
                 parent_id: SpanId::default(),
                 collect_id: 42,
+                is_root: false,
             };
             let collector2 = LocalCollector::new(Some(token2.into()), stack.clone());
             let span2 = stack.borrow_mut().enter_span("span2").unwrap();

@@ -70,6 +70,7 @@ pub struct CollectTokenItem {
     pub trace_id: TraceId,
     pub parent_id: SpanId,
     pub collect_id: u32,
+    pub is_root: bool,
 }
 
 /// `Collector` collects all spans associated to a root span.
@@ -94,6 +95,7 @@ impl Collector {
                 trace_id: parent.trace_id,
                 parent_id: parent.span_id,
                 collect_id,
+                is_root: true,
             }
             .into(),
         )
@@ -183,7 +185,6 @@ impl Config {
     ///
     /// ```
     /// use minitrace::collector::Config;
-    /// use minitrace::prelude::*;
     ///
     /// let config = Config::default().max_spans_per_trace(Some(100));
     /// minitrace::set_reporter(minitrace::collector::ConsoleReporter, config);
@@ -195,6 +196,25 @@ impl Config {
         }
     }
 
+    /// The time duration between two batch reports.
+    ///
+    /// The default value is 500 milliseconds.
+    ///
+    /// A batch report will be initiated by the earliest of these events:
+    ///
+    /// - When the specified time duration between two batch reports is met.
+    /// - When the number of spans in a batch hits its limit.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use std::time::Duration;
+    ///
+    /// use minitrace::collector::Config;
+    ///
+    /// let config = Config::default().batch_report_interval(Duration::from_secs(1));
+    /// minitrace::set_reporter(minitrace::collector::ConsoleReporter, config);
+    /// ```
     pub fn batch_report_interval(self, batch_report_interval: Duration) -> Self {
         Self {
             batch_report_interval,
@@ -202,6 +222,27 @@ impl Config {
         }
     }
 
+    /// The soft limit for the maximum number of spans in a batch report.
+    ///
+    /// A batch report will be initiated by the earliest of these events:
+    ///
+    /// - When the specified time duration between two batch reports is met.
+    /// - When the number of spans in a batch hits its limit.
+    ///
+    /// # Notice
+    ///
+    /// The eventually spans being reported may exceed the limit.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use std::time::Duration;
+    ///
+    /// use minitrace::collector::Config;
+    ///
+    /// let config = Config::default().batch_report_max_spans(Some(200));
+    /// minitrace::set_reporter(minitrace::collector::ConsoleReporter, config);
+    /// ```
     pub fn batch_report_max_spans(self, batch_report_max_spans: Option<usize>) -> Self {
         Self {
             batch_report_max_spans,
@@ -251,7 +292,8 @@ mod tests {
         assert_eq!(token.into_inner().1.as_slice(), &[CollectTokenItem {
             trace_id: TraceId(12),
             parent_id: SpanId::default(),
-            collect_id: 42
+            collect_id: 42,
+            is_root: true,
         }]);
     }
 
@@ -277,7 +319,8 @@ mod tests {
         assert_eq!(token.into_inner().1.as_slice(), &[CollectTokenItem {
             trace_id: TraceId(12),
             parent_id: SpanId::default(),
-            collect_id: 42
+            collect_id: 42,
+            is_root: true,
         }]);
     }
 }

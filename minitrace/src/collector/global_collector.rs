@@ -29,7 +29,7 @@ use crate::util::spsc::Sender;
 use crate::util::spsc::{self};
 use crate::util::CollectToken;
 
-const COLLECT_LOOP_INTERVAL: Duration = Duration::from_millis(10);
+const COLLECT_LOOP_INTERVAL: Duration = Duration::from_millis(50);
 
 static NEXT_COLLECT_ID: AtomicU32 = AtomicU32::new(0);
 static GLOBAL_COLLECTOR: Lazy<Mutex<GlobalCollector>> =
@@ -249,9 +249,8 @@ impl GlobalCollector {
             if collect_token.len() == 1 {
                 let item = collect_token[0];
                 if let Some((buf, span_count)) = self.active_collectors.get_mut(&item.collect_id) {
-                    // The root span, i.e. the span whose parent id is `SpanId::default`, is intended to be kept.
                     if *span_count < self.config.max_spans_per_trace.unwrap_or(usize::MAX)
-                        || item.parent_id == SpanId::default()
+                        || item.is_root
                     {
                         *span_count += spans.len();
                         buf.push(SpanCollection::Owned {

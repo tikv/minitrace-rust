@@ -100,6 +100,7 @@ mod tests {
             trace_id: TraceId(1234),
             parent_id: SpanId::default(),
             collect_id: 42,
+            is_root: false,
         };
         let collector = LocalCollector::new(Some(token.into()), stack.clone());
 
@@ -137,6 +138,7 @@ span1 []
             trace_id: TraceId(1234),
             parent_id: SpanId::default(),
             collect_id: 42,
+            is_root: false,
         };
         let collector = LocalCollector::new(Some(token.into()), stack.clone());
 
