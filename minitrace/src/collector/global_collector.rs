@@ -34,13 +34,18 @@ const COLLECT_LOOP_INTERVAL: Duration = Duration::from_millis(10);
 static NEXT_COLLECT_ID: AtomicU32 = AtomicU32::new(0);
 static GLOBAL_COLLECTOR: Lazy<Mutex<GlobalCollector>> =
     Lazy::new(|| Mutex::new(GlobalCollector::start()));
+static SPSC_RXS: Lazy<Mutex<Vec<Receiver<CollectCommand>>>> = Lazy::new(|| Mutex::new(Vec::new()));
 
 thread_local! {
     static COMMAND_SENDER: Sender<CollectCommand> = {
         let (tx, rx) = spsc::bounded(10240);
-        GLOBAL_COLLECTOR.lock().register_receiver(rx);
+        register_receiver(rx);
         tx
     };
+}
+
+fn register_receiver(rx: Receiver<CollectCommand>) {
+    SPSC_RXS.lock().push(rx);
 }
 
 fn send_command(cmd: CollectCommand) {
@@ -50,11 +55,10 @@ fn send_command(cmd: CollectCommand) {
 fn force_send_command(cmd: CollectCommand) {
     COMMAND_SENDER.with(|sender| sender.force_send(cmd));
 }
-
 pub fn set_reporter(reporter: impl Reporter, config: Config) {
     let mut global_collector = GLOBAL_COLLECTOR.lock();
     global_collector.config = config;
-    global_collector.reporter = Some(Box::leak(Box::new(reporter)));
+    global_collector.reporter = Some(Box::new(reporter));
 }
 
 pub fn flush() {
@@ -134,10 +138,9 @@ enum SpanCollection {
 
 pub(crate) struct GlobalCollector {
     config: Config,
-    reporter: Option<&'static mut dyn Reporter>,
+    reporter: Option<Box<dyn Reporter>>,
 
     active_collectors: HashMap<u32, (Vec<SpanCollection>, usize)>,
-    rxs: Vec<Receiver<CollectCommand>>,
 
     // Vectors to be reused by collection loops. They must be empty outside of the `handle_commands` loop.
     start_collects: Vec<StartCollect>,
@@ -175,7 +178,6 @@ impl GlobalCollector {
             reporter: None,
 
             active_collectors: HashMap::new(),
-            rxs: Vec::new(),
 
             start_collects: Vec::new(),
             drop_collects: Vec::new(),
@@ -183,10 +185,6 @@ impl GlobalCollector {
             submit_spans: Vec::new(),
             committed_records: Vec::new(),
         }
-    }
-
-    fn register_receiver(&mut self, rx: Receiver<CollectCommand>) {
-        self.rxs.push(rx);
     }
 
     fn handle_commands(&mut self) {
@@ -202,7 +200,7 @@ impl GlobalCollector {
         let submit_spans = &mut self.submit_spans;
         let committed_records = &mut self.committed_records;
 
-        self.rxs.retain_mut(|rx| {
+        SPSC_RXS.lock().retain_mut(|rx| {
             loop {
                 match rx.try_recv() {
                     Ok(Some(CollectCommand::StartCollect(cmd))) => start_collects.push(cmd),

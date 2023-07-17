@@ -3,7 +3,6 @@
 use criterion::criterion_group;
 use criterion::criterion_main;
 use criterion::Criterion;
-use minitrace::collector::Reporter;
 
 fn init_opentelemetry() {
     use tracing_subscriber::prelude::*;
@@ -18,7 +17,7 @@ fn init_opentelemetry() {
 fn init_minitrace() {
     struct DummyReporter;
 
-    impl Reporter for DummyReporter {
+    impl minitrace::collector::Reporter for DummyReporter {
         fn report(
             &mut self,
             _spans: &[minitrace::prelude::SpanRecord],
