@@ -16,6 +16,5 @@ fn main() {
         // do something ...
     }
 
-    // Wait for the reporter to finish the last batch
-    std::thread::sleep(std::time::Duration::from_millis(100));
+    minitrace::flush();
 }

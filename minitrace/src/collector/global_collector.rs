@@ -57,6 +57,11 @@ pub fn set_reporter(reporter: impl Reporter, config: Config) {
     global_collector.reporter = Some(Box::leak(Box::new(reporter)));
 }
 
+pub fn flush() {
+    let mut global_collector = GLOBAL_COLLECTOR.lock();
+    global_collector.handle_commands();
+}
+
 pub trait Reporter: Send + 'static {
     fn report(&mut self, spans: &[SpanRecord]) -> Result<(), Box<dyn std::error::Error>>;
 }

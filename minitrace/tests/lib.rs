@@ -49,7 +49,7 @@ fn single_thread_single_span() {
         four_spans();
     };
 
-    std::thread::sleep(Duration::from_millis(100));
+    minitrace::flush();
 
     let expected_graph = r#"
 root []
@@ -86,7 +86,7 @@ fn single_thread_multiple_spans() {
         root3.push_child_spans(local_spans);
     }
 
-    std::thread::sleep(Duration::from_millis(100));
+    minitrace::flush();
 
     let expected_graph1 = r#"
 root1 []
@@ -166,7 +166,7 @@ fn multiple_threads_single_span() {
     })
     .unwrap();
 
-    std::thread::sleep(Duration::from_millis(100));
+    minitrace::flush();
 
     let expected_graph = r#"
 root []
@@ -234,7 +234,7 @@ fn multiple_threads_multiple_spans() {
     })
     .unwrap();
 
-    std::thread::sleep(Duration::from_millis(100));
+    minitrace::flush();
 
     let expected_graph1 = r#"
 root1 []
@@ -343,7 +343,7 @@ fn multiple_spans_without_local_spans() {
         root3.cancel();
     }
 
-    std::thread::sleep(Duration::from_millis(100));
+    minitrace::flush();
 
     assert_eq!(
         collected_spans
@@ -439,7 +439,7 @@ fn test_macro() {
         block_on(runtime.spawn(work3(&100, &100))).unwrap();
     }
 
-    std::thread::sleep(Duration::from_millis(100));
+    minitrace::flush();
 
     let expected_graph = r#"
 root []
@@ -491,7 +491,7 @@ fn macro_example() {
         block_on(do_something_async(100));
     }
 
-    std::thread::sleep(Duration::from_millis(100));
+    minitrace::flush();
 
     let expected_graph = r#"
 root []
@@ -522,7 +522,7 @@ fn multiple_local_parent() {
         let _g = LocalSpan::enter_with_local_parent("span4");
     }
 
-    std::thread::sleep(Duration::from_millis(100));
+    minitrace::flush();
 
     let expected_graph = r#"
 root []
@@ -554,7 +554,7 @@ fn early_local_collect() {
         root.push_child_spans(local_spans);
     }
 
-    std::thread::sleep(Duration::from_millis(100));
+    minitrace::flush();
 
     let expected_graph = r#"
 root []
@@ -601,7 +601,7 @@ fn max_span_count() {
         }
     }
 
-    std::thread::sleep(Duration::from_millis(100));
+    minitrace::flush();
 
     let expected_graph = r#"
 root []

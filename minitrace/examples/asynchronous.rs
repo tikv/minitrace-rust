@@ -1,6 +1,7 @@
 // Copyright 2020 TiKV Project Authors. Licensed under Apache-2.0.
 
-#[allow(clippy::new_without_default)]
+#![allow(clippy::new_without_default)]
+
 use std::borrow::Cow;
 use std::time::Duration;
 
@@ -60,8 +61,7 @@ async fn main() {
         tokio::spawn(f).await.unwrap();
     }
 
-    // Wait for the reporter to finish the last batch
-    tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+    minitrace::flush();
 }
 
 pub struct ReportAll {
