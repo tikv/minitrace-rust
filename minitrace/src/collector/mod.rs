@@ -186,9 +186,9 @@ impl SpanContext {
     /// let span = Span::root("root", SpanContext::new(TraceId(12), SpanId::default()));
     /// let _guard = span.set_local_parent();
     ///
-    /// let context = SpanContext::from_local();
+    /// let context = SpanContext::current_local_parent();
     /// ```
-    pub fn from_local() -> Option<Self> {
+    pub fn current_local_parent() -> Option<Self> {
         #[cfg(not(feature = "report"))]
         {
             None
