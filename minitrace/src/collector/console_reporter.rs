@@ -3,13 +3,13 @@
 use super::global_collector::Reporter;
 use super::SpanRecord;
 
+/// A console reporter that logs span records to the stderr.
 pub struct ConsoleReporter;
 
 impl Reporter for ConsoleReporter {
-    fn report(&mut self, spans: &[SpanRecord]) -> Result<(), Box<dyn std::error::Error>> {
+    fn report(&mut self, spans: &[SpanRecord]) {
         for span in spans {
             eprintln!("{:#?}", span);
         }
-        Ok(())
     }
 }

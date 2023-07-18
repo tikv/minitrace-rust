@@ -43,7 +43,8 @@ pub enum SpanSet {
     SharedLocalSpans(Arc<LocalSpansInner>),
 }
 
-/// A span record been collected.
+/// A record of a span that includes all the information about the span,
+/// such as its identifiers, timing information, name, and associated properties.
 #[derive(Clone, Debug, Default)]
 pub struct SpanRecord {
     pub trace_id: TraceId,
@@ -56,7 +57,7 @@ pub struct SpanRecord {
     pub events: Vec<EventRecord>,
 }
 
-/// A span record been collected.
+/// A record of an event that occurred during the execution of a span.
 #[derive(Clone, Debug, Default)]
 pub struct EventRecord {
     pub name: &'static str,
@@ -116,6 +117,10 @@ impl Drop for Collector {
     }
 }
 
+/// A struct representing the context of a span, including its [`TraceId`] and [`SpanId`].
+///
+/// [`TraceId`]: crate::collector::TraceId
+/// [`SpanId`]: crate::collector::SpanId
 #[derive(Clone, Copy, Debug, Default)]
 pub struct SpanContext {
     pub trace_id: TraceId,
@@ -123,10 +128,35 @@ pub struct SpanContext {
 }
 
 impl SpanContext {
+    /// Creates a new `SpanContext` with the given [`TraceId`] and [`SpanId`].
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use minitrace::prelude::*;
+    ///
+    /// let context = SpanContext::new(TraceId(12), SpanId::default());
+    /// ```
+    ///
+    /// [`TraceId`]: crate::collector::TraceId
+    /// [`SpanId`]: crate::collector::SpanId
     pub fn new(trace_id: TraceId, span_id: SpanId) -> Self {
         Self { trace_id, span_id }
     }
 
+    /// Creates a `SpanContext` from the given [`Span`]. If the `Span` is a noop span,
+    /// this function will return `None`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use minitrace::prelude::*;
+    ///
+    /// let span = Span::root("root", SpanContext::new(TraceId(12), SpanId::default()));
+    /// let context = SpanContext::from_span(&span);
+    /// ```
+    ///
+    /// [`Span`]: crate::Span
     pub fn from_span(span: &Span) -> Option<Self> {
         #[cfg(not(feature = "report"))]
         {
@@ -145,6 +175,19 @@ impl SpanContext {
         }
     }
 
+    /// Creates a `SpanContext` from the current local parent span. If there is no
+    /// local parent span, this function will return `None`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use minitrace::prelude::*;
+    ///
+    /// let span = Span::root("root", SpanContext::new(TraceId(12), SpanId::default()));
+    /// let _guard = span.set_local_parent();
+    ///
+    /// let context = SpanContext::from_local();
+    /// ```
     pub fn from_local() -> Option<Self> {
         #[cfg(not(feature = "report"))]
         {

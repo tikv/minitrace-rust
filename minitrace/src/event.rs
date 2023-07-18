@@ -5,17 +5,21 @@ use std::rc::Rc;
 use crate::local::local_span_stack::LOCAL_SPAN_STACK;
 use crate::Span;
 
-/// Represents single points in time where something occurred during the execution of a program.
-///
-/// An `Event` can be compared to a log record in unstructured logging, but with two key differences:
-///
-/// - `Event`s exist within the context of a span. Unlike log lines, they may be located within the trace tree,
-///   allowing visibility into the temporal context in which the event occurred, as well as the source code location.
-/// - Like spans, Events have structured key-value data known as properties, which may include textual message.
+/// An event that represents a single point in time during the execution of a span.
 pub struct Event;
 
 impl Event {
-    /// Add an event to the parent span.
+    /// Adds an event to the parent span with the given name and properties.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use minitrace::prelude::*;
+    ///
+    /// let root = Span::root("root", SpanContext::new(TraceId(12), SpanId::default()));
+    ///
+    /// Event::add_to_parent("event in root", &root, || [("key", "value".to_owned())]);
+    /// ```
     pub fn add_to_parent<I, F>(name: &'static str, parent: &Span, properties: F)
     where
         I: IntoIterator<Item = (&'static str, String)>,
@@ -31,7 +35,18 @@ impl Event {
         }
     }
 
-    /// Add an event to the current local parent span.
+    /// Adds an event to the current local parent span with the given name and properties.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use minitrace::prelude::*;
+    ///
+    /// let root = Span::root("root", SpanContext::new(TraceId(12), SpanId::default()));
+    /// let _guard = root.set_local_parent();
+    ///
+    /// Event::add_to_local_parent("event in root", || [("key", "value".to_owned())]);
+    /// ```
     pub fn add_to_local_parent<I, F>(name: &'static str, properties: F)
     where
         I: IntoIterator<Item = (&'static str, String)>,

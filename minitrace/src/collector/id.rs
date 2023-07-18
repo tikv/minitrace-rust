@@ -2,9 +2,11 @@
 
 use std::cell::Cell;
 
+/// An identifier for a trace, which groups a set of related spans together.
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, Default)]
 pub struct TraceId(pub u128);
 
+/// An identifier for a span within a trace.
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, Default)]
 pub struct SpanId(pub u64);
 

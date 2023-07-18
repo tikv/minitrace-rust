@@ -1,9 +1,9 @@
 // Copyright 2020 TiKV Project Authors. Licensed under Apache-2.0.
 
-//! Tools to trace a `Future`.
+//! This module provides tools to trace a `Future`.
 //!
-//! [`FutureExt`] extends `Future` with two methods: [`in_span()`] and [`enter_on_poll()`].
-//! The out-most future must use `in_span()`, otherwise, the traces inside the `Future` will be lost.
+//! The [`FutureExt`] trait extends `Future` with two methods: [`in_span()`] and [`enter_on_poll()`].
+//! It is crucial that the outermost future uses `in_span()`, otherwise, the traces inside the `Future` will be lost.
 //!
 //! # Example
 //!
@@ -12,10 +12,10 @@
 //!
 //! let root = Span::root("root", SpanContext::new(TraceId(12), SpanId::default()));
 //!
-//! // To trace a task
+//! // Instrument the a task
 //! let task = async {
 //!     async {
-//!         // some work
+//!         // Perform some work
 //!     }
 //!     .enter_on_poll("future is polled")
 //!     .await;
@@ -38,10 +38,10 @@ impl<T: std::future::Future> FutureExt for T {}
 
 /// An extension trait for `Futures` that provides tracing instrument adapters.
 pub trait FutureExt: std::future::Future + Sized {
-    /// Bind a [`Span`] to the [`Future`] that keeps clocking until the future drops.
+    /// Binds a [`Span`] to the [`Future`] that continues to record until the future is dropped.
     ///
-    /// Besides, it will set the span as the local parent at every poll so that `LocalSpan` becomes available inside the future.
-    /// Under the hood, it call [`Span::set_local_parent`](Span::set_local_parent) when the executor [`poll`](std::future::Future::poll) it.
+    /// In addition, it sets the span as the local parent at every poll so that `LocalSpan` becomes available within the future.
+    /// Internally, it calls [`Span::set_local_parent`](Span::set_local_parent) when the executor [`poll`](std::future::Future::poll) it.
     ///
     /// # Examples
     ///
@@ -51,7 +51,10 @@ pub trait FutureExt: std::future::Future + Sized {
     /// use minitrace::prelude::*;
     ///
     /// let root = Span::root("Root", SpanContext::new(TraceId(12), SpanId::default()));
-    /// let task = async { 42 }.in_span(Span::enter_with_parent("Task", &root));
+    /// let task = async {
+    ///     // Perform some work
+    /// }
+    /// .in_span(Span::enter_with_parent("Task", &root));
     ///
     /// tokio::spawn(task);
     /// # }
@@ -66,7 +69,7 @@ pub trait FutureExt: std::future::Future + Sized {
         }
     }
 
-    /// Start a [`LocalSpan`] at every [`Future::poll()`]. It will create multiple _short_ spans if the future get polled multiple times.
+    /// Starts a [`LocalSpan`] at every [`Future::poll()`]. If the future gets polled multiple times, it will create multiple _short_ spans.
     ///
     /// # Examples
     ///
@@ -76,8 +79,14 @@ pub trait FutureExt: std::future::Future + Sized {
     /// use minitrace::prelude::*;
     ///
     /// let root = Span::root("Root", SpanContext::new(TraceId(12), SpanId::default()));
-    /// let task = async { async { 9527 }.enter_on_poll("Sub Task").await }
-    ///     .in_span(Span::enter_with_parent("Task", &root));
+    /// let task = async {
+    ///     async {
+    ///         // Perform some work
+    ///     }
+    ///     .enter_on_poll("Sub Task")
+    ///     .await
+    /// }
+    /// .in_span(Span::enter_with_parent("Task", &root));
     ///
     /// tokio::spawn(task);
     /// # }

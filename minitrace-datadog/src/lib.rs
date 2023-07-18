@@ -85,21 +85,30 @@ impl DatadogReporter {
         spans.serialize(&mut Serializer::new(&mut buf).with_struct_map())?;
         Ok(buf)
     }
+
+    fn try_report(&self, spans: &[SpanRecord]) -> Result<(), Box<dyn std::error::Error>> {
+        let datadog_spans = self.convert(spans);
+        let bytes = self.serialize(datadog_spans)?;
+        let client = reqwest::blocking::Client::new();
+        let _rep = client
+            .post(format!("http://{}/v0.4/traces", self.agent_addr))
+            .header("Datadog-Meta-Tracer-Version", "v1.27.0")
+            .header("Content-Type", "application/msgpack")
+            .body(bytes)
+            .send()?;
+        Ok(())
+    }
 }
 
 impl Reporter for DatadogReporter {
-    fn report(&mut self, spans: &[SpanRecord]) -> Result<(), Box<dyn std::error::Error>> {
-        let datadog_spans = self.convert(spans);
-        if let Ok(bytes) = self.serialize(datadog_spans) {
-            let client = reqwest::blocking::Client::new();
-            let _rep = client
-                .post(format!("http://{}/v0.4/traces", self.agent_addr))
-                .header("Datadog-Meta-Tracer-Version", "v1.27.0")
-                .header("Content-Type", "application/msgpack")
-                .body(bytes)
-                .send()?;
+    fn report(&mut self, spans: &[SpanRecord]) {
+        if spans.is_empty() {
+            return;
         }
-        Ok(())
+
+        if let Err(err) = self.try_report(spans) {
+            eprintln!("report to datadog failed: {}", err);
+        }
     }
 }
 #[derive(Serialize)]

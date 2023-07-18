@@ -111,10 +111,9 @@ impl ReportAll {
 }
 
 impl Reporter for ReportAll {
-    fn report(&mut self, spans: &[SpanRecord]) -> Result<(), Box<dyn std::error::Error>> {
-        self.jaeger.report(spans).ok();
-        self.datadog.report(spans).ok();
-        self.opentelemetry.report(spans).ok();
-        Ok(())
+    fn report(&mut self, spans: &[SpanRecord]) {
+        self.jaeger.report(spans);
+        self.datadog.report(spans);
+        self.opentelemetry.report(spans);
     }
 }

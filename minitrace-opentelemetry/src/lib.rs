@@ -144,12 +144,22 @@ impl OpenTelemetryReporter {
         }));
         queue
     }
-}
 
-impl Reporter for OpenTelemetryReporter {
-    fn report(&mut self, spans: &[SpanRecord]) -> Result<(), Box<dyn std::error::Error>> {
+    fn try_report(&mut self, spans: &[SpanRecord]) -> Result<(), Box<dyn std::error::Error>> {
         let opentelemetry_spans = self.convert(spans);
         futures::executor::block_on(self.opentelemetry_exporter.export(opentelemetry_spans))?;
         Ok(())
+    }
+}
+
+impl Reporter for OpenTelemetryReporter {
+    fn report(&mut self, spans: &[SpanRecord]) {
+        if spans.is_empty() {
+            return;
+        }
+
+        if let Err(err) = self.try_report(spans) {
+            eprintln!("report to opentelemetry failed: {}", err);
+        }
     }
 }

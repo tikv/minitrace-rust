@@ -128,13 +128,23 @@ impl JaegerReporter {
 
         Ok(bytes)
     }
-}
 
-impl Reporter for JaegerReporter {
-    fn report(&mut self, spans: &[SpanRecord]) -> Result<(), Box<dyn std::error::Error>> {
+    fn try_report(&self, spans: &[SpanRecord]) -> Result<(), Box<dyn std::error::Error>> {
         let jaeger_spans = self.convert(spans);
         let bytes = self.serialize(jaeger_spans)?;
         self.socket.send_to(&bytes, self.agent_addr)?;
         Ok(())
+    }
+}
+
+impl Reporter for JaegerReporter {
+    fn report(&mut self, spans: &[SpanRecord]) {
+        if spans.is_empty() {
+            return;
+        }
+
+        if let Err(err) = self.try_report(spans) {
+            eprintln!("report to jaeger failed: {}", err);
+        }
     }
 }

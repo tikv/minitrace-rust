@@ -6,7 +6,6 @@ use std::sync::atomic::Ordering;
 use std::sync::Arc;
 use std::time::Duration;
 
-use log::error;
 use minstant::Anchor;
 use once_cell::sync::Lazy;
 use parking_lot::Mutex;
@@ -56,12 +55,23 @@ fn force_send_command(cmd: CollectCommand) {
     COMMAND_SENDER.with(|sender| sender.force_send(cmd));
 }
 
+/// Sets the reporter and its configuration for the current application.
+///
+/// # Examples
+///
+/// ```
+/// use minitrace::collector::Config;
+/// use minitrace::collector::ConsoleReporter;
+///
+/// minitrace::set_reporter(ConsoleReporter, Config::default());
+/// ```
 pub fn set_reporter(reporter: impl Reporter, config: Config) {
     let mut global_collector = GLOBAL_COLLECTOR.lock();
     global_collector.config = config;
     global_collector.reporter = Some(Box::new(reporter));
 }
 
+/// Flushes all pending span records to the reporter immediately.
 pub fn flush() {
     // Spawns a new thread to ensure the reporter operates outside the tokio runtime to prevent panic.
     std::thread::Builder::new()
@@ -75,8 +85,12 @@ pub fn flush() {
         .unwrap();
 }
 
+/// A trait defining the behavior of a reporter. A reporter is responsible for
+/// handling span records, typically by sending them to a remote service for
+/// further processing and analysis.
 pub trait Reporter: Send + 'static {
-    fn report(&mut self, spans: &[SpanRecord]) -> Result<(), Box<dyn std::error::Error>>;
+    /// Reports a batch of spans to a remote service.
+    fn report(&mut self, spans: &[SpanRecord]);
 }
 
 #[derive(Default, Clone)]
@@ -369,14 +383,10 @@ impl GlobalCollector {
             || committed_records.len() > self.config.batch_report_max_spans.unwrap_or(usize::MAX)
             || flush
         {
-            if let Err(err) = self
-                .reporter
+            self.reporter
                 .as_mut()
                 .unwrap()
-                .report(committed_records.drain(..).as_slice())
-            {
-                error!("report spans failed: {}", err);
-            }
+                .report(committed_records.drain(..).as_slice());
             self.last_report = std::time::Instant::now();
         }
     }

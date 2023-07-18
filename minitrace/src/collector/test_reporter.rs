@@ -24,8 +24,7 @@ impl TestReporter {
 }
 
 impl Reporter for TestReporter {
-    fn report(&mut self, spans: &[SpanRecord]) -> Result<(), Box<dyn std::error::Error>> {
+    fn report(&mut self, spans: &[SpanRecord]) {
         self.spans.lock().extend_from_slice(spans);
-        Ok(())
     }
 }
