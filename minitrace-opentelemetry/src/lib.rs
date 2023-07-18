@@ -10,6 +10,7 @@
 //! ```
 //!
 //! Jaeger UI is available on http://127.0.0.1:16686/
+//!
 //! Zipkin UI is available on http://127.0.0.1:9411/
 //!
 //! ## Report to OpenTelemetry Collector

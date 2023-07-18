@@ -172,6 +172,7 @@ pub(crate) struct GlobalCollector {
     drop_collects: Vec<DropCollect>,
     commit_collects: Vec<CommitCollect>,
     submit_spans: Vec<SubmitSpans>,
+    dangling_events: HashMap<SpanId, Vec<EventRecord>>,
 }
 
 impl GlobalCollector {
@@ -209,6 +210,7 @@ impl GlobalCollector {
             drop_collects: Vec::new(),
             commit_collects: Vec::new(),
             submit_spans: Vec::new(),
+            dangling_events: HashMap::new(),
         }
     }
 
@@ -217,12 +219,14 @@ impl GlobalCollector {
         debug_assert!(self.drop_collects.is_empty());
         debug_assert!(self.commit_collects.is_empty());
         debug_assert!(self.submit_spans.is_empty());
+        debug_assert!(self.dangling_events.is_empty());
 
         let start_collects = &mut self.start_collects;
         let drop_collects = &mut self.drop_collects;
         let commit_collects = &mut self.commit_collects;
         let submit_spans = &mut self.submit_spans;
         let committed_records = &mut self.committed_records;
+        let dangling_events = &mut self.dangling_events;
 
         {
             SPSC_RXS.lock().retain_mut(|rx| {
@@ -305,9 +309,10 @@ impl GlobalCollector {
 
         for CommitCollect { collect_id } in commit_collects.drain(..) {
             if let Some((span_collections, _)) = self.active_collectors.remove(&collect_id) {
-                let anchor: Anchor = Anchor::new();
-                let mut events: HashMap<SpanId, Vec<EventRecord>> = HashMap::new();
+                debug_assert!(self.dangling_events.is_empty());
+                let dangling_events = &mut self.dangling_events;
 
+                let anchor: Anchor = Anchor::new();
                 let committed_len = committed_records.len();
 
                 for span_collection in span_collections {
@@ -322,7 +327,7 @@ impl GlobalCollector {
                                 trace_id,
                                 parent_id,
                                 committed_records,
-                                &mut events,
+                                dangling_events,
                                 &anchor,
                             ),
                             SpanSet::LocalSpansInner(local_spans) => amend_local_span(
@@ -330,7 +335,7 @@ impl GlobalCollector {
                                 trace_id,
                                 parent_id,
                                 committed_records,
-                                &mut events,
+                                dangling_events,
                                 &anchor,
                             ),
                             SpanSet::SharedLocalSpans(local_spans) => amend_local_span(
@@ -338,7 +343,7 @@ impl GlobalCollector {
                                 trace_id,
                                 parent_id,
                                 committed_records,
-                                &mut events,
+                                dangling_events,
                                 &anchor,
                             ),
                         },
@@ -352,7 +357,7 @@ impl GlobalCollector {
                                 trace_id,
                                 parent_id,
                                 committed_records,
-                                &mut events,
+                                dangling_events,
                                 &anchor,
                             ),
                             SpanSet::LocalSpansInner(local_spans) => amend_local_span(
@@ -360,7 +365,7 @@ impl GlobalCollector {
                                 trace_id,
                                 parent_id,
                                 committed_records,
-                                &mut events,
+                                dangling_events,
                                 &anchor,
                             ),
                             SpanSet::SharedLocalSpans(local_spans) => amend_local_span(
@@ -368,14 +373,15 @@ impl GlobalCollector {
                                 trace_id,
                                 parent_id,
                                 committed_records,
-                                &mut events,
+                                dangling_events,
                                 &anchor,
                             ),
                         },
                     }
                 }
 
-                mount_events(&mut committed_records[..committed_len], events);
+                mount_events(&mut committed_records[..committed_len], dangling_events);
+                dangling_events.clear();
             }
         }
 
@@ -469,7 +475,7 @@ fn amend_span(
     });
 }
 
-fn mount_events(records: &mut [SpanRecord], mut events: HashMap<SpanId, Vec<EventRecord>>) {
+fn mount_events(records: &mut [SpanRecord], events: &mut HashMap<SpanId, Vec<EventRecord>>) {
     for record in records.iter_mut() {
         if events.is_empty() {
             return;
@@ -483,6 +489,8 @@ fn mount_events(records: &mut [SpanRecord], mut events: HashMap<SpanId, Vec<Even
             }
         }
     }
+
+    debug_assert!(events.is_empty());
 }
 
 impl SpanSet {
