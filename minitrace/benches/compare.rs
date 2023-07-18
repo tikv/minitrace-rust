@@ -18,12 +18,7 @@ fn init_minitrace() {
     struct DummyReporter;
 
     impl minitrace::collector::Reporter for DummyReporter {
-        fn report(
-            &mut self,
-            _spans: &[minitrace::prelude::SpanRecord],
-        ) -> Result<(), Box<dyn std::error::Error>> {
-            Ok(())
-        }
+        fn report(&mut self, _spans: &[minitrace::prelude::SpanRecord]) {}
     }
 
     minitrace::set_reporter(DummyReporter, minitrace::collector::Config::default());
