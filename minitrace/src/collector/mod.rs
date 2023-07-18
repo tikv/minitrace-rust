@@ -206,6 +206,76 @@ impl SpanContext {
             })
         }
     }
+
+    /// Decodes the `SpanContext` from a [W3C Trace Context] `traceparent` string.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use minitrace::prelude::*;
+    ///
+    /// let span_context =
+    ///     SpanContext::decode_w3c("00-0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-01").unwrap();
+    /// ```
+    ///
+    /// [W3C Trace Context](https://www.w3.org/TR/trace-context/)
+    pub fn decode_w3c(traceparent: &str) -> Option<Self> {
+        let mut parts = traceparent.split('-');
+
+        match (
+            parts.next(),
+            parts.next(),
+            parts.next(),
+            parts.next(),
+            parts.next(),
+        ) {
+            (Some("00"), Some(trace_id), Some(span_id), Some(_), None) => {
+                let trace_id = u128::from_str_radix(trace_id, 16).ok()?;
+                let span_id = u64::from_str_radix(span_id, 16).ok()?;
+                Some(Self::new(TraceId(trace_id), SpanId(span_id)))
+            }
+            _ => None,
+        }
+    }
+
+    /// Encodes the `SpanContext` into a [W3C Trace Context] `traceparent` string.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use minitrace::prelude::*;
+    ///
+    /// let span_context = SpanContext::new(TraceId(12), SpanId(34));
+    /// let traceparent = span_context.encode_w3c();
+    /// ```
+    ///
+    /// [W3C Trace Context](https://www.w3.org/TR/trace-context/)
+    pub fn encode_w3c(&self) -> String {
+        format!(
+            "00-{:032x}-{:016x}-{:02x}",
+            self.trace_id.0, self.span_id.0, 0x01,
+        )
+    }
+
+    /// Encodes the `SpanContext` as a [W3C Trace Context] `traceparent` string with
+    /// the sampled flag set to false.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use minitrace::prelude::*;
+    ///
+    /// let span_context = SpanContext::new(TraceId(12), SpanId(34));
+    /// let traceparent = span_context.encode_w3c_not_sampled();
+    /// ```
+    ///
+    /// [W3C Trace Context](https://www.w3.org/TR/trace-context/)
+    pub fn encode_w3c_not_sampled(&self) -> String {
+        format!(
+            "00-{:032x}-{:016x}-{:02x}",
+            self.trace_id.0, self.span_id.0, 0x00,
+        )
+    }
 }
 
 /// Configuration of the behavior of the global collector.
@@ -365,5 +435,26 @@ mod tests {
             collect_id: 42,
             is_root: true,
         }]);
+    }
+
+    #[test]
+    fn w3c_trace_context() {
+        let span_context =
+            SpanContext::decode_w3c("00-0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-01")
+                .unwrap();
+        assert_eq!(
+            span_context.trace_id,
+            TraceId(0x0af7651916cd43dd8448eb211c80319c)
+        );
+        assert_eq!(span_context.span_id, SpanId(0xb7ad6b7169203331));
+
+        assert_eq!(
+            span_context.encode_w3c(),
+            "00-0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-01"
+        );
+        assert_eq!(
+            span_context.encode_w3c_not_sampled(),
+            "00-0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-00"
+        );
     }
 }
