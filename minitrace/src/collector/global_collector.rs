@@ -226,7 +226,6 @@ impl GlobalCollector {
         let commit_collects = &mut self.commit_collects;
         let submit_spans = &mut self.submit_spans;
         let committed_records = &mut self.committed_records;
-        let dangling_events = &mut self.dangling_events;
 
         {
             SPSC_RXS.lock().retain_mut(|rx| {
@@ -380,7 +379,7 @@ impl GlobalCollector {
                     }
                 }
 
-                mount_events(&mut committed_records[..committed_len], dangling_events);
+                mount_events(&mut committed_records[committed_len..], dangling_events);
                 dangling_events.clear();
             }
         }
@@ -475,13 +474,16 @@ fn amend_span(
     });
 }
 
-fn mount_events(records: &mut [SpanRecord], events: &mut HashMap<SpanId, Vec<EventRecord>>) {
+fn mount_events(
+    records: &mut [SpanRecord],
+    dangling_events: &mut HashMap<SpanId, Vec<EventRecord>>,
+) {
     for record in records.iter_mut() {
-        if events.is_empty() {
+        if dangling_events.is_empty() {
             return;
         }
 
-        if let Some(event) = events.remove(&record.span_id) {
+        if let Some(event) = dangling_events.remove(&record.span_id) {
             if record.events.is_empty() {
                 record.events = event;
             } else {
@@ -490,7 +492,7 @@ fn mount_events(records: &mut [SpanRecord], events: &mut HashMap<SpanId, Vec<Eve
         }
     }
 
-    debug_assert!(events.is_empty());
+    debug_assert!(dangling_events.is_empty());
 }
 
 impl SpanSet {
