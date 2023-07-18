@@ -1,30 +1,6 @@
 // Copyright 2020 TiKV Project Authors. Licensed under Apache-2.0.
 
-//! Builtin [Jaeger](https://www.jaegertracing.io/) reporter for minitrace.
-//!
-//! ## Setup Jaeger Agent
-//!
-//! ```sh
-//! docker run --rm -d -p6831:6831/udp -p16686:16686 --name jaeger jaegertracing/all-in-one:latest
-//! ```
-//!
-//! ## Report to Jaeger Agent
-//!
-//! ```no_run
-//! use std::net::SocketAddr;
-//!
-//! use minitrace::collector::Config;
-//! use minitrace::prelude::*;
-//!
-//! // Initialize reporter
-//! let reporter =
-//!     minitrace_jaeger::JaegerReporter::new("127.0.0.1:6831".parse().unwrap(), "asynchronous")
-//!         .unwrap();
-//! minitrace::set_reporter(reporter, Config::default());
-//!
-//! // Start trace
-//! let root = Span::root("root", SpanContext::new(TraceId(42), SpanId::default()));
-//! ```
+#![doc = include_str!("../README.md")]
 
 mod thrift;
 
@@ -44,6 +20,7 @@ use crate::thrift::JaegerSpan;
 use crate::thrift::Process;
 use crate::thrift::Tag;
 
+/// [Jaeger](https://www.jaegertracing.io/) reporter for `minitrace` via UDP endpoint.
 pub struct JaegerReporter {
     agent_addr: SocketAddr,
     service_name: String,
