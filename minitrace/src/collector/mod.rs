@@ -207,19 +207,26 @@ impl SpanContext {
         }
     }
 
-    /// Decodes the `SpanContext` from a [W3C Trace Context] `traceparent` string.
+    /// Decodes the `SpanContext` from a [W3C Trace Context](https://www.w3.org/TR/trace-context/)
+    /// `traceparent` header string.
     ///
     /// # Examples
     ///
     /// ```
     /// use minitrace::prelude::*;
     ///
-    /// let span_context =
-    ///     SpanContext::decode_w3c("00-0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-01").unwrap();
-    /// ```
+    /// let span_context = SpanContext::decode_w3c_traceparent(
+    ///     "00-0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-01",
+    /// )
+    /// .unwrap();
     ///
-    /// [W3C Trace Context](https://www.w3.org/TR/trace-context/)
-    pub fn decode_w3c(traceparent: &str) -> Option<Self> {
+    /// assert_eq!(
+    ///     span_context.trace_id,
+    ///     TraceId(0x0af7651916cd43dd8448eb211c80319c)
+    /// );
+    /// assert_eq!(span_context.span_id, SpanId(0xb7ad6b7169203331));
+    /// ```
+    pub fn decode_w3c_traceparent(traceparent: &str) -> Option<Self> {
         let mut parts = traceparent.split('-');
 
         match (
@@ -238,7 +245,8 @@ impl SpanContext {
         }
     }
 
-    /// Encodes the `SpanContext` into a [W3C Trace Context] `traceparent` string.
+    /// Encodes the `SpanContext` into a [W3C Trace Context](https://www.w3.org/TR/trace-context/)
+    /// `traceparent` header string.
     ///
     /// # Examples
     ///
@@ -246,19 +254,22 @@ impl SpanContext {
     /// use minitrace::prelude::*;
     ///
     /// let span_context = SpanContext::new(TraceId(12), SpanId(34));
-    /// let traceparent = span_context.encode_w3c();
-    /// ```
+    /// let traceparent = span_context.encode_w3c_traceparent();
     ///
-    /// [W3C Trace Context](https://www.w3.org/TR/trace-context/)
-    pub fn encode_w3c(&self) -> String {
+    /// assert_eq!(
+    ///     traceparent,
+    ///     "00-0000000000000000000000000000000c-0000000000000022-01"
+    /// );
+    /// ```
+    pub fn encode_w3c_traceparent(&self) -> String {
         format!(
             "00-{:032x}-{:016x}-{:02x}",
             self.trace_id.0, self.span_id.0, 0x01,
         )
     }
 
-    /// Encodes the `SpanContext` as a [W3C Trace Context] `traceparent` string with
-    /// the sampled flag set to false.
+    /// Encodes the `SpanContext` as a [W3C Trace Context](https://www.w3.org/TR/trace-context/)
+    /// `traceparent` header string with the sampled flag set to false.
     ///
     /// # Examples
     ///
@@ -266,11 +277,14 @@ impl SpanContext {
     /// use minitrace::prelude::*;
     ///
     /// let span_context = SpanContext::new(TraceId(12), SpanId(34));
-    /// let traceparent = span_context.encode_w3c_not_sampled();
-    /// ```
+    /// let traceparent = span_context.encode_w3c_traceparent_not_sampled();
     ///
-    /// [W3C Trace Context](https://www.w3.org/TR/trace-context/)
-    pub fn encode_w3c_not_sampled(&self) -> String {
+    /// assert_eq!(
+    ///     traceparent,
+    ///     "00-0000000000000000000000000000000c-0000000000000022-00"
+    /// );
+    /// ```
+    pub fn encode_w3c_traceparent_not_sampled(&self) -> String {
         format!(
             "00-{:032x}-{:016x}-{:02x}",
             self.trace_id.0, self.span_id.0, 0x00,
@@ -438,10 +452,11 @@ mod tests {
     }
 
     #[test]
-    fn w3c_trace_context() {
-        let span_context =
-            SpanContext::decode_w3c("00-0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-01")
-                .unwrap();
+    fn w3c_traceparent() {
+        let span_context = SpanContext::decode_w3c_traceparent(
+            "00-0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-01",
+        )
+        .unwrap();
         assert_eq!(
             span_context.trace_id,
             TraceId(0x0af7651916cd43dd8448eb211c80319c)
@@ -449,11 +464,11 @@ mod tests {
         assert_eq!(span_context.span_id, SpanId(0xb7ad6b7169203331));
 
         assert_eq!(
-            span_context.encode_w3c(),
+            span_context.encode_w3c_traceparent(),
             "00-0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-01"
         );
         assert_eq!(
-            span_context.encode_w3c_not_sampled(),
+            span_context.encode_w3c_traceparent_not_sampled(),
             "00-0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-00"
         );
     }
