@@ -91,7 +91,7 @@ The concept of 'level' may not be an optimal feature for tracing systems. While 
 
 In this context, minitrace offers a more efficient solution by filtering out entire traces that are not of interest through its unique tail-sampling design. Therefore, the concept of 'level', borrowed directly from logging systems, may not be suitable for tracing.
 
-### Will you support OpenTelemetry feature 'X'?
+### Will minitrace support OpenTelemetry feature 'X'?
 
 minitrace is focused on high performance tracing only. You can open an issue for the missing tracing features you want to have.
 
