@@ -63,13 +63,15 @@ pub fn set_reporter(reporter: impl Reporter, config: Config) {
 }
 
 pub fn flush() {
-    // Spawns a new thread to ensure the reporter operates outside the Tokio runtime to prevent panic.
+    // Spawns a new thread to ensure the reporter operates outside the tokio runtime to prevent panic.
     std::thread::Builder::new()
         .name("minitrace-flush".to_string())
         .spawn(move || {
             let mut global_collector = GLOBAL_COLLECTOR.lock();
             global_collector.handle_commands(true);
         })
+        .unwrap()
+        .join()
         .unwrap();
 }
 
