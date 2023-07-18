@@ -11,15 +11,16 @@
 </div>
 <br>
 
-Minitrace is a Rust tracing library [10~100x faster](#benchmarks) than others:
+minitrace is a tracing library [10~100x faster](#benchmarks) than others:
 
 ![benchmark](etc/img/head-benchmark.svg)
 
 Features:
 
 - [Extremely fast](#benchmarks)
-- Compatible with [OpenTracing] and [OpenTelemetry]
-- [Jaeger] and [Datadog] reporter
+- [Library-level tracing](#what-is-library-level-tracing)
+- [Compatible with the log crate and its macros](minitrace/examples/log.rs)
+- Compatible with [Jaeger], [Datadog], and [OpenTelemetry]
 
 ## Resources
 
@@ -67,15 +68,19 @@ There are some articles posted by the maintainer of minitrace:
 - [The Design of A High-performance Tracing Library in Rust (Chinese)](https://www.youtube.com/watch?v=8xTaxC1RcXE)
 - [How We Trace a KV Database with Less than 5% Performance Impact](https://en.pingcap.com/blog/how-we-trace-a-kv-database-with-less-than-5-percent-performance-impact/)
 
-### Why / What's the difference compared to 'X'?
+### What is library-level tracing?
 
-Most tracing libraries aims to provide more features, while minitrace always prioritize performance. 
+Library-level tracing refers to the capability of incorporating tracing capabilities directly within libraries, as opposed to restricting them to application-level or system-level tracing.
 
-Rather than providing a full-featured tracing library, minitrace is designed to be simple, modular and extensible.
-You can easily compose your own tracing features on top of minitrace with minimal effort.
+Tracing can introduce overhead to a program's execution. While this is generally acceptable at the application level, where the added overhead is often insignificant compared to the overall execution time, it can be more problematic at the library level. Here, functions may be invoked frequently or performance may be critical, and the overhead from tracing can become substantial. As a result, tracing libraries not designed with speed and efficiency in mind may not be suitable for library-level tracing.
 
-For a practical illustration, refer to `examples/log.rs` to learn how to integrate the widely-used `log` library and
-its macros with minitrace in just 10 lines of code.
+In the realm of the minitrace library, library-level tracing is engineered to be fast and lightweight, resulting in zero overhead when it's not activated. This makes minitrace an excellent choice for use in performance-sensitive applications, and it can be seamlessly integrated into libraries in a similar fashion to the [`log`](https://crates.io/crates/log) crate, something other tracing libraries may not offer.
+
+### How does minitrace differ from other tracing libraries?
+
+While many tracing libraries aim for extensive features, minitrace prioritizes performance and simplicity.
+
+For example, minitrace doesn't introduce new logging macros, but seamlessly integrates with the log crate. This allows you to use existing logging macros and dependencies, with logs automatically attached to the current tracing span. Thus, minitrace offers a compact, swift, and user-friendly tracing solution that works well with other specialized libraries.
 
 ### Will you support OpenTelemetry feature 'X'?
 
@@ -92,7 +97,6 @@ Note that we always prioritize performance over features, so that not all tracin
 [Docs]: https://docs.rs/minitrace/
 [Getting Started]: minitrace/examples/get_started.rs
 [Examples]: minitrace/examples
-[OpenTracing]: https://opentracing.io/
 [OpenTelemetry]: https://opentelemetry.io/
 [Jaeger]: https://crates.io/crates/minitrace-jaeger
 [Datadog]: https://crates.io/crates/minitrace-datadog

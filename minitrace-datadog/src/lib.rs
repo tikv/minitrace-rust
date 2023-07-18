@@ -1,31 +1,6 @@
 // Copyright 2020 TiKV Project Authors. Licensed under Apache-2.0.
 
-//! Builtin [Datadog](https://docs.datadoghq.com/tracing/) reporter for minitrace.
-//!
-//! ## Setup Datadog Agent
-//!
-//! Please follow the Datadog [official documentation](https://docs.datadoghq.com/getting_started/tracing/#datadog-agent).
-//!
-//! ## Report to Datadog Agent
-//!
-//! ```no_run
-//! use std::net::SocketAddr;
-//!
-//! use minitrace::collector::Config;
-//! use minitrace::prelude::*;
-//!
-//! // Initialize reporter
-//! let reporter = minitrace_datadog::DatadogReporter::new(
-//!     "127.0.0.1:8126".parse().unwrap(),
-//!     "asynchronous",
-//!     "db",
-//!     "select",
-//! );
-//! minitrace::set_reporter(reporter, Config::default());
-//!
-//! // Start trace
-//! let root = Span::root("root", SpanContext::new(TraceId(42), SpanId::default()));
-//! ```
+#![doc = include_str!("../README.md")]
 
 use std::collections::HashMap;
 use std::net::SocketAddr;
@@ -35,6 +10,7 @@ use minitrace::prelude::*;
 use rmp_serde::Serializer;
 use serde::Serialize;
 
+/// [Datadog](https://docs.datadoghq.com/tracing/) reporter for `minitrace` in msgpack format.
 pub struct DatadogReporter {
     agent_addr: SocketAddr,
     service_name: String,

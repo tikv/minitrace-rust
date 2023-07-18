@@ -4,7 +4,7 @@
 [![Crates.io](https://img.shields.io/crates/v/minitrace-opentelemetry.svg)](https://crates.io/crates/minitrace-opentelemetry)
 [![LICENSE](https://img.shields.io/github/license/tikv/minitrace-rust.svg)](https://github.com/tikv/minitrace-rust/blob/master/LICENSE)
 
-Builtin [OpenTelemetry OTLP](https://github.com/open-telemetry/opentelemetry-collector) reporter for minitrace.
+[OpenTelemetry](https://github.com/open-telemetry/opentelemetry-rust) reporter for [`minitrace`](https://crates.io/crates/minitrace).
 
 ## Dependencies
 
@@ -17,60 +17,51 @@ minitrace-opentelemetry = "0.4"
 ## Setup OpenTelemetry Collector
 
 ```sh
-cd examples
+cd minitrace-opentelemetry/examples
 docker compose up -d
+
+cargo run --example synchronous
 ```
 
-Jaeger UI is available on http://127.0.0.1:16686/
-Zipkin UI is available on http://127.0.0.1:9411/
+Jaeger UI is available on [http://127.0.0.1:16686/](http://127.0.0.1:16686/)
+
+Zipkin UI is available on [http://127.0.0.1:9411/](http://127.0.0.1:16686/)
 
 ## Report to OpenTelemetry Collector
 
-```rust
+```rust, no_run
+use std::borrow::Cow;
 use std::time::Duration;
-
+use minitrace::collector::Config;
 use minitrace::prelude::*;
-use opentelemetry::sdk::export::trace::SpanExporter as _;
+use minitrace_opentelemetry::OpenTelemetryReporter;
+use opentelemetry_otlp::{SpanExporter, ExportConfig, Protocol, TonicConfig};
+use opentelemetry::trace::SpanKind;
+use opentelemetry::sdk::Resource;
+use opentelemetry::KeyValue;
+use opentelemetry::InstrumentationLibrary;
 
-// start trace
-let (root_span, collector) = Span::root("root");
-
-// finish trace
-drop(root_span);
-
-// collect spans
-let spans = collector.collect().await;
-
-// report trace
-let instrumentation_lib = opentelemetry::InstrumentationLibrary::new(
-    "example-crate",
-    Some(env!("CARGO_PKG_VERSION")),
-    None,
+// Initialize reporter
+let reporter = OpenTelemetryReporter::new(
+    SpanExporter::new_tonic(
+        ExportConfig {
+            endpoint: "http://127.0.0.1:4317".to_string(),
+            protocol: Protocol::Grpc,
+            timeout: Duration::from_secs(opentelemetry_otlp::OTEL_EXPORTER_OTLP_TIMEOUT_DEFAULT),
+        },
+        TonicConfig::default(),
+    )
+    .unwrap(),
+    SpanKind::Server,
+    Cow::Owned(Resource::new([KeyValue::new("service.name", "asynchronous")])),
+    InstrumentationLibrary::new("example-crate", Some(env!("CARGO_PKG_VERSION")), None),
 );
-let otlp_spans = minitrace_opentelemetry::convert(
-    &spans,
-    0,
-    rand::random(),
-    0u64.to_le_bytes(),
-    opentelemetry::trace::TraceState::default(),
-    opentelemetry::trace::Status::Ok,
-    opentelemetry::trace::SpanKind::Server,
-    true,
-    std::borrow::Cow::Owned(opentelemetry::sdk::Resource::new([
-        opentelemetry::KeyValue::new("service.name", "example"),
-    ])),
-    instrumentation_lib,
-)
-.collect();
-let mut exporter = opentelemetry_otlp::SpanExporter::new_tonic(
-    opentelemetry_otlp::ExportConfig {
-        endpoint: "http://127.0.0.1:4317".to_string(),
-        protocol: opentelemetry_otlp::Protocol::Grpc,
-        timeout: Duration::from_secs(opentelemetry_otlp::OTEL_EXPORTER_OTLP_TIMEOUT_DEFAULT),
-    },
-    opentelemetry_otlp::TonicConfig::default(),
-)
-.unwrap();
-exporter.export(otlp_spans).await.ok();
-exporter.force_flush().await.ok();
+minitrace::set_reporter(reporter, Config::default());
+
+{
+    // Start tracing
+    let root = Span::root("root", SpanContext::new(TraceId(42), SpanId::default()));
+}
+
+minitrace::flush()
 ```

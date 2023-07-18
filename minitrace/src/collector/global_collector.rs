@@ -122,14 +122,14 @@ impl GlobalCollect {
     //
     // For example, we have a `SpanSet::LocalSpansInner` and a `CollectToken` as follow:
     //
-    //     SpanSet::LocalSpansInner::spans                      CollectToken::parent_ids
-    //     +------+-----------+-----+                      +------------+--------------------+
+    //     SpanSet::LocalSpansInner::spans                  CollectToken::parent_ids
+    //     +------+-----------+-----+                      +------------+------------+
     //     |  id  | parent_id | ... |                      | collect_id | parent_ids |
-    //     +------+-----------+-----+                      +------------+--------------------+
-    //     |  43  |    545    | ... |                      |    1212    |          7         |
-    //     |  15  |  default  | ... | <- root span         |    874     |         321        |
-    //     | 545  |    15     | ... |                      |    915     |         413        |
-    //     |  70  |  default  | ... | <- root span         +------------+--------------------+
+    //     +------+-----------+-----+                      +------------+------------+
+    //     |  43  |    545    | ... |                      |    1212    |      7     |
+    //     |  15  |  default  | ... | <- root span         |    874     |     321    |
+    //     | 545  |    15     | ... |                      |    915     |     413    |
+    //     |  70  |  default  | ... | <- root span         +------------+------------+
     //     +------+-----------+-----+
     //
     // There is a many-to-many mapping. Span#15 has parents Span#7, Span#321 and Span#413, so does Span#70.
