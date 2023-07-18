@@ -1,12 +1,12 @@
 // Copyright 2023 TiKV Project Authors. Licensed under Apache-2.0.
 
 use std::io::Write;
-use std::net::SocketAddr;
 
-use futures::executor::block_on;
 use log::info;
 use log_derive::logfn;
 use log_derive::logfn_inputs;
+use minitrace::collector::Config;
+use minitrace::collector::ConsoleReporter;
 use minitrace::prelude::*;
 use minitrace::Event;
 
@@ -18,6 +18,7 @@ fn plus(a: u64, b: u64) -> Result<u64, std::io::Error> {
 }
 
 fn main() {
+    minitrace::set_reporter(ConsoleReporter, Config::default());
     env_logger::Builder::from_default_env()
         .format(|buf, record| {
             // Add a event to the current local span representing the log record
@@ -31,9 +32,10 @@ fn main() {
         .filter_level(log::LevelFilter::Debug)
         .init();
 
-    let collector = {
-        let (root_span, collector) = Span::root("root");
-        let _span_guard = root_span.set_local_parent();
+    {
+        let parent = SpanContext::new(TraceId(rand::random()), SpanId::default());
+        let root = Span::root("root", parent);
+        let _span_guard = root.set_local_parent();
 
         info!("event in root span");
 
@@ -42,15 +44,7 @@ fn main() {
         info!("event in child span");
 
         plus(1, 2).unwrap();
-
-        collector
     };
 
-    let spans = block_on(collector.collect());
-
-    let jaeger_spans = minitrace_jaeger::convert(&spans, 0, rand::random(), 0).collect();
-
-    let socket = SocketAddr::new("127.0.0.1".parse().unwrap(), 6831);
-    minitrace_jaeger::report_blocking("log".to_string(), socket, jaeger_spans)
-        .expect("report error");
+    minitrace::flush();
 }

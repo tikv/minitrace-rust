@@ -1,306 +1,287 @@
 // Copyright 2020 TiKV Project Authors. Licensed under Apache-2.0.
 
-//! A high-performance, ergonomic timeline tracing library for Rust.
+//! `minitrace` is a high-performance, ergonomic, library-level timeline tracing library for Rust.
+//!
+//! Unlike most tracing libraries which are primarily designed for instrumenting executables,
+//! `minitrace` also accommodates the need for library instrumentation. It stands out due to
+//! its extreme lightweight and fast performance compared to other tracing libraries. Moreover,
+//! it has zero overhead when not enabled in the executable, making it a worry-free choice for
+//! libraries concerned about unnecessary performance loss.
+//!
+//! # Getting Started
+//!
+//! ## Libraries
+//!
+//! Libraries should include `minitrace` as a dependency without enabling any extra features.
+//!
+//! ```toml
+//! [dependencies]
+//! minitrace = "0.4"
+//! ```
+//!
+//! Libraries can attach their spans to the caller's span (if available) via the API boundary.
+//!
+//! ```
+//! use minitrace::prelude::*;
+//! # struct QueryResult;
+//! # struct Error;
+//!
+//! struct Connection {
+//!     // ...
+//! }
+//!
+//! impl Connection {
+//!     #[trace]
+//!     pub fn query(sql: &str) -> Result<QueryResult, Error> {
+//!         // ...
+//!         # Ok(QueryResult)
+//!     }
+//! }
+//! ```
+//!
+//! Libraries can also create a new trace individually to record their work.
+//!
+//! ```
+//! use minitrace::prelude::*;
+//! # struct HttpRequest;
+//! # struct Error;
+//!
+//! pub fn send_request(req: HttpRequest) -> Result<(), Error> {
+//!     let root = Span::root(
+//!         "send_request",
+//!         SpanContext::new(TraceId(rand::random()), SpanId::default()),
+//!     );
+//!     let _guard = root.set_local_parent();
+//!
+//!     // ...
+//!     # Ok(())
+//! }
+//! ```
+//!
+//! ## Executables
+//!
+//! Executables should include `minitrace` as a dependency with the `report` feature
+//! enabled. To disable `minitrace` statically, simply don't enable the `report` feature.
+//!
+//! ```toml
+//! [dependencies]
+//! minitrace = { version = "0.4", features = ["report"] }
+//! ```
+//!
+//! Executables should initialize a reporter implementation early in the program's runtime.
+//! Span records generated before the implementation is initialized will be ignored. Before
+//! terminating, the reporter should be flushed to ensure all span records are reported.
+//!
+//! ```
+//! use minitrace::collector::Config;
+//! use minitrace::collector::ConsoleReporter;
+//!
+//! fn main() {
+//!     minitrace::set_reporter(ConsoleReporter, Config::default());
+//!
+//!     // ...
+//!
+//!     minitrace::flush();
+//! }
+//! ```
+//!
+//! # Key Concepts
+//!
+//! `minitrace` operates through three types: [`Span`], [`LocalSpan`], and [`Event`], each
+//! representing a different type of tracing record. The macro [`trace`] is available to
+//! manage these types automatically. For [`Future`] instrumentation, necessary utilities
+//! are provided by [`FutureExt`].
 //!
 //! ## Span
 //!
-//!   A [`SpanRecord`] represents an individual unit of work. It contains:
-//!   - An operation name
-//!   - A start timestamp and duration
-//!   - A set of key-value properties
-//!   - A reference to a parent `Span`
+//! A [`Span`] represents an individual unit of work. It contains:
+//! - A name
+//! - A start timestamp and duration
+//! - A set of key-value properties
+//! - A reference to a parent `Span`
 //!
-//!   To record such a span record, we create a [`Span`] to start clocking and drop it to stop recording.
+//! A new `Span` can be started through [`Span::root()`], requiring the trace id and the
+//! parent span id from a remote source. If there's no remote parent span, the parent span
+//! id is typically set to its default value of zero.
 //!
-//!   A new `Span` can be started via [`Span::root()`] and [`Span::enter_with_parent()`]. `Span::enter_with_parent()`
-//!   will start a child span to a given parent span.
+//! [`Span::enter_with_parent()`] starts a child span given a parent span.
 //!
-//!   `Span` is thread-safe and can be sent across threads.
+//! `Span` is thread-safe and can be sent across threads.
+//! ```
+//! use minitrace::collector::Config;
+//! use minitrace::collector::ConsoleReporter;
+//! use minitrace::prelude::*;
 //!
-//!   ```
-//!   use minitrace::prelude::*;
-//!   use futures::executor::block_on;
+//! minitrace::set_reporter(ConsoleReporter, Config::default());
 //!
-//!   let (root, collector) = Span::root("root");
+//! {
+//!     let root = Span::root("root", SpanContext::new(TraceId(12), SpanId::default()));
+//!     {
+//!         let _child_span = Span::enter_with_parent("a child span", &root);
 //!
-//!   {
-//!       let _child_span = Span::enter_with_parent("a child span", &root);
-//!       // some work
-//!   }
+//!         // Perform some work
+//!     }
+//! }
 //!
-//!   drop(root);
-//!   let records: Vec<SpanRecord> = block_on(collector.collect());
-//!
-//!   println!("{records:#?}");
-//!   // [
-//!   //     SpanRecord {
-//!   //         id: 1,
-//!   //         parent_id: 0,
-//!   //         begin_unix_time_ns: 1642166520139678013,
-//!   //         duration_ns: 16008,
-//!   //         name: "root",
-//!   //         properties: [],
-//!   //         events: [],
-//!   //     },
-//!   //     SpanRecord {
-//!   //         id: 2,
-//!   //         parent_id: 1,
-//!   //         begin_unix_time_ns: 1642166520139692070,
-//!   //         duration_ns: 634,
-//!   //         name: "a child span",
-//!   //         properties: [],
-//!   //         events: [],
-//!   //     },
-//!   // ]
-//!   ```
-//!
+//! minitrace::flush();
+//! ```
 //!
 //! ## Local Span
 //!
-//!   A `Span` can be optimized into [`LocalSpan`], if the span is not supposed to be sent to other threads,
-//!   which can greatly reduce the overhead.
+//! A `Span` can be efficiently transformed into a [`LocalSpan`], reducing overhead
+//! significantly, provided it is not
+//! intended for sending to other threads.
 //!
-//!   Before starting a `LocalSpan`, a scope of parent span should be set using [`Span::set_local_parent()`].
-//!   Use [`LocalSpan::enter_with_local_parent()`] to start a `LocalSpan`, and then, it will become the new local parent.
+//! Before starting a `LocalSpan`, a scope of parent span should be set using
+//! [`Span::set_local_parent()`]. Use [`LocalSpan::enter_with_local_parent()`] to start
+//! a `LocalSpan`, which then becomes the new local parent.
 //!
-//!   If no local parent is set, the `enter_with_local_parent()` will do nothing.
+//! If no local parent is set, the `enter_with_local_parent()` will do nothing.
+//! ```
+//! use minitrace::collector::Config;
+//! use minitrace::collector::ConsoleReporter;
+//! use minitrace::prelude::*;
 //!
-//!   ```
-//!   use minitrace::prelude::*;
-//!   use futures::executor::block_on;
+//! minitrace::set_reporter(ConsoleReporter, Config::default());
 //!
-//!   let (root, collector) = Span::root("root");
+//! {
+//!     let root = Span::root("root", SpanContext::new(TraceId(12), SpanId::default()));
+//!     {
+//!         let _guard = root.set_local_parent();
 //!
-//!   {
-//!       let _guard = root.set_local_parent();
+//!         // The parent of this span is `root`.
+//!         let _span1 = LocalSpan::enter_with_local_parent("a child span");
 //!
-//!       // The parent of this span is `root`.
-//!       let _span1 = LocalSpan::enter_with_local_parent("a child span");
+//!         foo();
+//!     }
+//! }
 //!
-//!       foo();
-//!   }
+//! fn foo() {
+//!     // The parent of this span is `span1`.
+//!     let _span2 = LocalSpan::enter_with_local_parent("a child span of child span");
+//! }
 //!
-//!   fn foo() {
-//!       // The parent of this span is `span1`.
-//!       let _span2 = LocalSpan::enter_with_local_parent("a child span of child span");
-//!   }
-//!
-//!   drop(root);
-//!   let records: Vec<SpanRecord> = block_on(collector.collect());
-//!
-//!   println!("{records:#?}");
-//!   // [
-//!   //     SpanRecord {
-//!   //         id: 1,
-//!   //         parent_id: 0,
-//!   //         begin_unix_time_ns: 1643101008017429580,
-//!   //         duration_ns: 64132,
-//!   //         name: "root",
-//!   //         properties: [],
-//!   //         events: [],
-//!   //     },
-//!   //     SpanRecord {
-//!   //         id: 2,
-//!   //         parent_id: 1,
-//!   //         begin_unix_time_ns: 1643101008017486383,
-//!   //         duration_ns: 4150,
-//!   //         name: "a child span",
-//!   //         properties: [],
-//!   //         events: [],
-//!   //     },
-//!   //     SpanRecord {
-//!   //         id: 3,
-//!   //         parent_id: 2,
-//!   //         begin_unix_time_ns: 1643101008017488703,
-//!   //         duration_ns: 1318,
-//!   //         name: "a child span of child span",
-//!   //         properties: [],
-//!   //         events: [],
-//!   //     },
-//!   // ]
-//!   ```
-//!
-//!
-//! ## Property
-//!
-//!   Property is an arbitrary custom kev-value pair associated to a span.
-//!
-//!   ```
-//!   use minitrace::prelude::*;
-//!   use futures::executor::block_on;
-//!
-//!   let (mut root, collector) = Span::root("root");
-//!   root.add_property(|| ("key", "value".to_owned()));
-//!
-//!   {
-//!       let _guard = root.set_local_parent();
-//!
-//!       let mut span1 = LocalSpan::enter_with_local_parent("a child span");
-//!       span1.add_property(|| ("key", "value".to_owned()));
-//!   }
-//!
-//!   drop(root);
-//!   let records: Vec<SpanRecord> = block_on(collector.collect());
-//!
-//!   println!("{records:#?}");
-//!   // [
-//!   //     SpanRecord {
-//!   //         id: 1,
-//!   //         parent_id: 0,
-//!   //         begin_unix_time_ns: 1642166791041022255,
-//!   //         duration_ns: 121705,
-//!   //         name: "root",
-//!   //         properties: [
-//!   //             (
-//!   //                 "key",
-//!   //                 "value",
-//!   //             ),
-//!   //         ],
-//!   //         events: [],
-//!   //     },
-//!   //     SpanRecord {
-//!   //         id: 2,
-//!   //         parent_id: 1,
-//!   //         begin_unix_time_ns: 1642166791041132550,
-//!   //         duration_ns: 7724,
-//!   //         name: "a child span",
-//!   //         properties: [
-//!   //             (
-//!   //                 "key",
-//!   //                 "value",
-//!   //             ),
-//!   //         ],
-//!   //         events: [],
-//!   //     },
-//!   // ]
-//!   ```
-//!
+//! minitrace::flush();
+//! ```
 //!
 //! ## Event
 //!
-//!   [`Event`] represent single points in time where something occurred during the execution of a program.
-//!   An `Event` can be seen as a log record attached to a span.
+//! [`Event`] represents a single point in time where something occurred during the execution of a program.
 //!
-//!   ```
-//!   use minitrace::prelude::*;
-//!   use futures::executor::block_on;
+//! An `Event` can be seen as a log record attached to a span.
+//! ```
+//! use minitrace::collector::Config;
+//! use minitrace::collector::ConsoleReporter;
+//! use minitrace::prelude::*;
 //!
-//!   let (mut root, collector) = Span::root("root");
+//! minitrace::set_reporter(ConsoleReporter, Config::default());
 //!
-//!   Event::add_to_parent("event in root", &root, || []);
+//! {
+//!     let root = Span::root("root", SpanContext::new(TraceId(12), SpanId::default()));
 //!
-//!   {
-//!       let _guard = root.set_local_parent();
-//!       let mut span1 = LocalSpan::enter_with_local_parent("a child span");
+//!     Event::add_to_parent("event in root", &root, || []);
 //!
-//!       Event::add_to_local_parent("event in span1", || [("key", "value".to_owned())]);
-//!   }
+//!     {
+//!         let _guard = root.set_local_parent();
+//!         let mut span1 = LocalSpan::enter_with_local_parent("a child span");
 //!
-//!   drop(root);
-//!   let records: Vec<SpanRecord> = block_on(collector.collect());
+//!         Event::add_to_local_parent("event in span1", || [("key", "value".to_owned())]);
+//!     }
+//! }
 //!
-//!   println!("{records:#?}");
-//!   // [
-//!   //     SpanRecord {
-//!   //         id: 1,
-//!   //         parent_id: 0,
-//!   //         begin_unix_time_ns: 1689321940550848459,
-//!   //         duration_ns: 25708,
-//!   //         name: "root",
-//!   //         properties: [],
-//!   //         events: [
-//!   //             EventRecord {
-//!   //                 name: "event in root",
-//!   //                 timestamp_unix_ns: 1689321940550870667,
-//!   //                 properties: [],
-//!   //             },
-//!   //         ],
-//!   //     },
-//!   //     SpanRecord {
-//!   //         id: 3,
-//!   //         parent_id: 1,
-//!   //         begin_unix_time_ns: 1689321940550874167,
-//!   //         duration_ns: 0,
-//!   //         name: "span1",
-//!   //         properties: [],
-//!   //         events: [
-//!   //             EventRecord {
-//!   //                 name: "event in span1",
-//!   //                 timestamp_unix_ns: 1689321940550874167,
-//!   //                 properties: [
-//!   //                     (
-//!   //                         "key",
-//!   //                         "value",
-//!   //                     ),
-//!   //                 ],
-//!   //             },
-//!   //         ],
-//!   //     },
-//!   // ]
-//!   ```
-//!
+//! minitrace::flush();
+//! ```
 //!
 //! ## Macro
 //!
-//!   An attribute-macro [`trace`] can help get rid of boilerplate. The macro always requires a local
-//!   parent in the context, otherwise, no span will be recorded.
+//! The attribute-macro [`trace`] helps to reduce boilerplate. However, the function annotated
+//! by the `trace` always requires a local parent in the context, otherwise, no span will be
+//! recorded.
 //!
-//!   ```
-//!   use minitrace::prelude::*;
-//!   use futures::executor::block_on;
+//! ```
+//! use futures::executor::block_on;
+//! use minitrace::collector::Config;
+//! use minitrace::collector::ConsoleReporter;
+//! use minitrace::prelude::*;
 //!
-//!   #[trace]
-//!   fn do_something(i: u64) {
-//!       std::thread::sleep(std::time::Duration::from_millis(i));
-//!   }
+//! #[trace]
+//! fn do_something(i: u64) {
+//!     std::thread::sleep(std::time::Duration::from_millis(i));
+//! }
 //!
-//!   #[trace]
-//!   async fn do_something_async(i: u64) {
-//!       futures_timer::Delay::new(std::time::Duration::from_millis(i)).await;
-//!   }
+//! #[trace]
+//! async fn do_something_async(i: u64) {
+//!     futures_timer::Delay::new(std::time::Duration::from_millis(i)).await;
+//! }
 //!
-//!   let (root, collector) = Span::root("root");
+//! minitrace::set_reporter(ConsoleReporter, Config::default());
 //!
-//!   {
-//!       let _g = root.set_local_parent();
-//!       do_something(100);
-//!       block_on(do_something_async(100));
-//!   }
+//! let root = Span::root("root", SpanContext::new(TraceId(12), SpanId::default()));
+//! {
+//!     let _g = root.set_local_parent();
 //!
-//!   drop(root);
-//!   let records: Vec<SpanRecord> = block_on(collector.collect());
+//!     do_something(100);
+//!     block_on(
+//!         async {
+//!             do_something_async(100).await;
+//!         }
+//!         .in_span(Span::enter_with_local_parent("aync_job")),
+//!     );
+//! }
 //!
-//!   println!("{records:#?}");
-//!   // [
-//!   //     SpanRecord {
-//!   //         id: 1,
-//!   //         parent_id: 0,
-//!   //         begin_unix_time_ns: 1642167988459480418,
-//!   //         duration_ns: 200741472,
-//!   //         name: "root",
-//!   //         properties: [],
-//!   //         events: [],
-//!   //     },
-//!   //     SpanRecord {
-//!   //         id: 2,
-//!   //         parent_id: 1,
-//!   //         begin_unix_time_ns: 1642167988459571971,
-//!   //         duration_ns: 100084126,
-//!   //         name: "do_something",
-//!   //         properties: [],
-//!   //         events: [],
-//!   //     },
-//!   //     SpanRecord {
-//!   //         id: 3,
-//!   //         parent_id: 1,
-//!   //         begin_unix_time_ns: 1642167988559887219,
-//!   //         duration_ns: 100306947,
-//!   //         name: "do_something_async",
-//!   //         properties: [],
-//!   //         events: [],
-//!   //     },
-//!   // ]
-//!   ```
+//! minitrace::flush();
+//! ```
+//!
+//! ## Reporter
+//!
+//! [`Reporter`] is responsible for reporting the span records to a remote agent,
+//! such as Jaeger.
+//!
+//! Executables should initialize a reporter implementation early in the program's
+//! runtime. Span records generated before the implementation is initialized will be ignored.
+//!
+//! For an easy start, `minitrace` offers a [`ConsoleReporter`] that prints span
+//! records to stderr. For more advanced use, crates like `minitrace-jaeger`, `minitrace-datadog`,
+//! and `minitrace-opentelemetry` are available.
+//!
+//! By default, the reporter is triggered every 500 milliseconds. The reporter can also be
+//! triggered manually by calling [`flush()`]. See [`Config`] for customizing the reporting behavior.
+//! ```
+//! use std::time::Duration;
+//!
+//! use minitrace::collector::Config;
+//! use minitrace::collector::ConsoleReporter;
+//!
+//! minitrace::set_reporter(
+//!     ConsoleReporter,
+//!     Config::default().batch_report_interval(Duration::from_secs(1)),
+//! );
+//!
+//! minitrace::flush();
+//! ```
+//!
+//! # Performance
+//!
+//! `minitrace` is designed to be fast and lightweight, considering four scenarios:
+//!
+//! - **No Tracing**: `minitrace` is not included as dependency in the executable, while the
+//! libraries has been intrumented. In this case, it will be completely removed from libraries,
+//! causing zero overhead.
+//!
+//! - **Sample Tracing**: `minitrace` is enabled in the executable, but only a small portion
+//! of the traces are enabled via [`Span::root()`], while the other portion start with a
+//! placeholder [`Span::noop()`]. The overhead in this case is very small - merely an integer
+//! load, comparison, and jump.
+//!
+//! - **Full Tracing with Tail Sampling**: `minitrace` is enabled in the executable, and all
+//! traces are enabled. However, only a select few abnormal tracing records (e.g., P99) are
+//! reported. Normal traces can be dismissed by using [`Span::cancel()`] to avoid reporting.
+//! This could be useful when you are interested in examining program's tail latency.
+//!
+//! - **Full Tracing**: `minitrace` is enabled in the executable, and all traces are enabled.
+//! All tracing records are reported. `minitrace` performs 10x to 100x faster than other tracing
+//! libraries in this case.
+//!
 //!
 //! [`Span`]: crate::Span
 //! [`LocalSpan`]: crate::local::LocalSpan
@@ -309,14 +290,26 @@
 //! [`trace`]: crate::trace
 //! [`LocalCollector`]: crate::local::LocalCollector
 //! [`Span::root()`]: crate::Span::root
+//! [`Span::noop()`]: crate::Span::noop
+//! [`Span::cancel()`]: crate::Span::cancel
 //! [`Span::enter_with_parent()`]: crate::Span::enter_with_parent
 //! [`Span::set_local_parent()`]: crate::Span::set_local_parent
 //! [`LocalSpan::enter_with_local_parent()`]: crate::local::LocalSpan::enter_with_local_parent
+//! [`Event`]: crate::Event
+//! [`Reporter`]: crate::collector::Reporter
+//! [`ConsoleReporter`]: crate::collector::ConsoleReporter
+//! [`Config`]: crate::collector::Config
+//! [`Future`]: std::future::Future
 
 // Suppress a false-positive lint from clippy
 // TODO: remove me once https://github.com/rust-lang/rust-clippy/issues/11076 is released
 #![allow(unknown_lints)]
 #![allow(clippy::arc_with_non_send_sync)]
+#![allow(clippy::needless_doctest_main)]
+#![cfg_attr(not(feature = "report"), allow(dead_code))]
+#![cfg_attr(not(feature = "report"), allow(unused_mut))]
+#![cfg_attr(not(feature = "report"), allow(unused_imports))]
+#![cfg_attr(not(feature = "report"), allow(unused_variables))]
 
 pub mod collector;
 mod event;
@@ -326,12 +319,13 @@ mod span;
 #[doc(hidden)]
 pub mod util;
 
-/// An attribute-macro to help get rid of boilerplate.
+/// An attribute macro designed to eliminate boilerplate code.
 ///
-/// The span name is the function name by default. It can be customized by passing a string literal.
+/// By default, the span name is the function name. This can be customized by passing a string
+/// literal as an argument.
 ///
-/// [`trace`] always require an local parent in the context. Make sure that the caller
-/// is within the scope of [`Span::set_local_parent()`].
+/// The `#[trace]` attribute requires a local parent context to function correctly. Ensure that
+/// the function annotated with `#[trace]` is called within the scope of [`Span::set_local_parent()`].
 ///
 /// # Examples
 ///
@@ -340,40 +334,40 @@ pub mod util;
 ///
 /// #[trace]
 /// fn foo() {
-///     // some work
+///     // Perform some work
 /// }
 ///
 /// #[trace]
 /// async fn bar() {
-///     // some work
+///     // Perform some work
 /// }
 ///
-/// #[trace("qux", enter_on_poll = true)]
+/// #[trace(name = "qux", enter_on_poll = true)]
 /// async fn qux() {
-///     // some work
+///     // Perform some work
 /// }
 /// ```
 ///
-/// The examples above will be translated into:
+/// The code snippets above are equivalent to:
 ///
 /// ```
 /// # use minitrace::prelude::*;
 /// # use minitrace::local::LocalSpan;
 /// fn foo() {
 ///     let __guard = LocalSpan::enter_with_local_parent("foo");
-///     // some work
+///     // Perform some work
 /// }
 ///
 /// fn bar() -> impl core::future::Future<Output = ()> {
 ///     async {
-///         // some work
+///         // Perform some work
 ///     }
 ///     .in_span(Span::enter_with_local_parent("bar"))
 /// }
 ///
 /// fn qux() -> impl core::future::Future<Output = ()> {
 ///     async {
-///         // some work
+///         // Perform some work
 ///     }
 ///     .enter_on_poll("qux")
 /// }
@@ -382,17 +376,23 @@ pub mod util;
 /// [`in_span()`]: crate::future::FutureExt::in_span
 pub use minitrace_macro::trace;
 
+#[cfg(feature = "report")]
+pub use crate::collector::global_collector::flush;
+#[cfg(feature = "report")]
+pub use crate::collector::global_collector::set_reporter;
 pub use crate::event::Event;
 pub use crate::span::Span;
 
 pub mod prelude {
-    //! A "prelude" for crates using the `minitrace` crate.
+    //! A "prelude" for crates using `minitrace`.
     #[doc(no_inline)]
-    pub use crate::collector::CollectArgs;
+    pub use crate::collector::SpanContext;
     #[doc(no_inline)]
-    pub use crate::collector::Collector;
+    pub use crate::collector::SpanId;
     #[doc(no_inline)]
     pub use crate::collector::SpanRecord;
+    #[doc(no_inline)]
+    pub use crate::collector::TraceId;
     #[doc(no_inline)]
     pub use crate::event::Event;
     #[doc(no_inline)]

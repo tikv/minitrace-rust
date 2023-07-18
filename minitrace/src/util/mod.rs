@@ -40,6 +40,14 @@ fn new_collect_token(items: impl IntoIterator<Item = CollectTokenItem>) -> Colle
     token
 }
 
+impl FromIterator<RawSpan> for RawSpans {
+    fn from_iter<T: IntoIterator<Item = RawSpan>>(iter: T) -> Self {
+        let mut raw_spans = RawSpans::default();
+        raw_spans.extend(iter);
+        raw_spans
+    }
+}
+
 impl FromIterator<CollectTokenItem> for CollectToken {
     fn from_iter<T: IntoIterator<Item = CollectTokenItem>>(iter: T) -> Self {
         new_collect_token(iter)

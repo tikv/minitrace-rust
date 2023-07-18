@@ -2,9 +2,8 @@
 
 use minstant::Instant;
 
+use crate::collector::SpanId;
 use crate::local::raw_span::RawSpan;
-use crate::local::span_id::DefaultIdGenerator;
-use crate::local::span_id::SpanId;
 use crate::util::RawSpans;
 
 pub struct SpanQueue {
@@ -33,8 +32,8 @@ impl SpanQueue {
         }
 
         let span = RawSpan::begin_with(
-            DefaultIdGenerator::next_id(),
-            self.next_parent_id.unwrap_or(SpanId(0)),
+            SpanId::next_id(),
+            self.next_parent_id.unwrap_or(SpanId::default()),
             Instant::now(),
             name,
             false,
@@ -72,8 +71,8 @@ impl SpanQueue {
         }
 
         let mut span = RawSpan::begin_with(
-            DefaultIdGenerator::next_id(),
-            self.next_parent_id.unwrap_or(SpanId(0)),
+            SpanId::next_id(),
+            self.next_parent_id.unwrap_or(SpanId::default()),
             Instant::now(),
             name,
             true,

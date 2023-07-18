@@ -72,11 +72,10 @@ impl SpanLine {
             collect_token
                 .iter()
                 .map(|item| CollectTokenItem {
-                    parent_id_of_roots: self
-                        .span_queue
-                        .current_span_id()
-                        .unwrap_or(item.parent_id_of_roots),
+                    trace_id: item.trace_id,
+                    parent_id: self.span_queue.current_span_id().unwrap_or(item.parent_id),
                     collect_id: item.collect_id,
+                    is_root: false,
                 })
                 .collect()
         })
@@ -97,7 +96,8 @@ pub struct LocalSpanHandle {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::local::span_id::SpanId;
+    use crate::collector::SpanId;
+    use crate::prelude::TraceId;
     use crate::util::tree::tree_str_from_raw_spans;
 
     #[test]
@@ -131,12 +131,16 @@ span1 []
     #[test]
     fn current_collect_token() {
         let token1 = CollectTokenItem {
-            parent_id_of_roots: SpanId::new(9527),
+            trace_id: TraceId(1234),
+            parent_id: SpanId::default(),
             collect_id: 42,
+            is_root: false,
         };
         let token2 = CollectTokenItem {
-            parent_id_of_roots: SpanId::new(9528),
+            trace_id: TraceId(1235),
+            parent_id: SpanId::default(),
             collect_id: 43,
+            is_root: false,
         };
         let token = [token1, token2].iter().collect();
         let mut span_line = SpanLine::new(16, 1, Some(token));
@@ -149,12 +153,16 @@ span1 []
         assert_eq!(current_token.len(), 2);
         assert_eq!(current_token.as_slice(), &[
             CollectTokenItem {
-                parent_id_of_roots: span_line.span_queue.current_span_id().unwrap(),
+                trace_id: TraceId(1234),
+                parent_id: span_line.span_queue.current_span_id().unwrap(),
                 collect_id: 42,
+                is_root: false,
             },
             CollectTokenItem {
-                parent_id_of_roots: span_line.span_queue.current_span_id().unwrap(),
+                trace_id: TraceId(1235),
+                parent_id: span_line.span_queue.current_span_id().unwrap(),
                 collect_id: 43,
+                is_root: false,
             }
         ]);
         span_line.finish_span(span);
@@ -194,8 +202,10 @@ span []
     #[test]
     fn unmatched_epoch_finish_span() {
         let item = CollectTokenItem {
-            parent_id_of_roots: SpanId::default(),
+            trace_id: TraceId(1234),
+            parent_id: SpanId::default(),
             collect_id: 42,
+            is_root: false,
         };
         let mut span_line1 = SpanLine::new(16, 1, Some(item.into()));
         let mut span_line2 = SpanLine::new(16, 2, None);

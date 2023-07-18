@@ -2,6 +2,7 @@
 
 use std::cell::RefCell;
 use std::rc::Rc;
+use std::sync::Arc;
 
 use minstant::Instant;
 
@@ -11,20 +12,17 @@ use crate::local::local_span_stack::LOCAL_SPAN_STACK;
 use crate::util::CollectToken;
 use crate::util::RawSpans;
 
-/// A collector to collect [`LocalSpan`].
+/// Collector to collect [`LocalSpan`].
 ///
 /// [`LocalCollector`] allows to collect [`LocalSpan`] manually without a local parent. The collected [`LocalSpan`] can later be
-/// mounted to a parent.
+/// attached to a parent.
 ///
-/// At most time, [`Span`] and [`LocalSpan`] are sufficient. Use [`LocalCollector`] when the span may start before the parent
-/// span. Sometimes it is useful to trace the preceding task that is blocking the current request.
+/// Generally, [`Span`] and [`LocalSpan`] are sufficient. However, use [`LocalCollector`] when the span might initiate before its
+/// parent span. This is particularly useful for tracing prior tasks that may be obstructing the current request.
 ///
 /// # Examples
 ///
 /// ```
-/// use std::sync::Arc;
-///
-/// use futures::executor::block_on;
 /// use minitrace::local::LocalCollector;
 /// use minitrace::prelude::*;
 ///
@@ -34,18 +32,16 @@ use crate::util::RawSpans;
 /// drop(span);
 /// let local_spans = collector.collect();
 ///
-/// // Mount the local spans to a parent
-/// let (root, collector) = Span::root("root");
-/// root.push_child_spans(Arc::new(local_spans));
-/// drop(root);
-///
-/// let records: Vec<SpanRecord> = block_on(collector.collect());
+/// // Attach the local spans to a parent
+/// let root = Span::root("root", SpanContext::new(TraceId(12), SpanId::default()));
+/// root.push_child_spans(local_spans);
 /// ```
 ///
 /// [`Span`]: crate::Span
 /// [`LocalSpan`]: crate::local::LocalSpan
 #[must_use]
 pub struct LocalCollector {
+    #[cfg(feature = "report")]
     inner: Option<LocalCollectorInner>,
 }
 
@@ -54,19 +50,80 @@ struct LocalCollectorInner {
     span_line_handle: SpanLineHandle,
 }
 
-#[derive(Debug)]
+/// A collection of [`LocalSpan`] instances.
+///
+/// This struct is typically used to group together multiple `LocalSpan` instances that have been
+/// collected from a [`LocalCollector`]. These spans can then be associated with a parent span using
+/// the [`Span::push_child_spans()`] method on the parent span.
+///
+/// Internally, it is implemented as an `Arc<LocalSpan>`, which allows it to be cloned and shared
+/// across threads at a low cost.
+///
+/// # Examples
+///
+/// ```
+/// use minitrace::local::LocalCollector;
+/// use minitrace::local::LocalSpans;
+/// use minitrace::prelude::*;
+///
+/// // Collect local spans manually without a parent
+/// let collector = LocalCollector::start();
+/// let span = LocalSpan::enter_with_local_parent("a child span");
+/// drop(span);
+///
+/// // Collect local spans into a LocalSpans instance
+/// let local_spans: LocalSpans = collector.collect();
+///
+/// // Attach the local spans to a parent
+/// let root = Span::root("root", SpanContext::new(TraceId(12), SpanId::default()));
+/// root.push_child_spans(local_spans);
+/// ```
+///
+/// [`Span::push_child_spans()`]: crate::Span::push_child_spans()
+/// [`LocalSpan`]: crate::local::LocalSpan
+/// [`LocalCollector`]: crate::local::LocalCollector
+#[derive(Debug, Clone)]
 pub struct LocalSpans {
-    pub(crate) spans: RawSpans,
-    pub(crate) end_time: Instant,
+    #[cfg(feature = "report")]
+    pub(crate) inner: Arc<LocalSpansInner>,
+}
+
+#[derive(Debug)]
+pub struct LocalSpansInner {
+    pub spans: RawSpans,
+    pub end_time: Instant,
 }
 
 impl LocalCollector {
     pub fn start() -> Self {
-        let stack = LOCAL_SPAN_STACK.with(Rc::clone);
-        Self::new(None, stack)
+        #[cfg(not(feature = "report"))]
+        {
+            LocalCollector {}
+        }
+
+        #[cfg(feature = "report")]
+        {
+            let stack = LOCAL_SPAN_STACK.with(Rc::clone);
+            Self::new(None, stack)
+        }
+    }
+
+    pub fn collect(self) -> LocalSpans {
+        #[cfg(not(feature = "report"))]
+        {
+            LocalSpans {}
+        }
+
+        #[cfg(feature = "report")]
+        {
+            LocalSpans {
+                inner: Arc::new(self.collect_spans_and_token().0),
+            }
+        }
     }
 }
 
+#[cfg(feature = "report")]
 impl LocalCollector {
     pub(crate) fn new(
         collect_token: Option<CollectToken>,
@@ -85,11 +142,7 @@ impl LocalCollector {
         }
     }
 
-    pub fn collect(self) -> LocalSpans {
-        self.collect_spans_and_token().0
-    }
-
-    pub(crate) fn collect_spans_and_token(mut self) -> (LocalSpans, Option<CollectToken>) {
+    pub(crate) fn collect_spans_and_token(mut self) -> (LocalSpansInner, Option<CollectToken>) {
         let (spans, collect_token) = self
             .inner
             .take()
@@ -105,7 +158,7 @@ impl LocalCollector {
             .unwrap_or_default();
 
         (
-            LocalSpans {
+            LocalSpansInner {
                 spans,
                 end_time: Instant::now(),
             },
@@ -116,6 +169,7 @@ impl LocalCollector {
 
 impl Drop for LocalCollector {
     fn drop(&mut self) {
+        #[cfg(feature = "report")]
         if let Some(LocalCollectorInner {
             stack,
             span_line_handle,
@@ -131,7 +185,8 @@ impl Drop for LocalCollector {
 mod tests {
     use super::*;
     use crate::collector::CollectTokenItem;
-    use crate::local::span_id::SpanId;
+    use crate::collector::SpanId;
+    use crate::prelude::TraceId;
     use crate::util::tree::tree_str_from_raw_spans;
 
     #[test]
@@ -142,8 +197,10 @@ mod tests {
         let span1 = stack.borrow_mut().enter_span("span1").unwrap();
         {
             let token2 = CollectTokenItem {
-                parent_id_of_roots: SpanId::new(9527),
+                trace_id: TraceId(1234),
+                parent_id: SpanId::default(),
                 collect_id: 42,
+                is_root: false,
             };
             let collector2 = LocalCollector::new(Some(token2.into()), stack.clone());
             let span2 = stack.borrow_mut().enter_span("span2").unwrap();
@@ -164,7 +221,7 @@ span2 []
         stack.borrow_mut().exit_span(span1);
         let spans = collector1.collect();
         assert_eq!(
-            tree_str_from_raw_spans(spans.spans),
+            tree_str_from_raw_spans(spans.inner.spans.iter().cloned().collect()),
             r"
 span1 []
 "
@@ -179,8 +236,10 @@ span1 []
         let span1 = stack.borrow_mut().enter_span("span1").unwrap();
         {
             let token2 = CollectTokenItem {
-                parent_id_of_roots: SpanId::new(9527),
+                trace_id: TraceId(1234),
+                parent_id: SpanId::default(),
                 collect_id: 42,
+                is_root: false,
             };
             let collector2 = LocalCollector::new(Some(token2.into()), stack.clone());
             let span2 = stack.borrow_mut().enter_span("span2").unwrap();
@@ -192,7 +251,7 @@ span1 []
         stack.borrow_mut().exit_span(span1);
         let spans = collector1.collect();
         assert_eq!(
-            tree_str_from_raw_spans(spans.spans),
+            tree_str_from_raw_spans(spans.inner.spans.iter().cloned().collect()),
             r"
 span1 []
 "

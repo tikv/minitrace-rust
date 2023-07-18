@@ -1,5 +1,7 @@
-error: expected `enter_on_poll = <bool>`
- --> tests/ui/err/trace-interleaved.rs:4:9
+error: invalid argument
+ --> tests/ui/err/trace-interleaved.rs:4:1
   |
 4 | #[trace(struct)]
-  |         ^^^^^^
+  | ^^^^^^^^^^^^^^^^
+  |
+  = note: this error originates in the attribute macro `trace` (in Nightly builds, run with -Z macro-backtrace for more info)

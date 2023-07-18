@@ -2,7 +2,7 @@
 
 use minstant::Instant;
 
-use crate::local::span_id::SpanId;
+use crate::collector::SpanId;
 
 #[derive(Clone, Debug)]
 pub struct RawSpan {

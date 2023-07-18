@@ -1,6 +1,6 @@
 use minitrace::trace;
 
-#[trace("test-span")]
+#[trace(name = "test-span")]
 async fn f(a: u32) -> u32 {
     a
 }

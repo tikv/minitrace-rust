@@ -14,6 +14,16 @@ fn init_opentelemetry() {
         .unwrap();
 }
 
+fn init_minitrace() {
+    struct DummyReporter;
+
+    impl minitrace::collector::Reporter for DummyReporter {
+        fn report(&mut self, _spans: &[minitrace::prelude::SpanRecord]) {}
+    }
+
+    minitrace::set_reporter(DummyReporter, minitrace::collector::Config::default());
+}
+
 fn opentelemetry_harness(n: usize) {
     fn dummy_opentelementry(n: usize) {
         for _ in 0..n {
@@ -55,19 +65,15 @@ fn minitrace_harness(n: usize) {
         }
     }
 
-    let _spans = {
-        let (root_span, collector) = Span::root("parent");
-        let _g = root_span.set_local_parent();
+    let root = Span::root("parent", SpanContext::new(TraceId(12), SpanId::default()));
+    let _g = root.set_local_parent();
 
-        dummy_minitrace(n);
-
-        collector
-    }
-    .collect();
+    dummy_minitrace(n);
 }
 
 fn tracing_comparison(c: &mut Criterion) {
     init_opentelemetry();
+    init_minitrace();
 
     let mut bgroup = c.benchmark_group("compare");
 

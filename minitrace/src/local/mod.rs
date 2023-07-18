@@ -7,7 +7,6 @@ pub(crate) mod local_span;
 pub(crate) mod local_span_line;
 pub(crate) mod local_span_stack;
 pub(crate) mod raw_span;
-pub(crate) mod span_id;
 pub(crate) mod span_queue;
 
 pub use self::local_collector::LocalCollector;

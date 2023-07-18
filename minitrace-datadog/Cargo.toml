@@ -12,7 +12,8 @@ readme = "README.md"
 keywords = ["tracing", "span", "datadog", "jaeger", "opentelemetry"]
 
 [dependencies]
-minitrace = { version = "0.4.1", path = "../minitrace" }
+log = "0.4"
+minitrace = { version = "0.4.1", path = "../minitrace", features = ["report"] }
 reqwest = { version = "0.11", features = ["blocking"] }
 rmp-serde = "1"
 serde = { version = "1", features = ["derive"] }

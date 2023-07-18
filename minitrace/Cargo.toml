@@ -11,6 +11,9 @@ documentation = "https://docs.rs/minitrace"
 readme = "../README.md"
 keywords = ["tracing", "span", "datadog", "jaeger", "opentelemetry"]
 
+[features]
+report = []
+
 [dependencies]
 defer = "0.1"
 futures = "0.3"
@@ -20,6 +23,7 @@ parking_lot = "0.12"
 pin-project = "1"
 # TODO: Remove once_cell once #![feature(once_cell)] is stabilized
 once_cell = "1"
+rand = "0.8"
 
 [dev-dependencies]
 # The procedural macro `trace` only supports async-trait higher than 0.1.52
@@ -39,6 +43,7 @@ opentelemetry = { version = "0.19", features = ["trace"] }
 opentelemetry-otlp = { version = "0.12", features = ["trace"] }
 rand = "0.8"
 rustracing = "0.6"
+serial_test = "2"
 tokio = { version = "1", features = ["rt", "time", "macros"] }
 tracing = "0.1"
 tracing-core = "0.1"
