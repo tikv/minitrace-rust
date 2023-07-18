@@ -264,9 +264,9 @@
 //!
 //! `minitrace` is designed to be fast and lightweight, considering four scenarios:
 //!
-//! - **No Tracing**: `minitrace` is not linked to the executable. In this case, it will be
-//! completelyremoved from the executable and libraries, causing zero overhead. So feel free
-//! to use `minitrace` in your libraries.
+//! - **No Tracing**: `minitrace` is not included as dependency in the executable, while the
+//! libraries has been intrumented. In this case, it will be completely removed from libraries,
+//! causing zero overhead.
 //!
 //! - **Sample Tracing**: `minitrace` is enabled in the executable, but only a small portion
 //! of the traces are enabled via [`Span::root()`], while the other portion start with a
