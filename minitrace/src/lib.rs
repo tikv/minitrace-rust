@@ -269,8 +269,8 @@
 //! causing zero overhead.
 //!
 //! - **Sample Tracing**: `minitrace` is enabled in the executable, but only a small portion
-//! of the traces are enabled via [`Span::root()`], while the other portion start with a
-//! placeholder [`Span::noop()`]. The overhead in this case is very small - merely an integer
+//! of the traces are enabled via [`Span::root()`], while the other portion start with placeholders
+//! by [`Span::noop()`]. The overhead in this case is very small - merely an integer
 //! load, comparison, and jump.
 //!
 //! - **Full Tracing with Tail Sampling**: `minitrace` is enabled in the executable, and all
