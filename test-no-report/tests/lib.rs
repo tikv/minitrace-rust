@@ -51,6 +51,9 @@ fn test_no_report() {
 
     span5.push_child_spans(local_spans);
 
+    assert!(SpanContext::current_local_parent().is_none());
+    assert!(SpanContext::from_span(&span5).is_none());
+
     root.cancel();
 
     minitrace::flush();
