@@ -216,8 +216,8 @@
 //!
 //! minitrace::set_reporter(ConsoleReporter, Config::default());
 //!
-//! let root = Span::root("root", SpanContext::new(TraceId(12), SpanId::default()));
 //! {
+//!     let root = Span::root("root", SpanContext::new(TraceId(12), SpanId::default()));
 //!     let _g = root.set_local_parent();
 //!
 //!     do_something(100);
