@@ -12,7 +12,7 @@ use crate::local::local_span_stack::LOCAL_SPAN_STACK;
 /// [`Span`]: crate::Span
 #[must_use]
 pub struct LocalSpan {
-    #[cfg(feature = "report")]
+    #[cfg(feature = "enable")]
     inner: Option<LocalSpanInner>,
 }
 
@@ -39,12 +39,12 @@ impl LocalSpan {
     /// ```
     #[inline]
     pub fn enter_with_local_parent(name: &'static str) -> Self {
-        #[cfg(not(feature = "report"))]
+        #[cfg(not(feature = "enable"))]
         {
             LocalSpan {}
         }
 
-        #[cfg(feature = "report")]
+        #[cfg(feature = "enable")]
         {
             let stack = LOCAL_SPAN_STACK.with(Rc::clone);
             Self::enter_with_stack(name, stack)
@@ -89,7 +89,7 @@ impl LocalSpan {
         I: IntoIterator<Item = (&'static str, String)>,
         F: FnOnce() -> I,
     {
-        #[cfg(feature = "report")]
+        #[cfg(feature = "enable")]
         if let Some(LocalSpanInner { stack, span_handle }) = &self.inner {
             let span_stack = &mut *stack.borrow_mut();
             span_stack.add_properties(span_handle, properties);
@@ -99,7 +99,7 @@ impl LocalSpan {
     }
 }
 
-#[cfg(feature = "report")]
+#[cfg(feature = "enable")]
 impl LocalSpan {
     #[inline]
     pub(crate) fn enter_with_stack(name: &'static str, stack: Rc<RefCell<LocalSpanStack>>) -> Self {
@@ -117,7 +117,7 @@ impl LocalSpan {
 impl Drop for LocalSpan {
     #[inline]
     fn drop(&mut self) {
-        #[cfg(feature = "report")]
+        #[cfg(feature = "enable")]
         if let Some(LocalSpanInner { stack, span_handle }) = self.inner.take() {
             let mut span_stack = stack.borrow_mut();
             span_stack.exit_span(span_handle);

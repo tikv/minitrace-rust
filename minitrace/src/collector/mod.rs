@@ -14,13 +14,11 @@ use std::rc::Rc;
 use std::sync::Arc;
 use std::time::Duration;
 
-#[cfg(feature = "report")]
 pub use console_reporter::ConsoleReporter;
 #[cfg(not(test))]
 pub(crate) use global_collector::GlobalCollect;
 #[cfg(test)]
 pub(crate) use global_collector::MockGlobalCollect;
-#[cfg(feature = "report")]
 pub use global_collector::Reporter;
 pub use id::SpanId;
 pub use id::TraceId;
@@ -158,12 +156,12 @@ impl SpanContext {
     ///
     /// [`Span`]: crate::Span
     pub fn from_span(span: &Span) -> Option<Self> {
-        #[cfg(not(feature = "report"))]
+        #[cfg(not(feature = "enable"))]
         {
             None
         }
 
-        #[cfg(feature = "report")]
+        #[cfg(feature = "enable")]
         {
             let inner = span.inner.as_ref()?;
             let collect_token = inner.issue_collect_token().next()?;
@@ -189,12 +187,12 @@ impl SpanContext {
     /// let context = SpanContext::current_local_parent();
     /// ```
     pub fn current_local_parent() -> Option<Self> {
-        #[cfg(not(feature = "report"))]
+        #[cfg(not(feature = "enable"))]
         {
             None
         }
 
-        #[cfg(feature = "report")]
+        #[cfg(feature = "enable")]
         {
             let stack = LOCAL_SPAN_STACK.with(Rc::clone);
             let mut stack = stack.borrow_mut();

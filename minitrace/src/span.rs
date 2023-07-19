@@ -23,7 +23,7 @@ use crate::util::CollectToken;
 /// A thread-safe span.
 #[must_use]
 pub struct Span {
-    #[cfg(feature = "report")]
+    #[cfg(feature = "enable")]
     pub(crate) inner: Option<SpanInner>,
 }
 
@@ -48,7 +48,7 @@ impl Span {
     #[inline]
     pub fn noop() -> Self {
         Self {
-            #[cfg(feature = "report")]
+            #[cfg(feature = "enable")]
             inner: None,
         }
     }
@@ -70,12 +70,12 @@ impl Span {
         parent: SpanContext,
         #[cfg(test)] collect: GlobalCollect,
     ) -> Self {
-        #[cfg(not(feature = "report"))]
+        #[cfg(not(feature = "enable"))]
         {
             Self::noop()
         }
 
-        #[cfg(feature = "report")]
+        #[cfg(feature = "enable")]
         {
             #[cfg(not(test))]
             let collect = GlobalCollect;
@@ -106,7 +106,7 @@ impl Span {
     /// root.cancel();
     #[inline]
     pub fn cancel(&mut self) {
-        #[cfg(feature = "report")]
+        #[cfg(feature = "enable")]
         self.inner.take();
     }
 
@@ -122,12 +122,12 @@ impl Span {
     /// let child = Span::enter_with_parent("child", &root);
     #[inline]
     pub fn enter_with_parent(name: &'static str, parent: &Span) -> Self {
-        #[cfg(not(feature = "report"))]
+        #[cfg(not(feature = "enable"))]
         {
             Self::noop()
         }
 
-        #[cfg(feature = "report")]
+        #[cfg(feature = "enable")]
         {
             match &parent.inner {
                 Some(_inner) => Self::enter_with_parents(
@@ -164,12 +164,12 @@ impl Span {
         parents: impl IntoIterator<Item = &'a Span>,
         #[cfg(test)] collect: GlobalCollect,
     ) -> Self {
-        #[cfg(not(feature = "report"))]
+        #[cfg(not(feature = "enable"))]
         {
             Self::noop()
         }
 
-        #[cfg(feature = "report")]
+        #[cfg(feature = "enable")]
         {
             #[cfg(not(test))]
             let collect = GlobalCollect;
@@ -201,12 +201,12 @@ impl Span {
         name: &'static str,
         #[cfg(test)] collect: GlobalCollect,
     ) -> Self {
-        #[cfg(not(feature = "report"))]
+        #[cfg(not(feature = "enable"))]
         {
             Self::noop()
         }
 
-        #[cfg(feature = "report")]
+        #[cfg(feature = "enable")]
         {
             #[cfg(not(test))]
             let collect = GlobalCollect;
@@ -238,12 +238,12 @@ impl Span {
     /// [`LocalSpan`]: crate::local::LocalSpan
     /// [`LocalSpan::enter_with_local_parent()`]: crate::local::LocalSpan::enter_with_local_parent
     pub fn set_local_parent(&self) -> Option<impl Drop> {
-        #[cfg(not(feature = "report"))]
+        #[cfg(not(feature = "enable"))]
         {
             None::<Span>
         }
 
-        #[cfg(feature = "report")]
+        #[cfg(feature = "enable")]
         {
             LOCAL_SPAN_STACK.with(|s| self.attach_into_stack(s))
         }
@@ -288,7 +288,7 @@ impl Span {
         I: IntoIterator<Item = (&'static str, String)>,
         F: FnOnce() -> I,
     {
-        #[cfg(feature = "report")]
+        #[cfg(feature = "enable")]
         if let Some(inner) = self.inner.as_mut() {
             inner.add_properties(properties);
         }
@@ -324,7 +324,7 @@ impl Span {
     /// [`LocalCollector`]: crate::local::LocalCollector
     #[inline]
     pub fn push_child_spans(&self, local_spans: LocalSpans) {
-        #[cfg(feature = "report")]
+        #[cfg(feature = "enable")]
         {
             if let Some(inner) = self.inner.as_ref() {
                 inner.push_child_spans(local_spans.inner)
@@ -333,7 +333,7 @@ impl Span {
     }
 }
 
-#[cfg(feature = "report")]
+#[cfg(feature = "enable")]
 impl Span {
     #[inline]
     fn new(
@@ -377,7 +377,7 @@ impl Span {
     }
 }
 
-#[cfg(feature = "report")]
+#[cfg(feature = "enable")]
 impl SpanInner {
     #[inline]
     fn add_properties<I, F>(&mut self, properties: F)
@@ -439,7 +439,7 @@ impl SpanInner {
 
 impl Drop for Span {
     fn drop(&mut self) {
-        #[cfg(feature = "report")]
+        #[cfg(feature = "enable")]
         if let Some(mut inner) = self.inner.take() {
             let collector = inner.collector.take();
             let end_instant = Instant::now();

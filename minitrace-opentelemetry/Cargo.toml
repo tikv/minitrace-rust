@@ -14,7 +14,7 @@ keywords = ["tracing", "span", "datadog", "jaeger", "opentelemetry"]
 [dependencies]
 futures = { version = "0.3", features = ["executor"] }
 log = "0.4"
-minitrace = { path = "../minitrace", features = ["report"] }
+minitrace = { path = "../minitrace" }
 opentelemetry = { version = "0.19", features = ["trace"] }
 
 [dev-dependencies]

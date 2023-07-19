@@ -22,6 +22,6 @@ quote = "1"
 syn = { version = "1.0.84", features = ["full", "parsing", "extra-traits", "proc-macro", "visit-mut"] }
 
 [dev-dependencies]
-minitrace = { version = "0.4.1", path = "../minitrace" }
+minitrace = { path = "../minitrace" }
 tokio = { version = "1", features = ["full"] }
 trybuild = "1"

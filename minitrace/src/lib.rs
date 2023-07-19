@@ -60,12 +60,12 @@
 //!
 //! ## Executables
 //!
-//! Executables should include `minitrace` as a dependency with the `report` feature
-//! enabled. To disable `minitrace` statically, simply don't enable the `report` feature.
+//! Executables should include `minitrace` as a dependency with the `enable` feature
+//! set. To disable `minitrace` statically, simply don't set the `enable` feature.
 //!
 //! ```toml
 //! [dependencies]
-//! minitrace = { version = "0.4", features = ["report"] }
+//! minitrace = { version = "0.4", features = ["enable"] }
 //! ```
 //!
 //! Executables should initialize a reporter implementation early in the program's runtime.
@@ -119,7 +119,7 @@
 //!     {
 //!         let _child_span = Span::enter_with_parent("a child span", &root);
 //!
-//!         // Perform some work
+//!         // perform some work
 //!     }
 //! }
 //!
@@ -306,10 +306,10 @@
 #![allow(unknown_lints)]
 #![allow(clippy::arc_with_non_send_sync)]
 #![allow(clippy::needless_doctest_main)]
-#![cfg_attr(not(feature = "report"), allow(dead_code))]
-#![cfg_attr(not(feature = "report"), allow(unused_mut))]
-#![cfg_attr(not(feature = "report"), allow(unused_imports))]
-#![cfg_attr(not(feature = "report"), allow(unused_variables))]
+#![cfg_attr(not(feature = "enable"), allow(dead_code))]
+#![cfg_attr(not(feature = "enable"), allow(unused_mut))]
+#![cfg_attr(not(feature = "enable"), allow(unused_imports))]
+#![cfg_attr(not(feature = "enable"), allow(unused_variables))]
 
 pub mod collector;
 mod event;
@@ -334,17 +334,17 @@ pub mod util;
 ///
 /// #[trace]
 /// fn foo() {
-///     // Perform some work
+///     // perform some work
 /// }
 ///
 /// #[trace]
 /// async fn bar() {
-///     // Perform some work
+///     // perform some work
 /// }
 ///
 /// #[trace(name = "qux", enter_on_poll = true)]
 /// async fn qux() {
-///     // Perform some work
+///     // perform some work
 /// }
 /// ```
 ///
@@ -355,19 +355,19 @@ pub mod util;
 /// # use minitrace::local::LocalSpan;
 /// fn foo() {
 ///     let __guard = LocalSpan::enter_with_local_parent("foo");
-///     // Perform some work
+///     // perform some work
 /// }
 ///
 /// fn bar() -> impl core::future::Future<Output = ()> {
 ///     async {
-///         // Perform some work
+///         // perform some work
 ///     }
 ///     .in_span(Span::enter_with_local_parent("bar"))
 /// }
 ///
 /// fn qux() -> impl core::future::Future<Output = ()> {
 ///     async {
-///         // Perform some work
+///         // perform some work
 ///     }
 ///     .enter_on_poll("qux")
 /// }
@@ -376,9 +376,7 @@ pub mod util;
 /// [`in_span()`]: crate::future::FutureExt::in_span
 pub use minitrace_macro::trace;
 
-#[cfg(feature = "report")]
 pub use crate::collector::global_collector::flush;
-#[cfg(feature = "report")]
 pub use crate::collector::global_collector::set_reporter;
 pub use crate::event::Event;
 pub use crate::span::Span;

@@ -41,7 +41,7 @@ use crate::util::RawSpans;
 /// [`LocalSpan`]: crate::local::LocalSpan
 #[must_use]
 pub struct LocalCollector {
-    #[cfg(feature = "report")]
+    #[cfg(feature = "enable")]
     inner: Option<LocalCollectorInner>,
 }
 
@@ -84,7 +84,7 @@ struct LocalCollectorInner {
 /// [`LocalCollector`]: crate::local::LocalCollector
 #[derive(Debug, Clone)]
 pub struct LocalSpans {
-    #[cfg(feature = "report")]
+    #[cfg(feature = "enable")]
     pub(crate) inner: Arc<LocalSpansInner>,
 }
 
@@ -96,12 +96,12 @@ pub struct LocalSpansInner {
 
 impl LocalCollector {
     pub fn start() -> Self {
-        #[cfg(not(feature = "report"))]
+        #[cfg(not(feature = "enable"))]
         {
             LocalCollector {}
         }
 
-        #[cfg(feature = "report")]
+        #[cfg(feature = "enable")]
         {
             let stack = LOCAL_SPAN_STACK.with(Rc::clone);
             Self::new(None, stack)
@@ -109,12 +109,12 @@ impl LocalCollector {
     }
 
     pub fn collect(self) -> LocalSpans {
-        #[cfg(not(feature = "report"))]
+        #[cfg(not(feature = "enable"))]
         {
             LocalSpans {}
         }
 
-        #[cfg(feature = "report")]
+        #[cfg(feature = "enable")]
         {
             LocalSpans {
                 inner: Arc::new(self.collect_spans_and_token().0),
@@ -123,7 +123,7 @@ impl LocalCollector {
     }
 }
 
-#[cfg(feature = "report")]
+#[cfg(feature = "enable")]
 impl LocalCollector {
     pub(crate) fn new(
         collect_token: Option<CollectToken>,
@@ -169,7 +169,7 @@ impl LocalCollector {
 
 impl Drop for LocalCollector {
     fn drop(&mut self) {
-        #[cfg(feature = "report")]
+        #[cfg(feature = "enable")]
         if let Some(LocalCollectorInner {
             stack,
             span_line_handle,

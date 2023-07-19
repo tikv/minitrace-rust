@@ -12,7 +12,7 @@ readme = "../README.md"
 keywords = ["tracing", "span", "datadog", "jaeger", "opentelemetry"]
 
 [features]
-report = []
+enable = []
 
 [dependencies]
 defer = "0.1"
@@ -35,6 +35,7 @@ futures = "0.3"
 futures-timer = "3"
 log = "0.4"
 log-derive = "0.4"
+minitrace = { path = ".", features = ["enable"] }
 minitrace-datadog = { version = "0.4.1", path = "../minitrace-datadog" }
 minitrace-jaeger = { version = "0.4.1", path = "../minitrace-jaeger" }
 minitrace-opentelemetry = { version = "0.4.1", path = "../minitrace-opentelemetry" }

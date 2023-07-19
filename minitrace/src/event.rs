@@ -25,7 +25,7 @@ impl Event {
         I: IntoIterator<Item = (&'static str, String)>,
         F: FnOnce() -> I,
     {
-        #[cfg(feature = "report")]
+        #[cfg(feature = "enable")]
         {
             let mut span = Span::enter_with_parent(name, parent).with_properties(properties);
             if let Some(mut inner) = span.inner.take() {
@@ -52,7 +52,7 @@ impl Event {
         I: IntoIterator<Item = (&'static str, String)>,
         F: FnOnce() -> I,
     {
-        #[cfg(feature = "report")]
+        #[cfg(feature = "enable")]
         {
             let stack = LOCAL_SPAN_STACK.with(Rc::clone);
             let mut stack = stack.borrow_mut();

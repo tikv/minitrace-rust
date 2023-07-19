@@ -178,10 +178,10 @@ pub(crate) struct GlobalCollector {
 impl GlobalCollector {
     #[allow(unreachable_code)]
     fn start() -> Self {
-        #[cfg(not(feature = "report"))]
+        #[cfg(not(feature = "enable"))]
         {
             unreachable!(
-                "Global collector should not be invoked because feature \"report\" is not enabled."
+                "Global collector should not be invoked because feature \"enable\" is not set."
             )
         }
 
