@@ -1,6 +1,6 @@
 // Copyright 2023 TiKV Project Authors. Licensed under Apache-2.0.
 
-// The libraries may have traceing instrument embedded in the code for tracing purposes. However,
+// The libraries may have tracing instrument embedded in the code for tracing purposes. However,
 // if the executable does not enable minitrace, it will be statically disabled. This results in
 // zero overhead to the libraries, achieved through conditional compilation with the "report" feature.
 //
