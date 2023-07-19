@@ -2,8 +2,9 @@
 
 //! This module provides tools to trace a `Future`.
 //!
-//! The [`FutureExt`] trait extends `Future` with two methods: [`in_span()`] and [`enter_on_poll()`].
-//! It is crucial that the outermost future uses `in_span()`, otherwise, the traces inside the `Future` will be lost.
+//! The [`FutureExt`] trait extends `Future` with two methods: [`in_span()`] and
+//! [`enter_on_poll()`]. It is crucial that the outermost future uses `in_span()`,
+//! otherwise, the traces inside the `Future` will be lost.
 //!
 //! # Example
 //!
@@ -40,8 +41,9 @@ impl<T: std::future::Future> FutureExt for T {}
 pub trait FutureExt: std::future::Future + Sized {
     /// Binds a [`Span`] to the [`Future`] that continues to record until the future is dropped.
     ///
-    /// In addition, it sets the span as the local parent at every poll so that `LocalSpan` becomes available within the future.
-    /// Internally, it calls [`Span::set_local_parent`](Span::set_local_parent) when the executor [`poll`](std::future::Future::poll) it.
+    /// In addition, it sets the span as the local parent at every poll so that `LocalSpan`
+    /// becomes available within the future. Internally, it calls [`Span::set_local_parent`] when
+    /// the executor [`poll`] it.
     ///
     /// # Examples
     ///
@@ -61,6 +63,8 @@ pub trait FutureExt: std::future::Future + Sized {
     /// ```
     ///
     /// [`Future`]:(std::future::Future)
+    /// [`Span::set_local_parent`](Span::set_local_parent)
+    /// [`poll`](std::future::Future::poll)
     #[inline]
     fn in_span(self, span: Span) -> InSpan<Self> {
         InSpan {
@@ -69,7 +73,8 @@ pub trait FutureExt: std::future::Future + Sized {
         }
     }
 
-    /// Starts a [`LocalSpan`] at every [`Future::poll()`]. If the future gets polled multiple times, it will create multiple _short_ spans.
+    /// Starts a [`LocalSpan`] at every [`Future::poll()`]. If the future gets polled multiple
+    /// times, it will create multiple _short_ spans.
     ///
     /// # Examples
     ///
