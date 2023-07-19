@@ -66,23 +66,29 @@ fn force_send_command(cmd: CollectCommand) {
 /// minitrace::set_reporter(ConsoleReporter, Config::default());
 /// ```
 pub fn set_reporter(reporter: impl Reporter, config: Config) {
-    let mut global_collector = GLOBAL_COLLECTOR.lock();
-    global_collector.config = config;
-    global_collector.reporter = Some(Box::new(reporter));
+    #[cfg(feature = "enable")]
+    {
+        let mut global_collector = GLOBAL_COLLECTOR.lock();
+        global_collector.config = config;
+        global_collector.reporter = Some(Box::new(reporter));
+    }
 }
 
 /// Flushes all pending span records to the reporter immediately.
 pub fn flush() {
-    // Spawns a new thread to ensure the reporter operates outside the tokio runtime to prevent panic.
-    std::thread::Builder::new()
-        .name("minitrace-flush".to_string())
-        .spawn(move || {
-            let mut global_collector = GLOBAL_COLLECTOR.lock();
-            global_collector.handle_commands(true);
-        })
-        .unwrap()
-        .join()
-        .unwrap();
+    #[cfg(feature = "enable")]
+    {
+        // Spawns a new thread to ensure the reporter operates outside the tokio runtime to prevent panic.
+        std::thread::Builder::new()
+            .name("minitrace-flush".to_string())
+            .spawn(move || {
+                let mut global_collector = GLOBAL_COLLECTOR.lock();
+                global_collector.handle_commands(true);
+            })
+            .unwrap()
+            .join()
+            .unwrap();
+    }
 }
 
 /// A trait defining the behavior of a reporter. A reporter is responsible for

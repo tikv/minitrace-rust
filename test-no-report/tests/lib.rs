@@ -6,10 +6,23 @@
 //
 // The following test is designed to confirm that minitrace compiles when it's statically disabled in the executable.
 
+use std::time::Duration;
+
+use minitrace::collector::Config;
+use minitrace::collector::ConsoleReporter;
+
 #[test]
 fn test_no_report() {
     use minitrace::local::LocalCollector;
     use minitrace::prelude::*;
+
+    minitrace::set_reporter(
+        ConsoleReporter,
+        Config::default()
+            .batch_report_interval(Duration::from_secs(1))
+            .max_spans_per_trace(Some(100))
+            .batch_report_max_spans(Some(200)),
+    );
 
     let mut root = Span::root("root", SpanContext::new(TraceId(0), SpanId(0)))
         .with_property(|| ("k1", "v1".to_string()))
@@ -39,4 +52,6 @@ fn test_no_report() {
     span5.push_child_spans(local_spans);
 
     root.cancel();
+
+    minitrace::flush();
 }
