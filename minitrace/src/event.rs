@@ -18,7 +18,9 @@ impl Event {
     ///
     /// let root = Span::root("root", SpanContext::new(TraceId(12), SpanId::default()));
     ///
-    /// Event::add_to_parent("event in root", &root, || [("key", "value".to_owned())]);
+    /// Event::add_to_parent("event in root", &root, || {
+    ///     [("key".to_string(), "value".to_string())]
+    /// });
     /// ```
     pub fn add_to_parent<I, F>(name: &'static str, parent: &Span, properties: F)
     where
@@ -45,7 +47,9 @@ impl Event {
     /// let root = Span::root("root", SpanContext::new(TraceId(12), SpanId::default()));
     /// let _guard = root.set_local_parent();
     ///
-    /// Event::add_to_local_parent("event in root", || [("key", "value".to_owned())]);
+    /// Event::add_to_local_parent("event in root", || {
+    ///     [("key".to_string(), "value".to_string())]
+    /// });
     /// ```
     pub fn add_to_local_parent<I, F>(name: &'static str, properties: F)
     where

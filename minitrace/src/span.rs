@@ -259,7 +259,7 @@ impl Span {
     /// use minitrace::prelude::*;
     ///
     /// let root = Span::root("root", SpanContext::new(TraceId(12), SpanId::default()))
-    ///     .with_property(|| ("key", "value".to_string()));
+    ///     .with_property(|| ("key".to_string(), "value".to_string()));
     /// ```
     #[inline]
     pub fn with_property<F>(self, property: F) -> Self
@@ -277,8 +277,8 @@ impl Span {
     /// let root = Span::root("root", SpanContext::new(TraceId(12), SpanId::default()))
     ///     .with_properties(|| {
     ///         vec![
-    ///             ("key1", "value1".to_string()),
-    ///             ("key2", "value2".to_string()),
+    ///             ("key1".to_string(), "value1".to_string()),
+    ///             ("key2".to_string(), "value2".to_string()),
     ///         ]
     ///     });
     /// ```
