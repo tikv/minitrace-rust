@@ -38,6 +38,7 @@ jobs:
       run: |
         cargo test --workspace --all-targets -- --nocapture
         cargo test --doc
+    # Github Action sometimes run out of resources to run benches
     # - name: Run benches
     #   run: cargo bench --workspace --bench compare --bench trace
     - name: Run examples
@@ -45,3 +46,4 @@ jobs:
         cargo run --example asynchronous
         cargo run --example synchronous
         cargo run --example get_started
+        cargo run --package test-no-report

@@ -63,7 +63,7 @@ impl SpanQueue {
     #[inline]
     pub fn add_event<I, F>(&mut self, name: &'static str, properties: F)
     where
-        I: IntoIterator<Item = (&'static str, String)>,
+        I: IntoIterator<Item = (String, String)>,
         F: FnOnce() -> I,
     {
         if self.span_queue.len() >= self.capacity {
@@ -83,7 +83,7 @@ impl SpanQueue {
     }
 
     #[inline]
-    pub fn add_properties<I: IntoIterator<Item = (&'static str, String)>>(
+    pub fn add_properties<I: IntoIterator<Item = (String, String)>>(
         &mut self,
         span_handle: &SpanHandle,
         properties: I,
@@ -145,10 +145,13 @@ span1 []
         let mut queue = SpanQueue::with_capacity(16);
         {
             let span1 = queue.start_span("span1").unwrap();
-            queue.add_properties(&span1, [("k1", "v1".to_owned()), ("k2", "v2".to_owned())]);
+            queue.add_properties(&span1, [
+                ("k1".to_string(), "v1".to_string()),
+                ("k2".to_string(), "v2".to_string()),
+            ]);
             {
                 let span2 = queue.start_span("span2").unwrap();
-                queue.add_properties(&span2, [("k1", "v1".to_owned())]);
+                queue.add_properties(&span2, [("k1".to_string(), "v1".to_string())]);
                 queue.finish_span(span2);
             }
             queue.finish_span(span1);

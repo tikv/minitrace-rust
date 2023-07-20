@@ -30,7 +30,7 @@ async fn main() {
 
         let _g = root.set_local_parent();
         let _span = LocalSpan::enter_with_local_parent("a span")
-            .with_property(|| ("a property", "a value".to_owned()));
+            .with_property(|| ("a property".to_string(), "a value".to_string()));
 
         for i in 1..=10 {
             func1(i);

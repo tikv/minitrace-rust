@@ -51,7 +51,7 @@ impl LocalSpanStack {
     #[inline]
     pub fn add_event<I, F>(&mut self, name: &'static str, properties: F)
     where
-        I: IntoIterator<Item = (&'static str, String)>,
+        I: IntoIterator<Item = (String, String)>,
         F: FnOnce() -> I,
     {
         if let Some(span_line) = self.current_span_line() {
@@ -99,7 +99,7 @@ impl LocalSpanStack {
     #[inline]
     pub fn add_properties<I, F>(&mut self, local_span_handle: &LocalSpanHandle, properties: F)
     where
-        I: IntoIterator<Item = (&'static str, String)>,
+        I: IntoIterator<Item = (String, String)>,
         F: FnOnce() -> I,
     {
         debug_assert!(self.current_span_line().is_some());
@@ -354,7 +354,7 @@ span1 []
                     .into(),
                 ))
                 .unwrap();
-            span_stack.add_properties(&span1, || [("k1", "v1".to_owned())]);
+            span_stack.add_properties(&span1, || [("k1".to_string(), "v1".to_string())]);
             let _ = span_stack.unregister_and_collect(span_line2).unwrap();
         }
         span_stack.exit_span(span1);

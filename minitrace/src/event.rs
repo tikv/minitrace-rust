@@ -22,7 +22,7 @@ impl Event {
     /// ```
     pub fn add_to_parent<I, F>(name: &'static str, parent: &Span, properties: F)
     where
-        I: IntoIterator<Item = (&'static str, String)>,
+        I: IntoIterator<Item = (String, String)>,
         F: FnOnce() -> I,
     {
         #[cfg(feature = "enable")]
@@ -49,7 +49,7 @@ impl Event {
     /// ```
     pub fn add_to_local_parent<I, F>(name: &'static str, properties: F)
     where
-        I: IntoIterator<Item = (&'static str, String)>,
+        I: IntoIterator<Item = (String, String)>,
         F: FnOnce() -> I,
     {
         #[cfg(feature = "enable")]

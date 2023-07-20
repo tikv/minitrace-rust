@@ -65,7 +65,7 @@ impl LocalSpan {
     /// ```
     #[inline]
     pub fn with_property<F>(self, property: F) -> Self
-    where F: FnOnce() -> (&'static str, String) {
+    where F: FnOnce() -> (String, String) {
         self.with_properties(|| [property()])
     }
 
@@ -86,7 +86,7 @@ impl LocalSpan {
     #[inline]
     pub fn with_properties<I, F>(self, properties: F) -> Self
     where
-        I: IntoIterator<Item = (&'static str, String)>,
+        I: IntoIterator<Item = (String, String)>,
         F: FnOnce() -> I,
     {
         #[cfg(feature = "enable")]
@@ -154,7 +154,7 @@ mod tests {
             let _g = LocalSpan::enter_with_stack("span1", stack.clone());
             {
                 let _span = LocalSpan::enter_with_stack("span2", stack)
-                    .with_property(|| ("k1", "v1".to_owned()));
+                    .with_property(|| ("k1".to_string(), "v1".to_owned()));
             }
         }
 
@@ -171,8 +171,8 @@ span1 []
 
     #[test]
     fn local_span_noop() {
-        let _span1 =
-            LocalSpan::enter_with_local_parent("span1").with_property(|| ("k1", "v1".to_string()));
+        let _span1 = LocalSpan::enter_with_local_parent("span1")
+            .with_property(|| ("k1".to_string(), "v1".to_string()));
     }
 
     #[test]
@@ -192,7 +192,7 @@ span1 []
             let span1 = LocalSpan::enter_with_stack("span1", stack.clone());
             {
                 let _span2 = LocalSpan::enter_with_stack("span2", stack)
-                    .with_property(|| ("k1", "v1".to_owned()));
+                    .with_property(|| ("k1".to_string(), "v1".to_string()));
 
                 drop(span1);
             }

@@ -23,7 +23,7 @@ fn main() {
         .format(|buf, record| {
             // Add a event to the current local span representing the log record
             Event::add_to_local_parent(record.level().as_str(), || {
-                [("message", record.args().to_string())]
+                [("message".to_string(), record.args().to_string())]
             });
 
             // Output the log to stdout as usual

@@ -76,10 +76,10 @@ impl OpenTelemetryReporter {
             .collect()
     }
 
-    fn convert_properties(properties: &[(&'static str, String)]) -> EvictedHashMap {
+    fn convert_properties(properties: &[(String, String)]) -> EvictedHashMap {
         let mut map = EvictedHashMap::new(u32::MAX, properties.len());
         for (k, v) in properties {
-            map.insert(KeyValue::new(*k, v.clone()));
+            map.insert(KeyValue::new(k.clone(), v.clone()));
         }
         map
     }
@@ -93,7 +93,7 @@ impl OpenTelemetryReporter {
                 event
                     .properties
                     .iter()
-                    .map(|(k, v)| KeyValue::new(*k, v.clone()))
+                    .map(|(k, v)| KeyValue::new(k.clone(), v.clone()))
                     .collect(),
                 0,
             )

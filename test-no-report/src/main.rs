@@ -11,8 +11,7 @@ use std::time::Duration;
 use minitrace::collector::Config;
 use minitrace::collector::ConsoleReporter;
 
-#[test]
-fn test_no_report() {
+fn main() {
     use minitrace::local::LocalCollector;
     use minitrace::prelude::*;
 
@@ -25,8 +24,8 @@ fn test_no_report() {
     );
 
     let mut root = Span::root("root", SpanContext::new(TraceId(0), SpanId(0)))
-        .with_property(|| ("k1", "v1".to_string()))
-        .with_properties(|| [("k2", "v2".to_string())]);
+        .with_property(|| ("k1".to_string(), "v1".to_string()))
+        .with_properties(|| [("k2".to_string(), "v2".to_string())]);
 
     Event::add_to_parent("event", &root, || []);
     Event::add_to_local_parent("event", || []);
@@ -36,8 +35,8 @@ fn test_no_report() {
     Event::add_to_local_parent("event", || []);
 
     let _span1 = LocalSpan::enter_with_local_parent("span1")
-        .with_property(|| ("k", "v".to_string()))
-        .with_properties(|| [("k", "v".to_string())]);
+        .with_property(|| ("k".to_string(), "v".to_string()))
+        .with_properties(|| [("k".to_string(), "v".to_string())]);
 
     let _span2 = LocalSpan::enter_with_local_parent("span2");
 

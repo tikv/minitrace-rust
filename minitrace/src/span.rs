@@ -263,7 +263,7 @@ impl Span {
     /// ```
     #[inline]
     pub fn with_property<F>(self, property: F) -> Self
-    where F: FnOnce() -> (&'static str, String) {
+    where F: FnOnce() -> (String, String) {
         self.with_properties(move || [property()])
     }
 
@@ -285,7 +285,7 @@ impl Span {
     #[inline]
     pub fn with_properties<I, F>(mut self, properties: F) -> Self
     where
-        I: IntoIterator<Item = (&'static str, String)>,
+        I: IntoIterator<Item = (String, String)>,
         F: FnOnce() -> I,
     {
         #[cfg(feature = "enable")]
@@ -382,7 +382,7 @@ impl SpanInner {
     #[inline]
     fn add_properties<I, F>(&mut self, properties: F)
     where
-        I: IntoIterator<Item = (&'static str, String)>,
+        I: IntoIterator<Item = (String, String)>,
         F: FnOnce() -> I,
     {
         for prop in properties() {
@@ -483,7 +483,7 @@ mod tests {
             let parent_ctx = SpanContext::new(TraceId(12), SpanId::default());
             let root = Span::root("root", parent_ctx, collect);
             let child1 = Span::enter_with_parent("child1", &root)
-                .with_properties(|| [("k1", "v1".to_owned())]);
+                .with_properties(|| [("k1".to_string(), "v1".to_string())]);
             let grandchild = Span::enter_with_parent("grandchild", &child1);
             let child2 = Span::enter_with_parent("child2", &root);
 
@@ -549,7 +549,7 @@ root []
                 [&parent1, &parent2, &parent3, &parent4, &parent5, &child1],
                 collect,
             )
-            .with_property(|| ("k1", "v1".to_owned()));
+            .with_property(|| ("k1".to_string(), "v1".to_string()));
 
             crossbeam::scope(move |scope| {
                 let mut rng = thread_rng();

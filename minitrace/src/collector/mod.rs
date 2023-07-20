@@ -51,7 +51,7 @@ pub struct SpanRecord {
     pub begin_unix_time_ns: u64,
     pub duration_ns: u64,
     pub name: &'static str,
-    pub properties: Vec<(&'static str, String)>,
+    pub properties: Vec<(String, String)>,
     pub events: Vec<EventRecord>,
 }
 
@@ -60,7 +60,7 @@ pub struct SpanRecord {
 pub struct EventRecord {
     pub name: &'static str,
     pub timestamp_unix_ns: u64,
-    pub properties: Vec<(&'static str, String)>,
+    pub properties: Vec<(String, String)>,
 }
 
 #[doc(hidden)]

@@ -46,7 +46,12 @@ impl DatadogReporter {
                 meta: if s.properties.is_empty() {
                     None
                 } else {
-                    Some(s.properties.iter().map(|(k, v)| (*k, v.as_ref())).collect())
+                    Some(
+                        s.properties
+                            .iter()
+                            .map(|(k, v)| (k.as_ref(), v.as_ref()))
+                            .collect(),
+                    )
                 },
                 error_code: 0,
                 span_id: s.span_id.0,

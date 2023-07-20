@@ -10,7 +10,7 @@ pub struct RawSpan {
     pub parent_id: SpanId,
     pub begin_instant: Instant,
     pub name: &'static str,
-    pub properties: Vec<(&'static str, String)>,
+    pub properties: Vec<(String, String)>,
     pub is_event: bool,
 
     // Will write this field at post processing

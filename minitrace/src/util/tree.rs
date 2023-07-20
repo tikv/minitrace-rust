@@ -16,7 +16,7 @@ use crate::util::RawSpans;
 pub struct Tree {
     name: &'static str,
     children: Vec<Tree>,
-    properties: Vec<(&'static str, String)>,
+    properties: Vec<(String, String)>,
 }
 
 impl Display for Tree {
@@ -77,7 +77,7 @@ impl Tree {
     pub fn from_span_sets(span_sets: &[(SpanSet, CollectToken)]) -> Vec<(u32, Tree)> {
         let mut collect = HashMap::<
             u32,
-            HashMap<SpanId, (&'static str, Vec<SpanId>, Vec<(&'static str, String)>)>,
+            HashMap<SpanId, (&'static str, Vec<SpanId>, Vec<(String, String)>)>,
         >::new();
         for (span_set, token) in span_sets {
             for item in token.iter() {
@@ -209,7 +209,7 @@ impl Tree {
     #[allow(clippy::type_complexity)]
     fn build_tree(
         id: SpanId,
-        raw: &mut HashMap<SpanId, (&'static str, Vec<SpanId>, Vec<(&'static str, String)>)>,
+        raw: &mut HashMap<SpanId, (&'static str, Vec<SpanId>, Vec<(String, String)>)>,
     ) -> Tree {
         let (name, children, properties) = raw.get(&id).cloned().unwrap();
         Tree {
