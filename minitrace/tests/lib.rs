@@ -424,16 +424,24 @@ fn test_macro() {
 
     {
         let root = Span::root("root", SpanContext::new(TraceId(12), SpanId::default()));
-        let _g = root.set_local_parent();
 
         let runtime = Builder::new_multi_thread()
             .worker_threads(4)
             .enable_all()
             .build()
             .unwrap();
-        block_on(runtime.spawn(Bar.run(&100))).unwrap();
-        block_on(runtime.spawn(Bar.work2(&100))).unwrap();
-        block_on(runtime.spawn(work3(&100, &100))).unwrap();
+
+        block_on(
+            runtime.spawn(
+                async {
+                    Bar.run(&100).await;
+                    Bar.work2(&100).await;
+                    work3(&100, &100).await;
+                }
+                .in_span(root),
+            ),
+        )
+        .unwrap();
     }
 
     minitrace::flush();

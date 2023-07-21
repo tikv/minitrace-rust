@@ -1,3 +1,5 @@
+#![allow(unused_mut)]
+
 use minitrace::trace;
 
 #[trace(name = "test-span")]

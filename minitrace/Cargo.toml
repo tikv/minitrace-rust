@@ -35,7 +35,7 @@ env_logger = "0.10"
 futures = "0.3"
 futures-timer = "3"
 log = "0.4"
-log-derive = "0.4"
+logcall = "0.1"
 minitrace = { path = ".", features = ["enable"] }
 minitrace-datadog = { version = "0.4.1", path = "../minitrace-datadog" }
 minitrace-jaeger = { version = "0.4.1", path = "../minitrace-jaeger" }
@@ -51,7 +51,6 @@ tracing = "0.1"
 tracing-core = "0.1"
 tracing-opentelemetry = "0.18"
 tracing-subscriber = "0.3"
-logcall = "0.1"
 
 [[bench]]
 name = "trace"
