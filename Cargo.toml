@@ -7,7 +7,6 @@ members = [
     "minitrace-datadog",
     "minitrace-opentelemetry",
     "test-no-report",
-    "logfn",
 ]
 
 [profile.bench]
