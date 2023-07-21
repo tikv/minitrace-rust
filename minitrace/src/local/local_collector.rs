@@ -56,7 +56,7 @@ struct LocalCollectorInner {
 /// collected from a [`LocalCollector`]. These spans can then be associated with a parent span using
 /// the [`Span::push_child_spans()`] method on the parent span.
 ///
-/// Internally, it is implemented as an `Arc<LocalSpan>`, which allows it to be cloned and shared
+/// Internally, it is implemented as an `Arc<[LocalSpan]>`, which allows it to be cloned and shared
 /// across threads at a low cost.
 ///
 /// # Examples
