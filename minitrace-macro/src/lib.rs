@@ -104,7 +104,7 @@ pub fn trace(
                 let instrumented_block = gen_block(&async_expr.block, true, args);
                 let async_attrs = &async_expr.attrs;
                 quote! {
-                        Box::pin(#(#async_attrs) * { #instrumented_block })
+                    Box::pin(#(#async_attrs) * { #instrumented_block })
                 }
             }
         }
