@@ -13,17 +13,17 @@ pub enum CollectCommand {
 
 #[derive(Debug)]
 pub struct StartCollect {
-    pub collect_id: u32,
+    pub collect_id: usize,
 }
 
 #[derive(Debug)]
 pub struct DropCollect {
-    pub collect_id: u32,
+    pub collect_id: usize,
 }
 
 #[derive(Debug)]
 pub struct CommitCollect {
-    pub collect_id: u32,
+    pub collect_id: usize,
 }
 
 #[derive(Debug)]

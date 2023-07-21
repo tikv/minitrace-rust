@@ -74,9 +74,9 @@ impl Tree {
     }
 
     /// Return a vector of collect id -> Tree
-    pub fn from_span_sets(span_sets: &[(SpanSet, CollectToken)]) -> Vec<(u32, Tree)> {
+    pub fn from_span_sets(span_sets: &[(SpanSet, CollectToken)]) -> Vec<(usize, Tree)> {
         let mut collect = HashMap::<
-            u32,
+            usize,
             HashMap<SpanId, (&'static str, Vec<SpanId>, Vec<(String, String)>)>,
         >::new();
         for (span_set, token) in span_sets {
@@ -179,7 +179,7 @@ impl Tree {
                 assert_eq!(tree.children.len(), 1);
                 (id, tree.children.pop().unwrap())
             })
-            .collect::<Vec<(u32, Tree)>>();
+            .collect::<Vec<(usize, Tree)>>();
         res.sort_unstable();
         res
     }

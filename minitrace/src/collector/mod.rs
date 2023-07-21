@@ -28,7 +28,6 @@ pub use test_reporter::TestReporter;
 use crate::local::local_collector::LocalSpansInner;
 use crate::local::local_span_stack::LOCAL_SPAN_STACK;
 use crate::local::raw_span::RawSpan;
-use crate::util::CollectToken;
 use crate::Span;
 #[cfg(test)]
 pub(crate) type GlobalCollect = Arc<MockGlobalCollect>;
@@ -68,51 +67,8 @@ pub struct EventRecord {
 pub struct CollectTokenItem {
     pub trace_id: TraceId,
     pub parent_id: SpanId,
-    pub collect_id: u32,
+    pub collect_id: usize,
     pub is_root: bool,
-}
-
-/// `Collector` collects all spans associated to a root span.
-pub(crate) struct Collector {
-    collect_id: Option<u32>,
-    collect: GlobalCollect,
-}
-
-impl Collector {
-    pub(crate) fn start_collect(
-        parent: SpanContext,
-        collect: GlobalCollect,
-    ) -> (Self, CollectToken) {
-        let collect_id = collect.start_collect();
-
-        (
-            Collector {
-                collect_id: Some(collect_id),
-                collect,
-            },
-            CollectTokenItem {
-                trace_id: parent.trace_id,
-                parent_id: parent.span_id,
-                collect_id,
-                is_root: true,
-            }
-            .into(),
-        )
-    }
-
-    pub(crate) fn collect(mut self) {
-        if let Some(collect_id) = self.collect_id.take() {
-            self.collect.commit_collect(collect_id);
-        }
-    }
-}
-
-impl Drop for Collector {
-    fn drop(&mut self) {
-        if let Some(collect_id) = self.collect_id {
-            self.collect.drop_collect(collect_id);
-        }
-    }
 }
 
 /// A struct representing the context of a span, including its [`TraceId`] and [`SpanId`].
@@ -388,66 +344,8 @@ impl Default for Config {
 
 #[cfg(test)]
 mod tests {
-    use mockall::predicate;
-    use mockall::Sequence;
 
     use super::*;
-    use crate::collector::CollectTokenItem;
-
-    #[test]
-    fn collector_basic() {
-        let mut mock = MockGlobalCollect::new();
-        let mut seq = Sequence::new();
-        mock.expect_start_collect()
-            .times(1)
-            .in_sequence(&mut seq)
-            .return_const(42_u32);
-        mock.expect_commit_collect()
-            .times(1)
-            .in_sequence(&mut seq)
-            .with(predicate::eq(42_u32))
-            .return_const(());
-        mock.expect_submit_spans().times(0);
-        mock.expect_drop_collect().times(0);
-
-        let mock = Arc::new(mock);
-        let (collector, token) =
-            Collector::start_collect(SpanContext::new(TraceId(12), SpanId::default()), mock);
-        collector.collect();
-        assert_eq!(token.into_inner().1.as_slice(), &[CollectTokenItem {
-            trace_id: TraceId(12),
-            parent_id: SpanId::default(),
-            collect_id: 42,
-            is_root: true,
-        }]);
-    }
-
-    #[test]
-    fn drop_collector() {
-        let mut mock = MockGlobalCollect::new();
-        let mut seq = Sequence::new();
-        mock.expect_start_collect()
-            .times(1)
-            .in_sequence(&mut seq)
-            .return_const(42_u32);
-        mock.expect_drop_collect()
-            .times(1)
-            .in_sequence(&mut seq)
-            .with(predicate::eq(42_u32))
-            .return_const(());
-        mock.expect_commit_collect().times(0);
-        mock.expect_submit_spans().times(0);
-
-        let mock = Arc::new(mock);
-        let (_collector, token) =
-            Collector::start_collect(SpanContext::new(TraceId(12), SpanId::default()), mock);
-        assert_eq!(token.into_inner().1.as_slice(), &[CollectTokenItem {
-            trace_id: TraceId(12),
-            parent_id: SpanId::default(),
-            collect_id: 42,
-            is_root: true,
-        }]);
-    }
 
     #[test]
     fn w3c_traceparent() {

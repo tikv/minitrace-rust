@@ -128,9 +128,8 @@
 //!
 //! ## Local Span
 //!
-//! A `Span` can be efficiently transformed into a [`LocalSpan`], reducing overhead
-//! significantly, provided it is not
-//! intended for sending to other threads.
+//! A `Span` can be efficiently replaced with a [`LocalSpan`], reducing overhead
+//! significantly, provided it is not intended for sending to other threads.
 //!
 //! Before starting a `LocalSpan`, a scope of parent span should be set using
 //! [`Span::set_local_parent()`]. Use [`LocalSpan::enter_with_local_parent()`] to start
