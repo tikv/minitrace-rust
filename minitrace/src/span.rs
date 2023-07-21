@@ -1,5 +1,6 @@
 // Copyright 2020 TiKV Project Authors. Licensed under Apache-2.0.
 
+use std::borrow::Cow;
 use std::cell::RefCell;
 use std::rc::Rc;
 use std::sync::Arc;
@@ -239,11 +240,11 @@ impl Span {
     /// use minitrace::prelude::*;
     ///
     /// let root = Span::root("root", SpanContext::new(TraceId(12), SpanId::default()))
-    ///     .with_property(|| ("key".to_string(), "value".to_string()));
+    ///     .with_property(|| ("key".into(), "value".into()));
     /// ```
     #[inline]
     pub fn with_property<F>(self, property: F) -> Self
-    where F: FnOnce() -> (String, String) {
+    where F: FnOnce() -> (Cow<'static, str>, Cow<'static, str>) {
         self.with_properties(move || [property()])
     }
 
@@ -257,15 +258,15 @@ impl Span {
     /// let root = Span::root("root", SpanContext::new(TraceId(12), SpanId::default()))
     ///     .with_properties(|| {
     ///         vec![
-    ///             ("key1".to_string(), "value1".to_string()),
-    ///             ("key2".to_string(), "value2".to_string()),
+    ///             ("key1".into(), "value1".into()),
+    ///             ("key2".into(), "value2".into()),
     ///         ]
     ///     });
     /// ```
     #[inline]
     pub fn with_properties<I, F>(mut self, properties: F) -> Self
     where
-        I: IntoIterator<Item = (String, String)>,
+        I: IntoIterator<Item = (Cow<'static, str>, Cow<'static, str>)>,
         F: FnOnce() -> I,
     {
         #[cfg(feature = "enable")]
@@ -390,7 +391,7 @@ impl SpanInner {
     #[inline]
     fn add_properties<I, F>(&mut self, properties: F)
     where
-        I: IntoIterator<Item = (String, String)>,
+        I: IntoIterator<Item = (Cow<'static, str>, Cow<'static, str>)>,
         F: FnOnce() -> I,
     {
         for prop in properties() {
@@ -558,7 +559,7 @@ mod tests {
             let parent_ctx = SpanContext::new(TraceId(12), SpanId::default());
             let root = Span::root("root", parent_ctx, collect);
             let child1 = Span::enter_with_parent("child1", &root)
-                .with_properties(|| [("k1".to_string(), "v1".to_string())]);
+                .with_properties(|| [("k1".into(), "v1".into())]);
             let grandchild = Span::enter_with_parent("grandchild", &child1);
             let child2 = Span::enter_with_parent("child2", &root);
 
@@ -624,7 +625,7 @@ root []
                 [&parent1, &parent2, &parent3, &parent4, &parent5, &child1],
                 collect,
             )
-            .with_property(|| ("k1".to_string(), "v1".to_string()));
+            .with_property(|| ("k1".into(), "v1".into()));
 
             crossbeam::scope(move |scope| {
                 let mut rng = thread_rng();

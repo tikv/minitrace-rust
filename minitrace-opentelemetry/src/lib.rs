@@ -21,7 +21,10 @@ use opentelemetry::trace::Status;
 use opentelemetry::trace::TraceFlags;
 use opentelemetry::trace::TraceState;
 use opentelemetry::InstrumentationLibrary;
+use opentelemetry::Key;
 use opentelemetry::KeyValue;
+use opentelemetry::StringValue;
+use opentelemetry::Value;
 
 /// [OpenTelemetry](https://github.com/open-telemetry/opentelemetry-rust) reporter for `minitrace`.
 ///
@@ -76,10 +79,13 @@ impl OpenTelemetryReporter {
             .collect()
     }
 
-    fn convert_properties(properties: &[(String, String)]) -> EvictedHashMap {
+    fn convert_properties(properties: &[(Cow<'static, str>, Cow<'static, str>)]) -> EvictedHashMap {
         let mut map = EvictedHashMap::new(u32::MAX, properties.len());
         for (k, v) in properties {
-            map.insert(KeyValue::new(k.clone(), v.clone()));
+            map.insert(KeyValue::new(
+                cow_to_otel_key(k.clone()),
+                cow_to_otel_value(v.clone()),
+            ));
         }
         map
     }
@@ -93,7 +99,9 @@ impl OpenTelemetryReporter {
                 event
                     .properties
                     .iter()
-                    .map(|(k, v)| KeyValue::new(k.clone(), v.clone()))
+                    .map(|(k, v)| {
+                        KeyValue::new(cow_to_otel_key(k.clone()), cow_to_otel_value(v.clone()))
+                    })
                     .collect(),
                 0,
             )
@@ -117,5 +125,19 @@ impl Reporter for OpenTelemetryReporter {
         if let Err(err) = self.try_report(spans) {
             eprintln!("report to opentelemetry failed: {}", err);
         }
+    }
+}
+
+fn cow_to_otel_key(cow: Cow<'static, str>) -> Key {
+    match cow {
+        Cow::Borrowed(s) => Key::from_static_str(s),
+        Cow::Owned(s) => Key::from(s),
+    }
+}
+
+fn cow_to_otel_value(cow: Cow<'static, str>) -> Value {
+    match cow {
+        Cow::Borrowed(s) => Value::String(StringValue::from(s)),
+        Cow::Owned(s) => Value::String(StringValue::from(s)),
     }
 }

@@ -1,5 +1,6 @@
 // Copyright 2021 TiKV Project Authors. Licensed under Apache-2.0.
 
+use std::borrow::Cow;
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -61,11 +62,11 @@ impl LocalSpan {
     /// use minitrace::prelude::*;
     ///
     /// let span = LocalSpan::enter_with_local_parent("a child span")
-    ///     .with_property(|| ("key".to_string(), "value".to_string()));
+    ///     .with_property(|| ("key".into(), "value".into()));
     /// ```
     #[inline]
     pub fn with_property<F>(self, property: F) -> Self
-    where F: FnOnce() -> (String, String) {
+    where F: FnOnce() -> (Cow<'static, str>, Cow<'static, str>) {
         self.with_properties(|| [property()])
     }
 
@@ -78,15 +79,15 @@ impl LocalSpan {
     ///
     /// let span = LocalSpan::enter_with_local_parent("a child span").with_properties(|| {
     ///     vec![
-    ///         ("key1".to_string(), "value1".to_string()),
-    ///         ("key2".to_string(), "value2".to_string()),
+    ///         ("key1".into(), "value1".into()),
+    ///         ("key2".into(), "value2".into()),
     ///     ]
     /// });
     /// ```
     #[inline]
     pub fn with_properties<I, F>(self, properties: F) -> Self
     where
-        I: IntoIterator<Item = (String, String)>,
+        I: IntoIterator<Item = (Cow<'static, str>, Cow<'static, str>)>,
         F: FnOnce() -> I,
     {
         #[cfg(feature = "enable")]
@@ -154,7 +155,7 @@ mod tests {
             let _g = LocalSpan::enter_with_stack("span1", stack.clone());
             {
                 let _span = LocalSpan::enter_with_stack("span2", stack)
-                    .with_property(|| ("k1".to_string(), "v1".to_owned()));
+                    .with_property(|| ("k1".into(), "v1".into()));
             }
         }
 
@@ -172,7 +173,7 @@ span1 []
     #[test]
     fn local_span_noop() {
         let _span1 = LocalSpan::enter_with_local_parent("span1")
-            .with_property(|| ("k1".to_string(), "v1".to_string()));
+            .with_property(|| ("k1".into(), "v1".into()));
     }
 
     #[test]
@@ -192,7 +193,7 @@ span1 []
             let span1 = LocalSpan::enter_with_stack("span1", stack.clone());
             {
                 let _span2 = LocalSpan::enter_with_stack("span2", stack)
-                    .with_property(|| ("k1".to_string(), "v1".to_string()));
+                    .with_property(|| ("k1".into(), "v1".into()));
 
                 drop(span1);
             }

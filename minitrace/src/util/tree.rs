@@ -2,6 +2,7 @@
 
 //! A module for relationship checking in test
 
+use std::borrow::Cow;
 use std::collections::HashMap;
 use std::fmt::Display;
 use std::fmt::Formatter;
@@ -16,7 +17,7 @@ use crate::util::RawSpans;
 pub struct Tree {
     name: &'static str,
     children: Vec<Tree>,
-    properties: Vec<(String, String)>,
+    properties: Vec<(Cow<'static, str>, Cow<'static, str>)>,
 }
 
 impl Display for Tree {
@@ -77,7 +78,14 @@ impl Tree {
     pub fn from_span_sets(span_sets: &[(SpanSet, CollectToken)]) -> Vec<(usize, Tree)> {
         let mut collect = HashMap::<
             usize,
-            HashMap<SpanId, (&'static str, Vec<SpanId>, Vec<(String, String)>)>,
+            HashMap<
+                SpanId,
+                (
+                    &'static str,
+                    Vec<SpanId>,
+                    Vec<(Cow<'static, str>, Cow<'static, str>)>,
+                ),
+            >,
         >::new();
         for (span_set, token) in span_sets {
             for item in token.iter() {
@@ -209,7 +217,14 @@ impl Tree {
     #[allow(clippy::type_complexity)]
     fn build_tree(
         id: SpanId,
-        raw: &mut HashMap<SpanId, (&'static str, Vec<SpanId>, Vec<(String, String)>)>,
+        raw: &mut HashMap<
+            SpanId,
+            (
+                &'static str,
+                Vec<SpanId>,
+                Vec<(Cow<'static, str>, Cow<'static, str>)>,
+            ),
+        >,
     ) -> Tree {
         let (name, children, properties) = raw.get(&id).cloned().unwrap();
         Tree {

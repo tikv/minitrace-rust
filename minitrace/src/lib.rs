@@ -184,9 +184,7 @@
 //!         let _guard = root.set_local_parent();
 //!         let mut span1 = LocalSpan::enter_with_local_parent("a child span");
 //!
-//!         Event::add_to_local_parent("event in span1", || {
-//!             [("key".to_string(), "value".to_string())]
-//!         });
+//!         Event::add_to_local_parent("event in span1", || [("key".into(), "value".into())]);
 //!     }
 //! }
 //!

@@ -1,5 +1,6 @@
 // Copyright 2023 TiKV Project Authors. Licensed under Apache-2.0.
 
+use std::borrow::Cow;
 use std::rc::Rc;
 
 use crate::local::local_span_stack::LOCAL_SPAN_STACK;
@@ -18,13 +19,11 @@ impl Event {
     ///
     /// let root = Span::root("root", SpanContext::new(TraceId(12), SpanId::default()));
     ///
-    /// Event::add_to_parent("event in root", &root, || {
-    ///     [("key".to_string(), "value".to_string())]
-    /// });
+    /// Event::add_to_parent("event in root", &root, || [("key".into(), "value".into())]);
     /// ```
     pub fn add_to_parent<I, F>(name: &'static str, parent: &Span, properties: F)
     where
-        I: IntoIterator<Item = (String, String)>,
+        I: IntoIterator<Item = (Cow<'static, str>, Cow<'static, str>)>,
         F: FnOnce() -> I,
     {
         #[cfg(feature = "enable")]
@@ -47,13 +46,11 @@ impl Event {
     /// let root = Span::root("root", SpanContext::new(TraceId(12), SpanId::default()));
     /// let _guard = root.set_local_parent();
     ///
-    /// Event::add_to_local_parent("event in root", || {
-    ///     [("key".to_string(), "value".to_string())]
-    /// });
+    /// Event::add_to_local_parent("event in root", || [("key".into(), "value".into())]);
     /// ```
     pub fn add_to_local_parent<I, F>(name: &'static str, properties: F)
     where
-        I: IntoIterator<Item = (String, String)>,
+        I: IntoIterator<Item = (Cow<'static, str>, Cow<'static, str>)>,
         F: FnOnce() -> I,
     {
         #[cfg(feature = "enable")]

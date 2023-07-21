@@ -1,5 +1,6 @@
 // Copyright 2022 TiKV Project Authors. Licensed under Apache-2.0.
 
+use std::borrow::Cow;
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -51,7 +52,7 @@ impl LocalSpanStack {
     #[inline]
     pub fn add_event<I, F>(&mut self, name: &'static str, properties: F)
     where
-        I: IntoIterator<Item = (String, String)>,
+        I: IntoIterator<Item = (Cow<'static, str>, Cow<'static, str>)>,
         F: FnOnce() -> I,
     {
         if let Some(span_line) = self.current_span_line() {
@@ -99,7 +100,7 @@ impl LocalSpanStack {
     #[inline]
     pub fn add_properties<I, F>(&mut self, local_span_handle: &LocalSpanHandle, properties: F)
     where
-        I: IntoIterator<Item = (String, String)>,
+        I: IntoIterator<Item = (Cow<'static, str>, Cow<'static, str>)>,
         F: FnOnce() -> I,
     {
         debug_assert!(self.current_span_line().is_some());
@@ -354,7 +355,7 @@ span1 []
                     .into(),
                 ))
                 .unwrap();
-            span_stack.add_properties(&span1, || [("k1".to_string(), "v1".to_string())]);
+            span_stack.add_properties(&span1, || [("k1".into(), "v1".into())]);
             let _ = span_stack.unregister_and_collect(span_line2).unwrap();
         }
         span_stack.exit_span(span1);

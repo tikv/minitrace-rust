@@ -10,6 +10,7 @@ pub(crate) mod global_collector;
 pub(crate) mod id;
 mod test_reporter;
 
+use std::borrow::Cow;
 use std::rc::Rc;
 use std::sync::Arc;
 use std::time::Duration;
@@ -50,7 +51,7 @@ pub struct SpanRecord {
     pub begin_unix_time_ns: u64,
     pub duration_ns: u64,
     pub name: &'static str,
-    pub properties: Vec<(String, String)>,
+    pub properties: Vec<(Cow<'static, str>, Cow<'static, str>)>,
     pub events: Vec<EventRecord>,
 }
 
@@ -59,7 +60,7 @@ pub struct SpanRecord {
 pub struct EventRecord {
     pub name: &'static str,
     pub timestamp_unix_ns: u64,
-    pub properties: Vec<(String, String)>,
+    pub properties: Vec<(Cow<'static, str>, Cow<'static, str>)>,
 }
 
 #[doc(hidden)]
