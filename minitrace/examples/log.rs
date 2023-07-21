@@ -3,15 +3,12 @@
 use std::io::Write;
 
 use log::info;
-use log_derive::logfn;
-use log_derive::logfn_inputs;
 use minitrace::collector::Config;
 use minitrace::collector::ConsoleReporter;
 use minitrace::prelude::*;
 use minitrace::Event;
 
-#[logfn_inputs(DEBUG)]
-#[logfn(ok = "DEBUG", err = "ERROR")]
+#[logcall::logcall("debug")]
 #[trace]
 fn plus(a: u64, b: u64) -> Result<u64, std::io::Error> {
     Ok(a + b)
