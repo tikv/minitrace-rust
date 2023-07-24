@@ -497,8 +497,6 @@ fn mount_events(
             }
         }
     }
-
-    debug_assert!(dangling_events.is_empty());
 }
 
 impl SpanSet {

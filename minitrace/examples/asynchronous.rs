@@ -40,7 +40,7 @@ async fn main() {
     minitrace::set_reporter(ReportAll::new(), Config::default());
 
     {
-        let parent = SpanContext::new(TraceId(rand::random()), SpanId::default());
+        let parent = SpanContext::new(TraceId::random(), SpanId::default());
         let span = Span::root("root", parent);
 
         let f = async {

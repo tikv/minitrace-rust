@@ -49,7 +49,7 @@
 //! pub fn send_request(req: HttpRequest) -> Result<(), Error> {
 //!     let root = Span::root(
 //!         "send_request",
-//!         SpanContext::new(TraceId(rand::random()), SpanId::default()),
+//!         SpanContext::new(TraceId::random(), SpanId::default()),
 //!     );
 //!     let _guard = root.set_local_parent();
 //!
@@ -115,7 +115,10 @@
 //! minitrace::set_reporter(ConsoleReporter, Config::default());
 //!
 //! {
-//!     let root = Span::root("root", SpanContext::new(TraceId(12), SpanId::default()));
+//!     let root = Span::root(
+//!         "root",
+//!         SpanContext::new(TraceId::random(), SpanId::default()),
+//!     );
 //!     {
 //!         let _child_span = Span::enter_with_parent("a child span", &root);
 //!
@@ -144,7 +147,10 @@
 //! minitrace::set_reporter(ConsoleReporter, Config::default());
 //!
 //! {
-//!     let root = Span::root("root", SpanContext::new(TraceId(12), SpanId::default()));
+//!     let root = Span::root(
+//!         "root",
+//!         SpanContext::new(TraceId::random(), SpanId::default()),
+//!     );
 //!     {
 //!         let _guard = root.set_local_parent();
 //!
@@ -176,7 +182,10 @@
 //! minitrace::set_reporter(ConsoleReporter, Config::default());
 //!
 //! {
-//!     let root = Span::root("root", SpanContext::new(TraceId(12), SpanId::default()));
+//!     let root = Span::root(
+//!         "root",
+//!         SpanContext::new(TraceId::random(), SpanId::default()),
+//!     );
 //!
 //!     Event::add_to_parent("event in root", &root, || []);
 //!
@@ -216,7 +225,10 @@
 //! minitrace::set_reporter(ConsoleReporter, Config::default());
 //!
 //! {
-//!     let root = Span::root("root", SpanContext::new(TraceId(12), SpanId::default()));
+//!     let root = Span::root(
+//!         "root",
+//!         SpanContext::new(TraceId::random(), SpanId::default()),
+//!     );
 //!     let _g = root.set_local_parent();
 //!
 //!     do_something(100);
@@ -318,61 +330,6 @@ mod span;
 #[doc(hidden)]
 pub mod util;
 
-/// An attribute macro designed to eliminate boilerplate code.
-///
-/// By default, the span name is the function name. This can be customized by passing a string
-/// literal as an argument.
-///
-/// The `#[trace]` attribute requires a local parent context to function correctly. Ensure that
-/// the function annotated with `#[trace]` is called within the scope of [`Span::set_local_parent()`].
-///
-/// # Examples
-///
-/// ```
-/// use minitrace::prelude::*;
-///
-/// #[trace]
-/// fn foo() {
-///     // perform some work
-/// }
-///
-/// #[trace]
-/// async fn bar() {
-///     // perform some work
-/// }
-///
-/// #[trace(name = "qux", enter_on_poll = true)]
-/// async fn qux() {
-///     // perform some work
-/// }
-/// ```
-///
-/// The code snippets above are equivalent to:
-///
-/// ```
-/// # use minitrace::prelude::*;
-/// # use minitrace::local::LocalSpan;
-/// fn foo() {
-///     let __guard = LocalSpan::enter_with_local_parent("foo");
-///     // perform some work
-/// }
-///
-/// fn bar() -> impl core::future::Future<Output = ()> {
-///     async {
-///         // perform some work
-///     }
-///     .in_span(Span::enter_with_local_parent("bar"))
-/// }
-///
-/// fn qux() -> impl core::future::Future<Output = ()> {
-///     async {
-///         // perform some work
-///     }
-///     .enter_on_poll("qux")
-/// }
-/// ```
-///
-/// [`in_span()`]: crate::future::FutureExt::in_span
 pub use minitrace_macro::trace;
 
 pub use crate::collector::global_collector::flush;

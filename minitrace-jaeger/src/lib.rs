@@ -74,9 +74,9 @@ impl JaegerReporter {
                     .iter()
                     .map(|event| Log {
                         timestamp: (event.timestamp_unix_ns / 1_000) as i64,
-                        fields: event
-                            .properties
+                        fields: [("name".into(), event.name.into())]
                             .iter()
+                            .chain(&event.properties)
                             .map(|(k, v)| Tag::String {
                                 key: k.to_string(),
                                 value: v.to_string(),
@@ -107,9 +107,27 @@ impl JaegerReporter {
     }
 
     fn try_report(&self, spans: &[SpanRecord]) -> Result<(), Box<dyn std::error::Error>> {
-        let jaeger_spans = self.convert(spans);
-        let bytes = self.serialize(jaeger_spans)?;
-        self.socket.send_to(&bytes, self.agent_addr)?;
+        const MAX_UDP_PACKAGE_SIZE: usize = 8000;
+
+        let mut spans_per_batch = spans.len();
+        let mut sent_spans = 0;
+
+        while sent_spans < spans.len() {
+            let batch_size = spans_per_batch.min(spans.len() - sent_spans);
+            let jaeger_spans = self.convert(&spans[sent_spans..sent_spans + batch_size]);
+            let bytes = self.serialize(jaeger_spans)?;
+            if bytes.len() >= MAX_UDP_PACKAGE_SIZE {
+                if batch_size <= 1 {
+                    sent_spans += 1;
+                } else {
+                    spans_per_batch /= 2;
+                }
+                continue;
+            }
+            self.socket.send_to(&bytes, self.agent_addr)?;
+            sent_spans += batch_size;
+        }
+
         Ok(())
     }
 }

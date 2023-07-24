@@ -1,6 +1,7 @@
 // Copyright 2020 TiKV Project Authors. Licensed under Apache-2.0.
 
-#![doc = include_str!("../README.md")]
+//! An attribute macro designed to eliminate boilerplate code for [`minitrace`](https://crates.io/crates/minitrace).
+
 #![recursion_limit = "256"]
 // Instrumenting the async fn is not as straight forward as expected because `async_trait` rewrites `async fn`
 // into a normal fn which returns `Box<impl Future>`, and this stops the macro from distinguishing `async fn` from `fn`.
@@ -65,6 +66,61 @@ impl Args {
     }
 }
 
+/// An attribute macro designed to eliminate boilerplate code.
+///
+/// This macro automatically creates a span for the annotated function. The span name defaults to the function
+/// name but can be customized by passing a string literal as an argument using the `name` parameter.
+///
+/// The `#[trace]` attribute requires a local parent context to function correctly. Ensure that
+/// the function annotated with `#[trace]` is called within the scope of `Span::set_local_parent()`.
+///
+/// # Examples
+///
+/// ```
+/// use minitrace::prelude::*;
+///
+/// #[trace]
+/// fn foo() {
+///     // perform some work
+/// }
+///
+/// #[trace]
+/// async fn bar() {
+///     // perform some work
+/// }
+///
+/// #[trace(name = "qux", enter_on_poll = true)]
+/// async fn baz() {
+///     // perform some work
+/// }
+/// ```
+///
+/// The code snippets above are equivalent to:
+///
+/// ```
+/// # use minitrace::prelude::*;
+/// # use minitrace::local::LocalSpan;
+/// fn foo() {
+///     let __guard__ = LocalSpan::enter_with_local_parent("foo");
+///     // perform some work
+/// }
+///
+/// async fn bar() {
+///     async {
+///         // perform some work
+///     }
+///     .in_span(Span::enter_with_local_parent("bar"))
+///     .await
+/// }
+///
+/// async fn baz() {
+///     async {
+///         // perform some work
+///     }
+///     .enter_on_poll("qux")
+///     .await
+/// }
+/// ```
 #[proc_macro_attribute]
 #[proc_macro_error]
 pub fn trace(

@@ -257,7 +257,8 @@ pub struct Config {
 }
 
 impl Config {
-    /// A soft limit for the span collection for a trace, usually used to avoid out-of-memory.
+    /// A soft limit for the total number of spans and events for a trace, usually used
+    /// to avoid out-of-memory.
     ///
     /// # Note
     ///
