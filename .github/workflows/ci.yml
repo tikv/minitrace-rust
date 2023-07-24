@@ -15,7 +15,7 @@ jobs:
     strategy:
       matrix:
         os: [windows-latest, macos-latest, ubuntu-latest]
-        rust: [stable, nightly]
+        rust: [stable, nightly-2023-07-21]
     env:
       RUST_BACKTRACE: 1
     steps:
