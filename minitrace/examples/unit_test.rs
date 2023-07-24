@@ -1,6 +1,7 @@
 #![allow(dead_code)]
 #![allow(unused_imports)]
 
+use minitrace::prelude::*;
 use test_harness::test;
 
 type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
@@ -28,11 +29,11 @@ mod test_util {
     use super::*;
 
     pub fn setup_minitrace<F>(test: F)
-    where F: FnOnce() -> Result<()> {
+    where F: FnOnce() -> Result<()> + 'static {
         minitrace::set_reporter(ConsoleReporter, Config::default());
         {
             let root = Span::root(
-                "unit test",
+                closure_name::<F>(),
                 SpanContext::new(TraceId::random(), SpanId::default()),
             );
             let _guard = root.set_local_parent();
@@ -43,7 +44,7 @@ mod test_util {
 
     pub fn setup_minitrace_async<F, Fut>(test: F)
     where
-        F: FnOnce() -> Fut,
+        F: FnOnce() -> Fut + 'static,
         Fut: std::future::Future<Output = Result<()>> + Send + 'static,
     {
         minitrace::set_reporter(ConsoleReporter, Config::default());
@@ -53,11 +54,16 @@ mod test_util {
             .build()
             .unwrap();
         let root = Span::root(
-            "unit test",
+            closure_name::<F>(),
             SpanContext::new(TraceId::random(), SpanId::default()),
         );
         rt.block_on(test().in_span(root)).unwrap();
         minitrace::flush();
+    }
+
+    pub fn closure_name<F: std::any::Any>() -> &'static str {
+        let full_name = std::any::type_name::<F>();
+        full_name.rsplit("::").next().unwrap()
     }
 }
 
