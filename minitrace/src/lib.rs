@@ -49,7 +49,7 @@
 //! pub fn send_request(req: HttpRequest) -> Result<(), Error> {
 //!     let root = Span::root(
 //!         "send_request",
-//!         SpanContext::new(TraceId(rand::random()), SpanId::default()),
+//!         SpanContext::new(TraceId::random(), SpanId::default()),
 //!     );
 //!     let _guard = root.set_local_parent();
 //!
@@ -60,12 +60,12 @@
 //!
 //! ## Executables
 //!
-//! Executables should include `minitrace` as a dependency with the `report` feature
-//! enabled. To disable `minitrace` statically, simply don't enable the `report` feature.
+//! Executables should include `minitrace` as a dependency with the `enable` feature
+//! set. To disable `minitrace` statically, simply don't set the `enable` feature.
 //!
 //! ```toml
 //! [dependencies]
-//! minitrace = { version = "0.4", features = ["report"] }
+//! minitrace = { version = "0.4", features = ["enable"] }
 //! ```
 //!
 //! Executables should initialize a reporter implementation early in the program's runtime.
@@ -115,11 +115,14 @@
 //! minitrace::set_reporter(ConsoleReporter, Config::default());
 //!
 //! {
-//!     let root = Span::root("root", SpanContext::new(TraceId(12), SpanId::default()));
+//!     let root = Span::root(
+//!         "root",
+//!         SpanContext::new(TraceId::random(), SpanId::default()),
+//!     );
 //!     {
 //!         let _child_span = Span::enter_with_parent("a child span", &root);
 //!
-//!         // Perform some work
+//!         // perform some work
 //!     }
 //! }
 //!
@@ -128,9 +131,8 @@
 //!
 //! ## Local Span
 //!
-//! A `Span` can be efficiently transformed into a [`LocalSpan`], reducing overhead
-//! significantly, provided it is not
-//! intended for sending to other threads.
+//! A `Span` can be efficiently replaced with a [`LocalSpan`], reducing overhead
+//! significantly, provided it is not intended for sending to other threads.
 //!
 //! Before starting a `LocalSpan`, a scope of parent span should be set using
 //! [`Span::set_local_parent()`]. Use [`LocalSpan::enter_with_local_parent()`] to start
@@ -145,7 +147,10 @@
 //! minitrace::set_reporter(ConsoleReporter, Config::default());
 //!
 //! {
-//!     let root = Span::root("root", SpanContext::new(TraceId(12), SpanId::default()));
+//!     let root = Span::root(
+//!         "root",
+//!         SpanContext::new(TraceId::random(), SpanId::default()),
+//!     );
 //!     {
 //!         let _guard = root.set_local_parent();
 //!
@@ -177,7 +182,10 @@
 //! minitrace::set_reporter(ConsoleReporter, Config::default());
 //!
 //! {
-//!     let root = Span::root("root", SpanContext::new(TraceId(12), SpanId::default()));
+//!     let root = Span::root(
+//!         "root",
+//!         SpanContext::new(TraceId::random(), SpanId::default()),
+//!     );
 //!
 //!     Event::add_to_parent("event in root", &root, || []);
 //!
@@ -185,7 +193,7 @@
 //!         let _guard = root.set_local_parent();
 //!         let mut span1 = LocalSpan::enter_with_local_parent("a child span");
 //!
-//!         Event::add_to_local_parent("event in span1", || [("key", "value".to_owned())]);
+//!         Event::add_to_local_parent("event in span1", || [("key".into(), "value".into())]);
 //!     }
 //! }
 //!
@@ -216,8 +224,11 @@
 //!
 //! minitrace::set_reporter(ConsoleReporter, Config::default());
 //!
-//! let root = Span::root("root", SpanContext::new(TraceId(12), SpanId::default()));
 //! {
+//!     let root = Span::root(
+//!         "root",
+//!         SpanContext::new(TraceId::random(), SpanId::default()),
+//!     );
 //!     let _g = root.set_local_parent();
 //!
 //!     do_something(100);
@@ -269,8 +280,8 @@
 //! causing zero overhead.
 //!
 //! - **Sample Tracing**: `minitrace` is enabled in the executable, but only a small portion
-//! of the traces are enabled via [`Span::root()`], while the other portion start with a
-//! placeholder [`Span::noop()`]. The overhead in this case is very small - merely an integer
+//! of the traces are enabled via [`Span::root()`], while the other portion start with placeholders
+//! by [`Span::noop()`]. The overhead in this case is very small - merely an integer
 //! load, comparison, and jump.
 //!
 //! - **Full Tracing with Tail Sampling**: `minitrace` is enabled in the executable, and all
@@ -306,10 +317,10 @@
 #![allow(unknown_lints)]
 #![allow(clippy::arc_with_non_send_sync)]
 #![allow(clippy::needless_doctest_main)]
-#![cfg_attr(not(feature = "report"), allow(dead_code))]
-#![cfg_attr(not(feature = "report"), allow(unused_mut))]
-#![cfg_attr(not(feature = "report"), allow(unused_imports))]
-#![cfg_attr(not(feature = "report"), allow(unused_variables))]
+#![cfg_attr(not(feature = "enable"), allow(dead_code))]
+#![cfg_attr(not(feature = "enable"), allow(unused_mut))]
+#![cfg_attr(not(feature = "enable"), allow(unused_imports))]
+#![cfg_attr(not(feature = "enable"), allow(unused_variables))]
 
 pub mod collector;
 mod event;
@@ -319,66 +330,9 @@ mod span;
 #[doc(hidden)]
 pub mod util;
 
-/// An attribute macro designed to eliminate boilerplate code.
-///
-/// By default, the span name is the function name. This can be customized by passing a string
-/// literal as an argument.
-///
-/// The `#[trace]` attribute requires a local parent context to function correctly. Ensure that
-/// the function annotated with `#[trace]` is called within the scope of [`Span::set_local_parent()`].
-///
-/// # Examples
-///
-/// ```
-/// use minitrace::prelude::*;
-///
-/// #[trace]
-/// fn foo() {
-///     // Perform some work
-/// }
-///
-/// #[trace]
-/// async fn bar() {
-///     // Perform some work
-/// }
-///
-/// #[trace(name = "qux", enter_on_poll = true)]
-/// async fn qux() {
-///     // Perform some work
-/// }
-/// ```
-///
-/// The code snippets above are equivalent to:
-///
-/// ```
-/// # use minitrace::prelude::*;
-/// # use minitrace::local::LocalSpan;
-/// fn foo() {
-///     let __guard = LocalSpan::enter_with_local_parent("foo");
-///     // Perform some work
-/// }
-///
-/// fn bar() -> impl core::future::Future<Output = ()> {
-///     async {
-///         // Perform some work
-///     }
-///     .in_span(Span::enter_with_local_parent("bar"))
-/// }
-///
-/// fn qux() -> impl core::future::Future<Output = ()> {
-///     async {
-///         // Perform some work
-///     }
-///     .enter_on_poll("qux")
-/// }
-/// ```
-///
-/// [`in_span()`]: crate::future::FutureExt::in_span
 pub use minitrace_macro::trace;
 
-#[cfg(feature = "report")]
 pub use crate::collector::global_collector::flush;
-#[cfg(feature = "report")]
 pub use crate::collector::global_collector::set_reporter;
 pub use crate::event::Event;
 pub use crate::span::Span;

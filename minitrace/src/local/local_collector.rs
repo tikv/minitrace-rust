@@ -14,10 +14,10 @@ use crate::util::RawSpans;
 
 /// Collector to collect [`LocalSpan`].
 ///
-/// [`LocalCollector`] allows to collect [`LocalSpan`] manually without a local parent. The collected [`LocalSpan`] can later be
+/// `LocalCollector` allows to collect `LocalSpan` manually without a local parent. The collected `LocalSpan` can later be
 /// attached to a parent.
 ///
-/// Generally, [`Span`] and [`LocalSpan`] are sufficient. However, use [`LocalCollector`] when the span might initiate before its
+/// Generally, [`Span`] and `LocalSpan` are sufficient. However, use `LocalCollector` when the span might initiate before its
 /// parent span. This is particularly useful for tracing prior tasks that may be obstructing the current request.
 ///
 /// # Examples
@@ -41,7 +41,7 @@ use crate::util::RawSpans;
 /// [`LocalSpan`]: crate::local::LocalSpan
 #[must_use]
 pub struct LocalCollector {
-    #[cfg(feature = "report")]
+    #[cfg(feature = "enable")]
     inner: Option<LocalCollectorInner>,
 }
 
@@ -56,7 +56,7 @@ struct LocalCollectorInner {
 /// collected from a [`LocalCollector`]. These spans can then be associated with a parent span using
 /// the [`Span::push_child_spans()`] method on the parent span.
 ///
-/// Internally, it is implemented as an `Arc<LocalSpan>`, which allows it to be cloned and shared
+/// Internally, it is implemented as an `Arc<[LocalSpan]>`, which allows it to be cloned and shared
 /// across threads at a low cost.
 ///
 /// # Examples
@@ -84,7 +84,7 @@ struct LocalCollectorInner {
 /// [`LocalCollector`]: crate::local::LocalCollector
 #[derive(Debug, Clone)]
 pub struct LocalSpans {
-    #[cfg(feature = "report")]
+    #[cfg(feature = "enable")]
     pub(crate) inner: Arc<LocalSpansInner>,
 }
 
@@ -96,12 +96,12 @@ pub struct LocalSpansInner {
 
 impl LocalCollector {
     pub fn start() -> Self {
-        #[cfg(not(feature = "report"))]
+        #[cfg(not(feature = "enable"))]
         {
             LocalCollector {}
         }
 
-        #[cfg(feature = "report")]
+        #[cfg(feature = "enable")]
         {
             let stack = LOCAL_SPAN_STACK.with(Rc::clone);
             Self::new(None, stack)
@@ -109,12 +109,12 @@ impl LocalCollector {
     }
 
     pub fn collect(self) -> LocalSpans {
-        #[cfg(not(feature = "report"))]
+        #[cfg(not(feature = "enable"))]
         {
             LocalSpans {}
         }
 
-        #[cfg(feature = "report")]
+        #[cfg(feature = "enable")]
         {
             LocalSpans {
                 inner: Arc::new(self.collect_spans_and_token().0),
@@ -123,7 +123,7 @@ impl LocalCollector {
     }
 }
 
-#[cfg(feature = "report")]
+#[cfg(feature = "enable")]
 impl LocalCollector {
     pub(crate) fn new(
         collect_token: Option<CollectToken>,
@@ -169,7 +169,7 @@ impl LocalCollector {
 
 impl Drop for LocalCollector {
     fn drop(&mut self) {
-        #[cfg(feature = "report")]
+        #[cfg(feature = "enable")]
         if let Some(LocalCollectorInner {
             stack,
             span_line_handle,

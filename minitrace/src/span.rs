@@ -1,5 +1,6 @@
 // Copyright 2020 TiKV Project Authors. Licensed under Apache-2.0.
 
+use std::borrow::Cow;
 use std::cell::RefCell;
 use std::rc::Rc;
 use std::sync::Arc;
@@ -7,7 +8,6 @@ use std::sync::Arc;
 use minstant::Instant;
 
 use crate::collector::CollectTokenItem;
-use crate::collector::Collector;
 use crate::collector::GlobalCollect;
 use crate::collector::SpanContext;
 use crate::collector::SpanId;
@@ -23,7 +23,7 @@ use crate::util::CollectToken;
 /// A thread-safe span.
 #[must_use]
 pub struct Span {
-    #[cfg(feature = "report")]
+    #[cfg(feature = "enable")]
     pub(crate) inner: Option<SpanInner>,
 }
 
@@ -31,7 +31,7 @@ pub(crate) struct SpanInner {
     pub(crate) raw_span: RawSpan,
     collect_token: CollectToken,
     // If the span is not a root span, this field is `None`.
-    collector: Option<Collector>,
+    collect_id: Option<usize>,
     collect: GlobalCollect,
 }
 
@@ -48,7 +48,7 @@ impl Span {
     #[inline]
     pub fn noop() -> Self {
         Self {
-            #[cfg(feature = "report")]
+            #[cfg(feature = "enable")]
             inner: None,
         }
     }
@@ -70,44 +70,25 @@ impl Span {
         parent: SpanContext,
         #[cfg(test)] collect: GlobalCollect,
     ) -> Self {
-        #[cfg(not(feature = "report"))]
+        #[cfg(not(feature = "enable"))]
         {
             Self::noop()
         }
 
-        #[cfg(feature = "report")]
+        #[cfg(feature = "enable")]
         {
             #[cfg(not(test))]
             let collect = GlobalCollect;
-            let (collector, token) = Collector::start_collect(parent, collect.clone());
-            Self::new(token, name, Some(collector), collect)
+            let collect_id = collect.start_collect();
+            let token = CollectTokenItem {
+                trace_id: parent.trace_id,
+                parent_id: parent.span_id,
+                collect_id,
+                is_root: true,
+            }
+            .into();
+            Self::new(token, name, Some(collect_id), collect)
         }
-    }
-
-    /// Dismisses the trace, preventing the reporting of any span records associated with it.
-    ///
-    /// This is particularly useful when focusing on the tail latency of a program. For instant,
-    /// you can dismiss all traces finishes within the 99th percentile.
-    ///
-    /// # Note
-    ///
-    /// This method only dismisses the entire trace when called on the root span.
-    /// If called on a non-root span, it will only cancel the reporting of that specific span.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use minitrace::prelude::*;
-    ///
-    /// let mut root = Span::root("root", SpanContext::new(TraceId(12), SpanId::default()));
-    ///
-    /// // ..
-    ///
-    /// root.cancel();
-    #[inline]
-    pub fn cancel(&mut self) {
-        #[cfg(feature = "report")]
-        self.inner.take();
     }
 
     /// Create a new child span associated with the specified parent span.
@@ -122,12 +103,12 @@ impl Span {
     /// let child = Span::enter_with_parent("child", &root);
     #[inline]
     pub fn enter_with_parent(name: &'static str, parent: &Span) -> Self {
-        #[cfg(not(feature = "report"))]
+        #[cfg(not(feature = "enable"))]
         {
             Self::noop()
         }
 
-        #[cfg(feature = "report")]
+        #[cfg(feature = "enable")]
         {
             match &parent.inner {
                 Some(_inner) => Self::enter_with_parents(
@@ -164,12 +145,12 @@ impl Span {
         parents: impl IntoIterator<Item = &'a Span>,
         #[cfg(test)] collect: GlobalCollect,
     ) -> Self {
-        #[cfg(not(feature = "report"))]
+        #[cfg(not(feature = "enable"))]
         {
             Self::noop()
         }
 
-        #[cfg(feature = "report")]
+        #[cfg(feature = "enable")]
         {
             #[cfg(not(test))]
             let collect = GlobalCollect;
@@ -201,12 +182,12 @@ impl Span {
         name: &'static str,
         #[cfg(test)] collect: GlobalCollect,
     ) -> Self {
-        #[cfg(not(feature = "report"))]
+        #[cfg(not(feature = "enable"))]
         {
             Self::noop()
         }
 
-        #[cfg(feature = "report")]
+        #[cfg(feature = "enable")]
         {
             #[cfg(not(test))]
             let collect = GlobalCollect;
@@ -238,12 +219,12 @@ impl Span {
     /// [`LocalSpan`]: crate::local::LocalSpan
     /// [`LocalSpan::enter_with_local_parent()`]: crate::local::LocalSpan::enter_with_local_parent
     pub fn set_local_parent(&self) -> Option<impl Drop> {
-        #[cfg(not(feature = "report"))]
+        #[cfg(not(feature = "enable"))]
         {
             None::<Span>
         }
 
-        #[cfg(feature = "report")]
+        #[cfg(feature = "enable")]
         {
             LOCAL_SPAN_STACK.with(|s| self.attach_into_stack(s))
         }
@@ -259,11 +240,11 @@ impl Span {
     /// use minitrace::prelude::*;
     ///
     /// let root = Span::root("root", SpanContext::new(TraceId(12), SpanId::default()))
-    ///     .with_property(|| ("key", "value".to_string()));
+    ///     .with_property(|| ("key".into(), "value".into()));
     /// ```
     #[inline]
     pub fn with_property<F>(self, property: F) -> Self
-    where F: FnOnce() -> (&'static str, String) {
+    where F: FnOnce() -> (Cow<'static, str>, Cow<'static, str>) {
         self.with_properties(move || [property()])
     }
 
@@ -277,18 +258,18 @@ impl Span {
     /// let root = Span::root("root", SpanContext::new(TraceId(12), SpanId::default()))
     ///     .with_properties(|| {
     ///         vec![
-    ///             ("key1", "value1".to_string()),
-    ///             ("key2", "value2".to_string()),
+    ///             ("key1".into(), "value1".into()),
+    ///             ("key2".into(), "value2".into()),
     ///         ]
     ///     });
     /// ```
     #[inline]
     pub fn with_properties<I, F>(mut self, properties: F) -> Self
     where
-        I: IntoIterator<Item = (&'static str, String)>,
+        I: IntoIterator<Item = (Cow<'static, str>, Cow<'static, str>)>,
         F: FnOnce() -> I,
     {
-        #[cfg(feature = "report")]
+        #[cfg(feature = "enable")]
         if let Some(inner) = self.inner.as_mut() {
             inner.add_properties(properties);
         }
@@ -324,22 +305,50 @@ impl Span {
     /// [`LocalCollector`]: crate::local::LocalCollector
     #[inline]
     pub fn push_child_spans(&self, local_spans: LocalSpans) {
-        #[cfg(feature = "report")]
+        #[cfg(feature = "enable")]
         {
             if let Some(inner) = self.inner.as_ref() {
                 inner.push_child_spans(local_spans.inner)
             }
         }
     }
+
+    /// Dismisses the trace, preventing the reporting of any span records associated with it.
+    ///
+    /// This is particularly useful when focusing on the tail latency of a program. For instant,
+    /// you can dismiss all traces finishes within the 99th percentile.
+    ///
+    /// # Note
+    ///
+    /// This method only dismisses the entire trace when called on the root span.
+    /// If called on a non-root span, it will only cancel the reporting of that specific span.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use minitrace::prelude::*;
+    ///
+    /// let mut root = Span::root("root", SpanContext::new(TraceId(12), SpanId::default()));
+    ///
+    /// // ..
+    #[inline]
+    pub fn cancel(&mut self) {
+        #[cfg(feature = "enable")]
+        if let Some(inner) = self.inner.take() {
+            if let Some(collect_id) = inner.collect_id {
+                inner.collect.drop_collect(collect_id);
+            }
+        }
+    }
 }
 
-#[cfg(feature = "report")]
+#[cfg(feature = "enable")]
 impl Span {
     #[inline]
     fn new(
         collect_token: CollectToken,
         name: &'static str,
-        collector: Option<Collector>,
+        collect_id: Option<usize>,
         collect: GlobalCollect,
     ) -> Self {
         let span_id = SpanId::next_id();
@@ -350,7 +359,7 @@ impl Span {
             inner: Some(SpanInner {
                 raw_span,
                 collect_token,
-                collector,
+                collect_id,
                 collect,
             }),
         }
@@ -377,12 +386,12 @@ impl Span {
     }
 }
 
-#[cfg(feature = "report")]
+#[cfg(feature = "enable")]
 impl SpanInner {
     #[inline]
     fn add_properties<I, F>(&mut self, properties: F)
     where
-        I: IntoIterator<Item = (&'static str, String)>,
+        I: IntoIterator<Item = (Cow<'static, str>, Cow<'static, str>)>,
         F: FnOnce() -> I,
     {
         for prop in properties() {
@@ -439,14 +448,17 @@ impl SpanInner {
 
 impl Drop for Span {
     fn drop(&mut self) {
-        #[cfg(feature = "report")]
+        #[cfg(feature = "enable")]
         if let Some(mut inner) = self.inner.take() {
-            let collector = inner.collector.take();
+            let collect_id = inner.collect_id.take();
+            let collect = inner.collect.clone();
+
             let end_instant = Instant::now();
             inner.raw_span.end_with(end_instant);
             inner.submit_spans();
-            if let Some(collector) = collector {
-                collector.collect();
+
+            if let Some(collect_id) = collect_id {
+                collect.commit_collect(collect_id);
             }
         }
     }
@@ -454,7 +466,7 @@ impl Drop for Span {
 
 #[cfg(test)]
 mod tests {
-    use std::sync::atomic::AtomicU32;
+    use std::sync::atomic::AtomicUsize;
     use std::sync::atomic::Ordering;
     use std::sync::Mutex;
 
@@ -478,12 +490,76 @@ mod tests {
     }
 
     #[test]
+    fn collect_root() {
+        let mut mock = MockGlobalCollect::new();
+        let mut seq = Sequence::new();
+        mock.expect_start_collect()
+            .times(1)
+            .in_sequence(&mut seq)
+            .return_const(42_usize);
+        mock.expect_submit_spans()
+            .times(1)
+            .in_sequence(&mut seq)
+            .with(
+                predicate::always(),
+                predicate::eq::<CollectToken>(
+                    CollectTokenItem {
+                        trace_id: TraceId(12),
+                        parent_id: SpanId::default(),
+                        collect_id: 42,
+                        is_root: true,
+                    }
+                    .into(),
+                ),
+            )
+            .return_const(());
+        mock.expect_commit_collect()
+            .times(1)
+            .in_sequence(&mut seq)
+            .with(predicate::eq(42_usize))
+            .return_const(());
+        mock.expect_drop_collect().times(0);
+
+        let mock: Arc<MockGlobalCollect> = Arc::new(mock);
+        let _root = Span::root(
+            "root",
+            SpanContext::new(TraceId(12), SpanId::default()),
+            mock,
+        );
+    }
+
+    #[test]
+    fn cancel_root() {
+        let mut mock = MockGlobalCollect::new();
+        let mut seq = Sequence::new();
+        mock.expect_start_collect()
+            .times(1)
+            .in_sequence(&mut seq)
+            .return_const(42_usize);
+        mock.expect_drop_collect()
+            .times(1)
+            .in_sequence(&mut seq)
+            .with(predicate::eq(42_usize))
+            .return_const(());
+        mock.expect_commit_collect().times(0);
+        mock.expect_submit_spans().times(0);
+
+        let mock = Arc::new(mock);
+        let mut root = Span::root(
+            "root",
+            SpanContext::new(TraceId(12), SpanId::default()),
+            mock,
+        );
+        root.cancel();
+    }
+
+    #[test]
     fn span_with_parent() {
         let routine = |collect| {
             let parent_ctx = SpanContext::new(TraceId(12), SpanId::default());
             let root = Span::root("root", parent_ctx, collect);
             let child1 = Span::enter_with_parent("child1", &root)
-                .with_properties(|| [("k1", "v1".to_owned())]);
+                .with_properties(|| [("k1".into(), "v1".into())]);
             let grandchild = Span::enter_with_parent("grandchild", &child1);
             let child2 = Span::enter_with_parent("child2", &root);
 
@@ -504,7 +580,7 @@ mod tests {
         mock.expect_start_collect()
             .times(1)
             .in_sequence(&mut seq)
-            .return_const(42_u32);
+            .return_const(42_usize);
         mock.expect_submit_spans()
             .times(4)
             .in_sequence(&mut seq)
@@ -516,7 +592,7 @@ mod tests {
         mock.expect_commit_collect()
             .times(1)
             .in_sequence(&mut seq)
-            .with(predicate::eq(42_u32))
+            .with(predicate::eq(42_usize))
             .return_const(());
         mock.expect_drop_collect().times(0);
 
@@ -549,7 +625,7 @@ root []
                 [&parent1, &parent2, &parent3, &parent4, &parent5, &child1],
                 collect,
             )
-            .with_property(|| ("k1", "v1".to_owned()));
+            .with_property(|| ("k1".into(), "v1".into()));
 
             crossbeam::scope(move |scope| {
                 let mut rng = thread_rng();
@@ -578,7 +654,7 @@ root []
             .times(5)
             .in_sequence(&mut seq)
             .returning({
-                let id = Arc::new(AtomicU32::new(1));
+                let id = Arc::new(AtomicUsize::new(1));
                 move || id.fetch_add(1, Ordering::SeqCst)
             });
         mock.expect_submit_spans()
@@ -590,7 +666,7 @@ root []
             });
         mock.expect_commit_collect()
             .times(5)
-            .with(predicate::in_iter([1_u32, 2, 3, 4, 5]))
+            .with(predicate::in_iter([1_usize, 2, 3, 4, 5]))
             .return_const(());
         mock.expect_drop_collect().times(0);
 
@@ -663,7 +739,7 @@ parent5 []
             .times(5)
             .in_sequence(&mut seq)
             .returning({
-                let id = Arc::new(AtomicU32::new(1));
+                let id = Arc::new(AtomicUsize::new(1));
                 move || id.fetch_add(1, Ordering::SeqCst)
             });
         mock.expect_submit_spans()
@@ -675,7 +751,7 @@ parent5 []
             });
         mock.expect_commit_collect()
             .times(5)
-            .with(predicate::in_iter([1_u32, 2, 3, 4, 5]))
+            .with(predicate::in_iter([1_usize, 2, 3, 4, 5]))
             .return_const(());
         mock.expect_drop_collect().times(0);
 
@@ -732,7 +808,7 @@ parent5 []
         mock.expect_start_collect()
             .times(1)
             .in_sequence(&mut seq)
-            .return_const(42_u32);
+            .return_const(42_usize);
         mock.expect_submit_spans()
             .times(4)
             .in_sequence(&mut seq)
@@ -744,7 +820,7 @@ parent5 []
         mock.expect_commit_collect()
             .times(1)
             .in_sequence(&mut seq)
-            .with(predicate::eq(42_u32))
+            .with(predicate::eq(42_usize))
             .return_const(());
         mock.expect_drop_collect().times(0);
 

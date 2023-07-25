@@ -9,11 +9,12 @@ homepage = "https://github.com/tikv/minitrace-rust"
 repository = "https://github.com/tikv/minitrace-rust"
 documentation = "https://docs.rs/minitrace-jaeger"
 readme = "README.md"
+categories = ["development-tools::debugging"]
 keywords = ["tracing", "span", "datadog", "jaeger", "opentelemetry"]
 
 [dependencies]
 log = "0.4"
-minitrace = { version = "0.4.1", path = "../minitrace", features = ["report"] }
+minitrace = { path = "../minitrace" }
 thrift_codec = "0.2"
 tokio = { version = "1", features = ["net"] }
 

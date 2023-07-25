@@ -40,13 +40,13 @@ async fn main() {
     minitrace::set_reporter(ReportAll::new(), Config::default());
 
     {
-        let parent = SpanContext::new(TraceId(rand::random()), SpanId::default());
+        let parent = SpanContext::new(TraceId::random(), SpanId::default());
         let span = Span::root("root", parent);
 
         let f = async {
             let jhs = {
                 let _span = LocalSpan::enter_with_local_parent("a span")
-                    .with_property(|| ("a property", "a value".to_owned()));
+                    .with_property(|| ("a property".into(), "a value".into()));
                 parallel_job()
             };
 

@@ -1,5 +1,7 @@
 // Copyright 2021 TiKV Project Authors. Licensed under Apache-2.0.
 
+use std::borrow::Cow;
+
 use minstant::Instant;
 
 use crate::collector::SpanId;
@@ -10,7 +12,7 @@ pub struct RawSpan {
     pub parent_id: SpanId,
     pub begin_instant: Instant,
     pub name: &'static str,
-    pub properties: Vec<(&'static str, String)>,
+    pub properties: Vec<(Cow<'static, str>, Cow<'static, str>)>,
     pub is_event: bool,
 
     // Will write this field at post processing

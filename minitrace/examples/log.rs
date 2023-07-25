@@ -3,15 +3,12 @@
 use std::io::Write;
 
 use log::info;
-use log_derive::logfn;
-use log_derive::logfn_inputs;
 use minitrace::collector::Config;
 use minitrace::collector::ConsoleReporter;
 use minitrace::prelude::*;
 use minitrace::Event;
 
-#[logfn_inputs(DEBUG)]
-#[logfn(ok = "DEBUG", err = "ERROR")]
+#[logcall::logcall("debug")]
 #[trace]
 fn plus(a: u64, b: u64) -> Result<u64, std::io::Error> {
     Ok(a + b)
@@ -23,7 +20,7 @@ fn main() {
         .format(|buf, record| {
             // Add a event to the current local span representing the log record
             Event::add_to_local_parent(record.level().as_str(), || {
-                [("message", record.args().to_string())]
+                [("message".into(), record.args().to_string().into())]
             });
 
             // Output the log to stdout as usual
@@ -33,7 +30,7 @@ fn main() {
         .init();
 
     {
-        let parent = SpanContext::new(TraceId(rand::random()), SpanId::default());
+        let parent = SpanContext::new(TraceId::random(), SpanId::default());
         let root = Span::root("root", parent);
         let _span_guard = root.set_local_parent();
 

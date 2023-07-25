@@ -25,12 +25,12 @@ async fn main() {
     minitrace::set_reporter(ReportAll::new(), Config::default());
 
     {
-        let parent = SpanContext::new(TraceId(rand::random()), SpanId::default());
+        let parent = SpanContext::new(TraceId::random(), SpanId::default());
         let root = Span::root("root", parent);
 
         let _g = root.set_local_parent();
         let _span = LocalSpan::enter_with_local_parent("a span")
-            .with_property(|| ("a property", "a value".to_owned()));
+            .with_property(|| ("a property".into(), "a value".into()));
 
         for i in 1..=10 {
             func1(i);

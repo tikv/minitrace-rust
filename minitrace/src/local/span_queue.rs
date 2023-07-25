@@ -1,5 +1,7 @@
 // Copyright 2020 TiKV Project Authors. Licensed under Apache-2.0.
 
+use std::borrow::Cow;
+
 use minstant::Instant;
 
 use crate::collector::SpanId;
@@ -63,7 +65,7 @@ impl SpanQueue {
     #[inline]
     pub fn add_event<I, F>(&mut self, name: &'static str, properties: F)
     where
-        I: IntoIterator<Item = (&'static str, String)>,
+        I: IntoIterator<Item = (Cow<'static, str>, Cow<'static, str>)>,
         F: FnOnce() -> I,
     {
         if self.span_queue.len() >= self.capacity {
@@ -83,7 +85,7 @@ impl SpanQueue {
     }
 
     #[inline]
-    pub fn add_properties<I: IntoIterator<Item = (&'static str, String)>>(
+    pub fn add_properties<I: IntoIterator<Item = (Cow<'static, str>, Cow<'static, str>)>>(
         &mut self,
         span_handle: &SpanHandle,
         properties: I,
@@ -145,10 +147,13 @@ span1 []
         let mut queue = SpanQueue::with_capacity(16);
         {
             let span1 = queue.start_span("span1").unwrap();
-            queue.add_properties(&span1, [("k1", "v1".to_owned()), ("k2", "v2".to_owned())]);
+            queue.add_properties(&span1, [
+                ("k1".into(), "v1".into()),
+                ("k2".into(), "v2".into()),
+            ]);
             {
                 let span2 = queue.start_span("span2").unwrap();
-                queue.add_properties(&span2, [("k1", "v1".to_owned())]);
+                queue.add_properties(&span2, [("k1".into(), "v1".into())]);
                 queue.finish_span(span2);
             }
             queue.finish_span(span1);

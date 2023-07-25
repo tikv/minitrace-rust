@@ -101,6 +101,16 @@ where T: std::fmt::Debug
     }
 }
 
+impl<'a, T> std::cmp::PartialEq for Reusable<'a, T>
+where T: std::cmp::PartialEq
+{
+    fn eq(&self, other: &Self) -> bool {
+        T::eq(self, other)
+    }
+}
+
+impl<'a, T> std::cmp::Eq for Reusable<'a, T> where T: std::cmp::Eq {}
+
 impl<'a, T> Deref for Reusable<'a, T> {
     type Target = T;
 

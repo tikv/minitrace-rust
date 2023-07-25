@@ -9,6 +9,7 @@ homepage = "https://github.com/tikv/minitrace-rust"
 repository = "https://github.com/tikv/minitrace-rust"
 documentation = "https://docs.rs/minitrace-macro"
 readme = "README.md"
+categories = ["development-tools::debugging"]
 keywords = ["tracing", "span", "datadog", "jaeger", "opentelemetry"]
 
 [lib]
@@ -22,6 +23,10 @@ quote = "1"
 syn = { version = "1.0.84", features = ["full", "parsing", "extra-traits", "proc-macro", "visit-mut"] }
 
 [dev-dependencies]
-minitrace = { version = "0.4.1", path = "../minitrace" }
+logcall = "0.1.4"
+minitrace = { path = "../minitrace" }
 tokio = { version = "1", features = ["full"] }
 trybuild = "1"
+# The procedural macro `trace` only supports async-trait higher than 0.1.52
+async-trait = "0.1.52"
+log = "0.4"

@@ -1,7 +1,7 @@
 // Copyright 2021 TiKV Project Authors. Licensed under Apache-2.0.
 
 use std::collections::HashMap;
-use std::sync::atomic::AtomicU32;
+use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
 use std::time::Duration;
@@ -30,7 +30,7 @@ use crate::util::CollectToken;
 
 const COLLECT_LOOP_INTERVAL: Duration = Duration::from_millis(50);
 
-static NEXT_COLLECT_ID: AtomicU32 = AtomicU32::new(0);
+static NEXT_COLLECT_ID: AtomicUsize = AtomicUsize::new(0);
 static GLOBAL_COLLECTOR: Lazy<Mutex<GlobalCollector>> =
     Lazy::new(|| Mutex::new(GlobalCollector::start()));
 static SPSC_RXS: Lazy<Mutex<Vec<Receiver<CollectCommand>>>> = Lazy::new(|| Mutex::new(Vec::new()));
@@ -66,23 +66,29 @@ fn force_send_command(cmd: CollectCommand) {
 /// minitrace::set_reporter(ConsoleReporter, Config::default());
 /// ```
 pub fn set_reporter(reporter: impl Reporter, config: Config) {
-    let mut global_collector = GLOBAL_COLLECTOR.lock();
-    global_collector.config = config;
-    global_collector.reporter = Some(Box::new(reporter));
+    #[cfg(feature = "enable")]
+    {
+        let mut global_collector = GLOBAL_COLLECTOR.lock();
+        global_collector.config = config;
+        global_collector.reporter = Some(Box::new(reporter));
+    }
 }
 
 /// Flushes all pending span records to the reporter immediately.
 pub fn flush() {
-    // Spawns a new thread to ensure the reporter operates outside the tokio runtime to prevent panic.
-    std::thread::Builder::new()
-        .name("minitrace-flush".to_string())
-        .spawn(move || {
-            let mut global_collector = GLOBAL_COLLECTOR.lock();
-            global_collector.handle_commands(true);
-        })
-        .unwrap()
-        .join()
-        .unwrap();
+    #[cfg(feature = "enable")]
+    {
+        // Spawns a new thread to ensure the reporter operates outside the tokio runtime to prevent panic.
+        std::thread::Builder::new()
+            .name("minitrace-flush".to_string())
+            .spawn(move || {
+                let mut global_collector = GLOBAL_COLLECTOR.lock();
+                global_collector.handle_commands(true);
+            })
+            .unwrap()
+            .join()
+            .unwrap();
+    }
 }
 
 /// A trait defining the behavior of a reporter. A reporter is responsible for
@@ -98,17 +104,17 @@ pub(crate) struct GlobalCollect;
 
 #[cfg_attr(test, mockall::automock)]
 impl GlobalCollect {
-    pub fn start_collect(&self) -> u32 {
+    pub fn start_collect(&self) -> usize {
         let collect_id = NEXT_COLLECT_ID.fetch_add(1, Ordering::Relaxed);
         send_command(CollectCommand::StartCollect(StartCollect { collect_id }));
         collect_id
     }
 
-    pub fn commit_collect(&self, collect_id: u32) {
+    pub fn commit_collect(&self, collect_id: usize) {
         force_send_command(CollectCommand::CommitCollect(CommitCollect { collect_id }));
     }
 
-    pub fn drop_collect(&self, collect_id: u32) {
+    pub fn drop_collect(&self, collect_id: usize) {
         force_send_command(CollectCommand::DropCollect(DropCollect { collect_id }));
     }
 
@@ -163,7 +169,7 @@ pub(crate) struct GlobalCollector {
     config: Config,
     reporter: Option<Box<dyn Reporter>>,
 
-    active_collectors: HashMap<u32, (Vec<SpanCollection>, usize)>,
+    active_collectors: HashMap<usize, (Vec<SpanCollection>, usize)>,
     committed_records: Vec<SpanRecord>,
     last_report: std::time::Instant,
 
@@ -178,10 +184,10 @@ pub(crate) struct GlobalCollector {
 impl GlobalCollector {
     #[allow(unreachable_code)]
     fn start() -> Self {
-        #[cfg(not(feature = "report"))]
+        #[cfg(not(feature = "enable"))]
         {
             unreachable!(
-                "Global collector should not be invoked because feature \"report\" is not enabled."
+                "Global collector should not be invoked because feature \"enable\" is not set."
             )
         }
 
@@ -491,8 +497,6 @@ fn mount_events(
             }
         }
     }
-
-    debug_assert!(dangling_events.is_empty());
 }
 
 impl SpanSet {

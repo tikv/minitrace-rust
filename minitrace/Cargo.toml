@@ -9,10 +9,11 @@ homepage = "https://github.com/tikv/minitrace-rust"
 repository = "https://github.com/tikv/minitrace-rust"
 documentation = "https://docs.rs/minitrace"
 readme = "../README.md"
+categories = ["development-tools::debugging"]
 keywords = ["tracing", "span", "datadog", "jaeger", "opentelemetry"]
 
 [features]
-report = []
+enable = []
 
 [dependencies]
 defer = "0.1"
@@ -34,16 +35,19 @@ env_logger = "0.10"
 futures = "0.3"
 futures-timer = "3"
 log = "0.4"
-log-derive = "0.4"
+logcall = "0.1.4"
+minitrace = { path = ".", features = ["enable"] }
 minitrace-datadog = { version = "0.4.1", path = "../minitrace-datadog" }
 minitrace-jaeger = { version = "0.4.1", path = "../minitrace-jaeger" }
 minitrace-opentelemetry = { version = "0.4.1", path = "../minitrace-opentelemetry" }
 mockall = "0.11"
+once_cell = "1"
 opentelemetry = { version = "0.19", features = ["trace"] }
 opentelemetry-otlp = { version = "0.12", features = ["trace"] }
 rand = "0.8"
 rustracing = "0.6"
 serial_test = "2"
+test-harness = "0.1.1"
 tokio = { version = "1", features = ["rt", "time", "macros"] }
 tracing = "0.1"
 tracing-core = "0.1"

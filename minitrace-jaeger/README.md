@@ -17,7 +17,7 @@ minitrace-jaeger = "0.4"
 ## Setup Jaeger Agent
 
 ```sh
-docker run --rm -d -p6831:6831/udp -p16686:16686 --name jaeger jaegertracing/all-in-one:latest
+docker run --rm -d -p6831:6831/udp -p14268:14268 -p16686:16686 --name jaeger jaegertracing/all-in-one:latest
 
 cargo run --example synchronous
 ```
