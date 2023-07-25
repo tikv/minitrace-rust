@@ -15,7 +15,7 @@ jobs:
     strategy:
       matrix:
         os: [windows-latest, macos-latest, ubuntu-latest]
-        rust: [stable, nightly-2023-07-21]
+        rust: [stable, nightly]
     env:
       RUST_BACKTRACE: 1
     steps:
@@ -27,10 +27,10 @@ jobs:
         override: true
         components: rustfmt, clippy
     - name: Check format
-      if: matrix.rust == 'nightly-2023-07-21'
+      if: matrix.rust == 'nightly'
       run: cargo fmt --all -- --check
     - name: Lints
-      if: matrix.rust == 'nightly-2023-07-21'
+      if: matrix.rust == 'nightly'
       run: cargo clippy --all-targets --all-features -- --deny warnings
     - name: Build
       run: cargo build --workspace --all-targets
