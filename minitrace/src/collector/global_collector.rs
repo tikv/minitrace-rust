@@ -1,6 +1,7 @@
 // Copyright 2021 TiKV Project Authors. Licensed under Apache-2.0.
 
 use std::collections::HashMap;
+use std::sync::atomic::AtomicBool;
 use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
@@ -34,6 +35,7 @@ static NEXT_COLLECT_ID: AtomicUsize = AtomicUsize::new(0);
 static GLOBAL_COLLECTOR: Lazy<Mutex<GlobalCollector>> =
     Lazy::new(|| Mutex::new(GlobalCollector::start()));
 static SPSC_RXS: Lazy<Mutex<Vec<Receiver<CollectCommand>>>> = Lazy::new(|| Mutex::new(Vec::new()));
+static REPORTER_READY: AtomicBool = AtomicBool::new(false);
 
 thread_local! {
     static COMMAND_SENDER: Sender<CollectCommand> = {
@@ -71,7 +73,12 @@ pub fn set_reporter(reporter: impl Reporter, config: Config) {
         let mut global_collector = GLOBAL_COLLECTOR.lock();
         global_collector.config = config;
         global_collector.reporter = Some(Box::new(reporter));
+        REPORTER_READY.store(true, Ordering::Relaxed);
     }
+}
+
+pub(crate) fn reporter_ready() -> bool {
+    REPORTER_READY.load(Ordering::Relaxed)
 }
 
 /// Flushes all pending span records to the reporter immediately.

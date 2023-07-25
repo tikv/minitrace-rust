@@ -7,6 +7,7 @@ use std::sync::Arc;
 
 use minstant::Instant;
 
+use crate::collector::global_collector::reporter_ready;
 use crate::collector::CollectTokenItem;
 use crate::collector::GlobalCollect;
 use crate::collector::SpanContext;
@@ -77,6 +78,10 @@ impl Span {
 
         #[cfg(feature = "enable")]
         {
+            if !reporter_ready() {
+                return Self::noop();
+            }
+
             #[cfg(not(test))]
             let collect = GlobalCollect;
             let collect_id = collect.start_collect();
@@ -476,6 +481,7 @@ mod tests {
     use rand::thread_rng;
 
     use super::*;
+    use crate::collector::ConsoleReporter;
     use crate::collector::MockGlobalCollect;
     use crate::local::LocalSpan;
     use crate::prelude::TraceId;
@@ -490,7 +496,9 @@ mod tests {
     }
 
     #[test]
-    fn collect_root() {
+    fn root_collect() {
+        crate::set_reporter(ConsoleReporter, crate::collector::Config::default());
+
         let mut mock = MockGlobalCollect::new();
         let mut seq = Sequence::new();
         mock.expect_start_collect()
@@ -529,7 +537,9 @@ mod tests {
     }
 
     #[test]
-    fn cancel_root() {
+    fn root_cancel() {
+        crate::set_reporter(ConsoleReporter, crate::collector::Config::default());
+
         let mut mock = MockGlobalCollect::new();
         let mut seq = Sequence::new();
         mock.expect_start_collect()
@@ -555,6 +565,8 @@ mod tests {
 
     #[test]
     fn span_with_parent() {
+        crate::set_reporter(ConsoleReporter, crate::collector::Config::default());
+
         let routine = |collect| {
             let parent_ctx = SpanContext::new(TraceId(12), SpanId::default());
             let root = Span::root("root", parent_ctx, collect);
@@ -612,6 +624,8 @@ root []
 
     #[test]
     fn span_with_parents() {
+        crate::set_reporter(ConsoleReporter, crate::collector::Config::default());
+
         let routine = |collect: GlobalCollect| {
             let parent_ctx = SpanContext::new(TraceId(12), SpanId::default());
             let parent1 = Span::root("parent1", parent_ctx, collect.clone());
@@ -702,6 +716,8 @@ parent5 []
 
     #[test]
     fn span_push_child_spans() {
+        crate::set_reporter(ConsoleReporter, crate::collector::Config::default());
+
         let routine = |collect: GlobalCollect| {
             let parent_ctx = SpanContext::new(TraceId(12), SpanId::default());
             let parent1 = Span::root("parent1", parent_ctx, collect.clone());
@@ -785,6 +801,8 @@ parent5 []
 
     #[test]
     fn span_communicate_via_stack() {
+        crate::set_reporter(ConsoleReporter, crate::collector::Config::default());
+
         let routine = |collect: GlobalCollect| {
             let stack = Rc::new(RefCell::new(LocalSpanStack::with_capacity(16)));
 
