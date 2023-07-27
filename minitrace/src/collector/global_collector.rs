@@ -419,7 +419,7 @@ fn amend_local_span(
     anchor: &Anchor,
 ) {
     for span in local_spans.spans.iter() {
-        let begin_unix_time_ns = span.begin_instant.as_unix_nanos(anchor);
+        let begin_time_unix_ns = span.begin_instant.as_unix_nanos(anchor);
         let parent_id = if span.parent_id == SpanId::default() {
             parent_id
         } else {
@@ -429,7 +429,7 @@ fn amend_local_span(
         if span.is_event {
             let event = EventRecord {
                 name: span.name,
-                timestamp_unix_ns: begin_unix_time_ns,
+                timestamp_unix_ns: begin_time_unix_ns,
                 properties: span.properties.clone(),
             };
             events.entry(parent_id).or_insert(vec![]).push(event);
@@ -445,8 +445,8 @@ fn amend_local_span(
             trace_id,
             span_id: span.id,
             parent_id,
-            begin_unix_time_ns,
-            duration_ns: end_unix_time_ns.saturating_sub(begin_unix_time_ns),
+            begin_time_unix_ns,
+            duration_ns: end_unix_time_ns.saturating_sub(begin_time_unix_ns),
             name: span.name,
             properties: span.properties.clone(),
             events: vec![],
@@ -462,12 +462,12 @@ fn amend_span(
     events: &mut HashMap<SpanId, Vec<EventRecord>>,
     anchor: &Anchor,
 ) {
-    let begin_unix_time_ns = raw_span.begin_instant.as_unix_nanos(anchor);
+    let begin_time_unix_ns = raw_span.begin_instant.as_unix_nanos(anchor);
 
     if raw_span.is_event {
         let event = EventRecord {
             name: raw_span.name,
-            timestamp_unix_ns: begin_unix_time_ns,
+            timestamp_unix_ns: begin_time_unix_ns,
             properties: raw_span.properties.clone(),
         };
         events.entry(parent_id).or_insert(vec![]).push(event);
@@ -479,8 +479,8 @@ fn amend_span(
         trace_id,
         span_id: raw_span.id,
         parent_id,
-        begin_unix_time_ns,
-        duration_ns: end_unix_time_ns.saturating_sub(begin_unix_time_ns),
+        begin_time_unix_ns,
+        duration_ns: end_unix_time_ns.saturating_sub(begin_time_unix_ns),
         name: raw_span.name,
         properties: raw_span.properties.clone(),
         events: vec![],

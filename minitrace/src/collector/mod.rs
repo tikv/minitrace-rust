@@ -48,7 +48,7 @@ pub struct SpanRecord {
     pub trace_id: TraceId,
     pub span_id: SpanId,
     pub parent_id: SpanId,
-    pub begin_unix_time_ns: u64,
+    pub begin_time_unix_ns: u64,
     pub duration_ns: u64,
     pub name: &'static str,
     pub properties: Vec<(Cow<'static, str>, Cow<'static, str>)>,

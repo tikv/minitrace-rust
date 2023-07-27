@@ -41,7 +41,7 @@ impl DatadogReporter {
                 service: &self.service_name,
                 trace_type: &self.trace_type,
                 resource: &self.resource,
-                start: s.begin_unix_time_ns as i64,
+                start: s.begin_time_unix_ns as i64,
                 duration: s.duration_ns as i64,
                 meta: if s.properties.is_empty() {
                     None
