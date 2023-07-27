@@ -47,10 +47,7 @@
 //! # struct Error;
 //!
 //! pub fn send_request(req: HttpRequest) -> Result<(), Error> {
-//!     let root = Span::root(
-//!         "send_request",
-//!         SpanContext::new(TraceId::random(), SpanId::default()),
-//!     );
+//!     let root = Span::root("send_request", SpanContext::random());
 //!     let _guard = root.set_local_parent();
 //!
 //!     // ...
@@ -115,10 +112,7 @@
 //! minitrace::set_reporter(ConsoleReporter, Config::default());
 //!
 //! {
-//!     let root = Span::root(
-//!         "root",
-//!         SpanContext::new(TraceId::random(), SpanId::default()),
-//!     );
+//!     let root = Span::root("root", SpanContext::random());
 //!     {
 //!         let _child_span = Span::enter_with_parent("a child span", &root);
 //!
@@ -147,10 +141,7 @@
 //! minitrace::set_reporter(ConsoleReporter, Config::default());
 //!
 //! {
-//!     let root = Span::root(
-//!         "root",
-//!         SpanContext::new(TraceId::random(), SpanId::default()),
-//!     );
+//!     let root = Span::root("root", SpanContext::random());
 //!     {
 //!         let _guard = root.set_local_parent();
 //!
@@ -182,10 +173,7 @@
 //! minitrace::set_reporter(ConsoleReporter, Config::default());
 //!
 //! {
-//!     let root = Span::root(
-//!         "root",
-//!         SpanContext::new(TraceId::random(), SpanId::default()),
-//!     );
+//!     let root = Span::root("root", SpanContext::random());
 //!
 //!     Event::add_to_parent("event in root", &root, || []);
 //!
@@ -225,10 +213,7 @@
 //! minitrace::set_reporter(ConsoleReporter, Config::default());
 //!
 //! {
-//!     let root = Span::root(
-//!         "root",
-//!         SpanContext::new(TraceId::random(), SpanId::default()),
-//!     );
+//!     let root = Span::root("root", SpanContext::random());
 //!     let _g = root.set_local_parent();
 //!
 //!     do_something(100);

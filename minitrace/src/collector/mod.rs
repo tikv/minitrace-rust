@@ -99,6 +99,22 @@ impl SpanContext {
         Self { trace_id, span_id }
     }
 
+    /// Create a new `SpanContext` trace id with a random trace id.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use minitrace::prelude::*;
+    ///
+    /// let root = Span::root("root", SpanContext::random());
+    /// ```
+    pub fn random() -> Self {
+        Self {
+            trace_id: TraceId(rand::random()),
+            span_id: SpanId::default(),
+        }
+    }
+
     /// Creates a `SpanContext` from the given [`Span`]. If the `Span` is a noop span,
     /// this function will return `None`.
     ///

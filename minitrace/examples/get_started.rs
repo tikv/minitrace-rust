@@ -8,7 +8,7 @@ fn main() {
     minitrace::set_reporter(ConsoleReporter, Config::default());
 
     {
-        let parent = SpanContext::new(TraceId::random(), SpanId::default());
+        let parent = SpanContext::random();
         let root = Span::root("root", parent);
         let _g = root.set_local_parent();
         let _g = LocalSpan::enter_with_local_parent("child");
