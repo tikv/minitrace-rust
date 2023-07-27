@@ -1,5 +1,7 @@
 # Changelog
 
+## Unreleased
+
 ## v0.5.0
 
 - Add `Event` type to represent single points in time during the span's lifetime.
