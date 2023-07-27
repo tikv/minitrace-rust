@@ -10,8 +10,8 @@
 
 ```toml
 [dependencies]
-minitrace = "0.4"
-minitrace-opentelemetry = "0.4"
+minitrace = "0.5"
+minitrace-opentelemetry = "0.5"
 ```
 
 ## Setup OpenTelemetry Collector

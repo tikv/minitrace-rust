@@ -10,8 +10,8 @@
 
 ```toml
 [dependencies]
-minitrace = "0.4"
-minitrace-jaeger = "0.4"
+minitrace = "0.5"
+minitrace-jaeger = "0.5"
 ```
 
 ## Setup Jaeger Agent

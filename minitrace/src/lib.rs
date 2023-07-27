@@ -16,7 +16,7 @@
 //!
 //! ```toml
 //! [dependencies]
-//! minitrace = "0.4"
+//! minitrace = "0.5"
 //! ```
 //!
 //! Libraries can attach their spans to the caller's span (if available) via the API boundary.
@@ -62,7 +62,7 @@
 //!
 //! ```toml
 //! [dependencies]
-//! minitrace = { version = "0.4", features = ["enable"] }
+//! minitrace = { version = "0.5", features = ["enable"] }
 //! ```
 //!
 //! Executables should initialize a reporter implementation early in the program's runtime.
