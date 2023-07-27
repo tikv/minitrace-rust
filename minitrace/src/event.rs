@@ -17,7 +17,7 @@ impl Event {
     /// ```
     /// use minitrace::prelude::*;
     ///
-    /// let root = Span::root("root", SpanContext::new(TraceId(12), SpanId::default()));
+    /// let root = Span::root("root", SpanContext::random());
     ///
     /// Event::add_to_parent("event in root", &root, || [("key".into(), "value".into())]);
     /// ```
@@ -43,7 +43,7 @@ impl Event {
     /// ```
     /// use minitrace::prelude::*;
     ///
-    /// let root = Span::root("root", SpanContext::new(TraceId(12), SpanId::default()));
+    /// let root = Span::root("root", SpanContext::random());
     /// let _guard = root.set_local_parent();
     ///
     /// Event::add_to_local_parent("event in root", || [("key".into(), "value".into())]);

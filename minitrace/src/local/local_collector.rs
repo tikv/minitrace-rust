@@ -33,7 +33,7 @@ use crate::util::RawSpans;
 /// let local_spans = collector.collect();
 ///
 /// // Attach the local spans to a parent
-/// let root = Span::root("root", SpanContext::new(TraceId(12), SpanId::default()));
+/// let root = Span::root("root", SpanContext::random());
 /// root.push_child_spans(local_spans);
 /// ```
 ///
@@ -75,7 +75,7 @@ struct LocalCollectorInner {
 /// let local_spans: LocalSpans = collector.collect();
 ///
 /// // Attach the local spans to a parent
-/// let root = Span::root("root", SpanContext::new(TraceId(12), SpanId::default()));
+/// let root = Span::root("root", SpanContext::random());
 /// root.push_child_spans(local_spans);
 /// ```
 ///

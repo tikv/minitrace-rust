@@ -123,7 +123,7 @@ impl SpanContext {
     /// ```
     /// use minitrace::prelude::*;
     ///
-    /// let span = Span::root("root", SpanContext::new(TraceId(12), SpanId::default()));
+    /// let span = Span::root("root", SpanContext::random());
     /// let context = SpanContext::from_span(&span);
     /// ```
     ///
@@ -154,7 +154,7 @@ impl SpanContext {
     /// ```
     /// use minitrace::prelude::*;
     ///
-    /// let span = Span::root("root", SpanContext::new(TraceId(12), SpanId::default()));
+    /// let span = Span::root("root", SpanContext::random());
     /// let _guard = span.set_local_parent();
     ///
     /// let context = SpanContext::current_local_parent();

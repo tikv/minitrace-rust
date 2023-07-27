@@ -41,7 +41,7 @@ minitrace::set_reporter(reporter, Config::default());
 
 {
     // Start tracing
-    let root = Span::root("root", SpanContext::new(TraceId(42), SpanId::default()));
+    let root = Span::root("root", SpanContext::random());
 }
 
 minitrace::flush();

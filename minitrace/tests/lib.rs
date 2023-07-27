@@ -40,7 +40,7 @@ fn single_thread_single_span() {
     minitrace::set_reporter(reporter, Config::default());
 
     {
-        let root = Span::root("root", SpanContext::new(TraceId(12), SpanId::default()));
+        let root = Span::root("root", SpanContext::random());
         let _g = root.set_local_parent();
 
         four_spans();
@@ -148,7 +148,7 @@ fn multiple_threads_single_span() {
     minitrace::set_reporter(reporter, Config::default());
 
     crossbeam::scope(|scope| {
-        let root = Span::root("root", SpanContext::new(TraceId(12), SpanId::default()));
+        let root = Span::root("root", SpanContext::random());
         let _g = root.set_local_parent();
 
         for _ in 0..4 {
@@ -423,7 +423,7 @@ fn test_macro() {
     minitrace::set_reporter(reporter, Config::default());
 
     {
-        let root = Span::root("root", SpanContext::new(TraceId(12), SpanId::default()));
+        let root = Span::root("root", SpanContext::random());
 
         let runtime = Builder::new_multi_thread()
             .worker_threads(4)
@@ -490,7 +490,7 @@ fn macro_example() {
     minitrace::set_reporter(reporter, Config::default());
 
     {
-        let root = Span::root("root", SpanContext::new(TraceId(12), SpanId::default()));
+        let root = Span::root("root", SpanContext::random());
         let _g = root.set_local_parent();
         do_something(100);
         block_on(do_something_async(100));
@@ -516,7 +516,7 @@ fn multiple_local_parent() {
     minitrace::set_reporter(reporter, Config::default());
 
     {
-        let root = Span::root("root", SpanContext::new(TraceId(12), SpanId::default()));
+        let root = Span::root("root", SpanContext::random());
         let _g = root.set_local_parent();
         let _g = LocalSpan::enter_with_local_parent("span1");
         let span2 = Span::enter_with_local_parent("span2");
@@ -555,7 +555,7 @@ fn early_local_collect() {
         drop(_g2);
         let local_spans = local_collector.collect();
 
-        let root = Span::root("root", SpanContext::new(TraceId(12), SpanId::default()));
+        let root = Span::root("root", SpanContext::random());
         root.push_child_spans(local_spans);
     }
 
@@ -586,7 +586,7 @@ fn max_spans_per_trace() {
     minitrace::set_reporter(reporter, Config::default().max_spans_per_trace(Some(5)));
 
     {
-        let root = Span::root("root", SpanContext::new(TraceId(12), SpanId::default()));
+        let root = Span::root("root", SpanContext::random());
 
         {
             let _g = root.set_local_parent();

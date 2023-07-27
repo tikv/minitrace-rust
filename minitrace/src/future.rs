@@ -11,7 +11,7 @@
 //! ```
 //! use minitrace::prelude::*;
 //!
-//! let root = Span::root("root", SpanContext::new(TraceId(12), SpanId::default()));
+//! let root = Span::root("root", SpanContext::random());
 //!
 //! // Instrument the a task
 //! let task = async {
@@ -52,7 +52,7 @@ pub trait FutureExt: std::future::Future + Sized {
     /// # async fn main() {
     /// use minitrace::prelude::*;
     ///
-    /// let root = Span::root("Root", SpanContext::new(TraceId(12), SpanId::default()));
+    /// let root = Span::root("Root", SpanContext::random());
     /// let task = async {
     ///     // ...
     /// }
@@ -82,7 +82,7 @@ pub trait FutureExt: std::future::Future + Sized {
     /// # async fn main() {
     /// use minitrace::prelude::*;
     ///
-    /// let root = Span::root("Root", SpanContext::new(TraceId(12), SpanId::default()));
+    /// let root = Span::root("Root", SpanContext::random());
     /// let task = async {
     ///     async {
     ///         // ...
