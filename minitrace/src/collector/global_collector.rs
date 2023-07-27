@@ -1,6 +1,7 @@
 // Copyright 2021 TiKV Project Authors. Licensed under Apache-2.0.
 
 use std::collections::HashMap;
+use std::sync::atomic::AtomicBool;
 use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
@@ -34,6 +35,7 @@ static NEXT_COLLECT_ID: AtomicUsize = AtomicUsize::new(0);
 static GLOBAL_COLLECTOR: Lazy<Mutex<GlobalCollector>> =
     Lazy::new(|| Mutex::new(GlobalCollector::start()));
 static SPSC_RXS: Lazy<Mutex<Vec<Receiver<CollectCommand>>>> = Lazy::new(|| Mutex::new(Vec::new()));
+static REPORTER_READY: AtomicBool = AtomicBool::new(false);
 
 thread_local! {
     static COMMAND_SENDER: Sender<CollectCommand> = {
@@ -71,7 +73,12 @@ pub fn set_reporter(reporter: impl Reporter, config: Config) {
         let mut global_collector = GLOBAL_COLLECTOR.lock();
         global_collector.config = config;
         global_collector.reporter = Some(Box::new(reporter));
+        REPORTER_READY.store(true, Ordering::Relaxed);
     }
+}
+
+pub(crate) fn reporter_ready() -> bool {
+    REPORTER_READY.load(Ordering::Relaxed)
 }
 
 /// Flushes all pending span records to the reporter immediately.
@@ -412,7 +419,7 @@ fn amend_local_span(
     anchor: &Anchor,
 ) {
     for span in local_spans.spans.iter() {
-        let begin_unix_time_ns = span.begin_instant.as_unix_nanos(anchor);
+        let begin_time_unix_ns = span.begin_instant.as_unix_nanos(anchor);
         let parent_id = if span.parent_id == SpanId::default() {
             parent_id
         } else {
@@ -422,7 +429,7 @@ fn amend_local_span(
         if span.is_event {
             let event = EventRecord {
                 name: span.name,
-                timestamp_unix_ns: begin_unix_time_ns,
+                timestamp_unix_ns: begin_time_unix_ns,
                 properties: span.properties.clone(),
             };
             events.entry(parent_id).or_insert(vec![]).push(event);
@@ -438,8 +445,8 @@ fn amend_local_span(
             trace_id,
             span_id: span.id,
             parent_id,
-            begin_unix_time_ns,
-            duration_ns: end_unix_time_ns.saturating_sub(begin_unix_time_ns),
+            begin_time_unix_ns,
+            duration_ns: end_unix_time_ns.saturating_sub(begin_time_unix_ns),
             name: span.name,
             properties: span.properties.clone(),
             events: vec![],
@@ -455,12 +462,12 @@ fn amend_span(
     events: &mut HashMap<SpanId, Vec<EventRecord>>,
     anchor: &Anchor,
 ) {
-    let begin_unix_time_ns = raw_span.begin_instant.as_unix_nanos(anchor);
+    let begin_time_unix_ns = raw_span.begin_instant.as_unix_nanos(anchor);
 
     if raw_span.is_event {
         let event = EventRecord {
             name: raw_span.name,
-            timestamp_unix_ns: begin_unix_time_ns,
+            timestamp_unix_ns: begin_time_unix_ns,
             properties: raw_span.properties.clone(),
         };
         events.entry(parent_id).or_insert(vec![]).push(event);
@@ -472,8 +479,8 @@ fn amend_span(
         trace_id,
         span_id: raw_span.id,
         parent_id,
-        begin_unix_time_ns,
-        duration_ns: end_unix_time_ns.saturating_sub(begin_unix_time_ns),
+        begin_time_unix_ns,
+        duration_ns: end_unix_time_ns.saturating_sub(begin_time_unix_ns),
         name: raw_span.name,
         properties: raw_span.properties.clone(),
         events: vec![],

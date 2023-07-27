@@ -59,7 +59,7 @@ impl JaegerReporter {
                 operation_name: s.name.to_string(),
                 references: vec![],
                 flags: 1,
-                start_time: (s.begin_unix_time_ns / 1_000) as i64,
+                start_time: (s.begin_time_unix_ns / 1_000) as i64,
                 duration: (s.duration_ns / 1_000) as i64,
                 tags: s
                     .properties
