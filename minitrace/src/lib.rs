@@ -112,15 +112,15 @@
 //! minitrace::set_reporter(ConsoleReporter, Config::default());
 //!
 //! {
-//!     let root = Span::root("root", SpanContext::random());
+//!     let root_span = Span::root("root", SpanContext::random());
 //!     {
-//!         let child_span = Span::enter_with_parent("a child span", &root);
+//!         let child_span = Span::enter_with_parent("a child span", &root_span);
 //!
 //!         // ...
 //!
-//!         // child_span ends here
+//!         // child_span ends here.
 //!     }
-//!     // root ends here
+//!     // root_span ends here.
 //! }
 //!
 //! minitrace::flush();
@@ -182,7 +182,7 @@
 //!
 //!     {
 //!         let _guard = root.set_local_parent();
-//!         let mut span1 = LocalSpan::enter_with_local_parent("a child span");
+//!         let _span1 = LocalSpan::enter_with_local_parent("a child span");
 //!
 //!         Event::add_to_local_parent("event in span1", || [("key".into(), "value".into())]);
 //!     }
@@ -217,9 +217,10 @@
 //!
 //! {
 //!     let root = Span::root("root", SpanContext::random());
-//!     let _g = root.set_local_parent();
+//!     let _guard = root.set_local_parent();
 //!
 //!     do_something(100);
+//!
 //!     block_on(
 //!         async {
 //!             do_something_async(100).await;
