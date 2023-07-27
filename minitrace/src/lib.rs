@@ -114,10 +114,13 @@
 //! {
 //!     let root = Span::root("root", SpanContext::random());
 //!     {
-//!         let _child_span = Span::enter_with_parent("a child span", &root);
+//!         let child_span = Span::enter_with_parent("a child span", &root);
 //!
-//!         // perform some work
+//!         // ...
+//!
+//!         // child_span ends here
 //!     }
+//!     // root ends here
 //! }
 //!
 //! minitrace::flush();

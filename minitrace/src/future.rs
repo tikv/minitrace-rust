@@ -16,7 +16,7 @@
 //! // Instrument the a task
 //! let task = async {
 //!     async {
-//!         // perform some work
+//!         // ...
 //!     }
 //!     .enter_on_poll("future is polled")
 //!     .await;
@@ -54,7 +54,7 @@ pub trait FutureExt: std::future::Future + Sized {
     ///
     /// let root = Span::root("Root", SpanContext::new(TraceId(12), SpanId::default()));
     /// let task = async {
-    ///     // perform some work
+    ///     // ...
     /// }
     /// .in_span(Span::enter_with_parent("Task", &root));
     ///
@@ -85,7 +85,7 @@ pub trait FutureExt: std::future::Future + Sized {
     /// let root = Span::root("Root", SpanContext::new(TraceId(12), SpanId::default()));
     /// let task = async {
     ///     async {
-    ///         // perform some work
+    ///         // ...
     ///     }
     ///     .enter_on_poll("Sub Task")
     ///     .await

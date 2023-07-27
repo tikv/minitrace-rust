@@ -81,17 +81,17 @@ impl Args {
 ///
 /// #[trace]
 /// fn foo() {
-///     // perform some work
+///     // ...
 /// }
 ///
 /// #[trace]
 /// async fn bar() {
-///     // perform some work
+///     // ...
 /// }
 ///
 /// #[trace(name = "qux", enter_on_poll = true)]
 /// async fn baz() {
-///     // perform some work
+///     // ...
 /// }
 /// ```
 ///
@@ -102,12 +102,12 @@ impl Args {
 /// # use minitrace::local::LocalSpan;
 /// fn foo() {
 ///     let __guard__ = LocalSpan::enter_with_local_parent("foo");
-///     // perform some work
+///     // ...
 /// }
 ///
 /// async fn bar() {
 ///     async {
-///         // perform some work
+///         // ...
 ///     }
 ///     .in_span(Span::enter_with_local_parent("bar"))
 ///     .await
@@ -115,7 +115,7 @@ impl Args {
 ///
 /// async fn baz() {
 ///     async {
-///         // perform some work
+///         // ...
 ///     }
 ///     .enter_on_poll("qux")
 ///     .await
