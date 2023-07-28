@@ -63,7 +63,7 @@ impl Span {
     /// ```
     /// use minitrace::prelude::*;
     ///
-    /// let mut root = Span::root("root", SpanContext::new(TraceId(12), SpanId::default()));
+    /// let mut root = Span::root("root", SpanContext::random());
     /// ```
     #[inline]
     pub fn root(
@@ -103,7 +103,7 @@ impl Span {
     /// ```
     /// use minitrace::prelude::*;
     ///
-    /// let root = Span::root("root", SpanContext::new(TraceId(12), SpanId::default()));
+    /// let root = Span::root("root", SpanContext::random());
     ///
     /// let child = Span::enter_with_parent("child", &root);
     #[inline]
@@ -140,8 +140,8 @@ impl Span {
     /// ```
     /// use minitrace::prelude::*;
     ///
-    /// let parent1 = Span::root("parent1", SpanContext::new(TraceId(12), SpanId::default()));
-    /// let parent2 = Span::root("parent2", SpanContext::new(TraceId(12), SpanId::default()));
+    /// let parent1 = Span::root("parent1", SpanContext::random());
+    /// let parent2 = Span::root("parent2", SpanContext::random());
     ///
     /// let child = Span::enter_with_parents("child", [&parent1, &parent2]);
     #[inline]
@@ -177,7 +177,7 @@ impl Span {
     /// ```
     /// use minitrace::prelude::*;
     ///
-    /// let root = Span::root("root", SpanContext::new(TraceId(12), SpanId::default()));
+    /// let root = Span::root("root", SpanContext::random());
     /// let _g = root.set_local_parent();
     ///
     /// let child = Span::enter_with_local_parent("child");
@@ -214,7 +214,7 @@ impl Span {
     /// ```
     /// use minitrace::prelude::*;
     ///
-    /// let root = Span::root("root", SpanContext::new(TraceId(12), SpanId::default()));
+    /// let root = Span::root("root", SpanContext::random());
     /// let _guard = root.set_local_parent(); // root is now the local parent
     ///
     /// // Now we can create a LocalSpan with root as the local parent.
@@ -244,8 +244,8 @@ impl Span {
     /// ```
     /// use minitrace::prelude::*;
     ///
-    /// let root = Span::root("root", SpanContext::new(TraceId(12), SpanId::default()))
-    ///     .with_property(|| ("key".into(), "value".into()));
+    /// let root =
+    ///     Span::root("root", SpanContext::random()).with_property(|| ("key".into(), "value".into()));
     /// ```
     #[inline]
     pub fn with_property<F>(self, property: F) -> Self
@@ -260,13 +260,12 @@ impl Span {
     /// ```
     /// use minitrace::prelude::*;
     ///
-    /// let root = Span::root("root", SpanContext::new(TraceId(12), SpanId::default()))
-    ///     .with_properties(|| {
-    ///         vec![
-    ///             ("key1".into(), "value1".into()),
-    ///             ("key2".into(), "value2".into()),
-    ///         ]
-    ///     });
+    /// let root = Span::root("root", SpanContext::random()).with_properties(|| {
+    ///     vec![
+    ///         ("key1".into(), "value1".into()),
+    ///         ("key2".into(), "value2".into()),
+    ///     ]
+    /// });
     /// ```
     #[inline]
     pub fn with_properties<I, F>(mut self, properties: F) -> Self
@@ -301,7 +300,7 @@ impl Span {
     /// let local_spans = collector.collect();
     ///
     /// // Attach the local spans to a parent
-    /// let root = Span::root("root", SpanContext::new(TraceId(12), SpanId::default()));
+    /// let root = Span::root("root", SpanContext::random());
     /// root.push_child_spans(local_spans);
     /// ```
     ///
@@ -333,7 +332,7 @@ impl Span {
     /// ```
     /// use minitrace::prelude::*;
     ///
-    /// let mut root = Span::root("root", SpanContext::new(TraceId(12), SpanId::default()));
+    /// let mut root = Span::root("root", SpanContext::random());
     ///
     /// // ..
     #[inline]
@@ -555,11 +554,7 @@ mod tests {
         mock.expect_submit_spans().times(0);
 
         let mock = Arc::new(mock);
-        let mut root = Span::root(
-            "root",
-            SpanContext::new(TraceId(12), SpanId::default()),
-            mock,
-        );
+        let mut root = Span::root("root", SpanContext::random(), mock);
         root.cancel();
     }
 
@@ -568,7 +563,7 @@ mod tests {
         crate::set_reporter(ConsoleReporter, crate::collector::Config::default());
 
         let routine = |collect| {
-            let parent_ctx = SpanContext::new(TraceId(12), SpanId::default());
+            let parent_ctx = SpanContext::random();
             let root = Span::root("root", parent_ctx, collect);
             let child1 = Span::enter_with_parent("child1", &root)
                 .with_properties(|| [("k1".into(), "v1".into())]);
@@ -627,7 +622,7 @@ root []
         crate::set_reporter(ConsoleReporter, crate::collector::Config::default());
 
         let routine = |collect: GlobalCollect| {
-            let parent_ctx = SpanContext::new(TraceId(12), SpanId::default());
+            let parent_ctx = SpanContext::random();
             let parent1 = Span::root("parent1", parent_ctx, collect.clone());
             let parent2 = Span::root("parent2", parent_ctx, collect.clone());
             let parent3 = Span::root("parent3", parent_ctx, collect.clone());
@@ -719,7 +714,7 @@ parent5 []
         crate::set_reporter(ConsoleReporter, crate::collector::Config::default());
 
         let routine = |collect: GlobalCollect| {
-            let parent_ctx = SpanContext::new(TraceId(12), SpanId::default());
+            let parent_ctx = SpanContext::random();
             let parent1 = Span::root("parent1", parent_ctx, collect.clone());
             let parent2 = Span::root("parent2", parent_ctx, collect.clone());
             let parent3 = Span::root("parent3", parent_ctx, collect.clone());
@@ -807,7 +802,7 @@ parent5 []
             let stack = Rc::new(RefCell::new(LocalSpanStack::with_capacity(16)));
 
             {
-                let parent_ctx = SpanContext::new(TraceId(12), SpanId::default());
+                let parent_ctx = SpanContext::random();
                 let root = Span::root("root", parent_ctx, collect.clone());
                 let _g = root.attach_into_stack(&stack).unwrap();
                 let child =

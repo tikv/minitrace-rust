@@ -6,13 +6,6 @@ use std::cell::Cell;
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, Default)]
 pub struct TraceId(pub u128);
 
-impl TraceId {
-    /// Create a new trace id with a random number.
-    pub fn random() -> TraceId {
-        TraceId(rand::random())
-    }
-}
-
 /// An identifier for a span within a trace.
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, Default)]
 pub struct SpanId(pub u64);

@@ -10,8 +10,8 @@
 
 ```toml
 [dependencies]
-minitrace = "0.4"
-minitrace-opentelemetry = "0.4"
+minitrace = "0.5"
+minitrace-opentelemetry = "0.5"
 ```
 
 ## Setup OpenTelemetry Collector
@@ -60,7 +60,7 @@ minitrace::set_reporter(reporter, Config::default());
 
 {
     // Start tracing
-    let root = Span::root("root", SpanContext::new(TraceId(42), SpanId::default()));
+    let root = Span::root("root", SpanContext::random());
 }
 
 minitrace::flush()

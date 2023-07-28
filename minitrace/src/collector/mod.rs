@@ -99,6 +99,22 @@ impl SpanContext {
         Self { trace_id, span_id }
     }
 
+    /// Create a new `SpanContext` trace id with a random trace id.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use minitrace::prelude::*;
+    ///
+    /// let root = Span::root("root", SpanContext::random());
+    /// ```
+    pub fn random() -> Self {
+        Self {
+            trace_id: TraceId(rand::random()),
+            span_id: SpanId::default(),
+        }
+    }
+
     /// Creates a `SpanContext` from the given [`Span`]. If the `Span` is a noop span,
     /// this function will return `None`.
     ///
@@ -107,7 +123,7 @@ impl SpanContext {
     /// ```
     /// use minitrace::prelude::*;
     ///
-    /// let span = Span::root("root", SpanContext::new(TraceId(12), SpanId::default()));
+    /// let span = Span::root("root", SpanContext::random());
     /// let context = SpanContext::from_span(&span);
     /// ```
     ///
@@ -138,7 +154,7 @@ impl SpanContext {
     /// ```
     /// use minitrace::prelude::*;
     ///
-    /// let span = Span::root("root", SpanContext::new(TraceId(12), SpanId::default()));
+    /// let span = Span::root("root", SpanContext::random());
     /// let _guard = span.set_local_parent();
     ///
     /// let context = SpanContext::current_local_parent();
@@ -217,10 +233,7 @@ impl SpanContext {
     /// );
     /// ```
     pub fn encode_w3c_traceparent(&self) -> String {
-        format!(
-            "00-{:032x}-{:016x}-{:02x}",
-            self.trace_id.0, self.span_id.0, 0x01,
-        )
+        Self::encode_w3c_traceparent_with_sampled(self, true)
     }
 
     /// Encodes the `SpanContext` as a [W3C Trace Context](https://www.w3.org/TR/trace-context/)
@@ -232,17 +245,17 @@ impl SpanContext {
     /// use minitrace::prelude::*;
     ///
     /// let span_context = SpanContext::new(TraceId(12), SpanId(34));
-    /// let traceparent = span_context.encode_w3c_traceparent_not_sampled();
+    /// let traceparent = span_context.encode_w3c_traceparent_with_sampled(false);
     ///
     /// assert_eq!(
     ///     traceparent,
     ///     "00-0000000000000000000000000000000c-0000000000000022-00"
     /// );
     /// ```
-    pub fn encode_w3c_traceparent_not_sampled(&self) -> String {
+    pub fn encode_w3c_traceparent_with_sampled(&self, sampled: bool) -> String {
         format!(
             "00-{:032x}-{:016x}-{:02x}",
-            self.trace_id.0, self.span_id.0, 0x00,
+            self.trace_id.0, self.span_id.0, sampled as u8,
         )
     }
 }
@@ -366,7 +379,7 @@ mod tests {
             "00-0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-01"
         );
         assert_eq!(
-            span_context.encode_w3c_traceparent_not_sampled(),
+            span_context.encode_w3c_traceparent_with_sampled(false),
             "00-0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-00"
         );
     }

@@ -16,7 +16,7 @@
 //!
 //! ```toml
 //! [dependencies]
-//! minitrace = "0.4"
+//! minitrace = "0.5"
 //! ```
 //!
 //! Libraries can attach their spans to the caller's span (if available) via the API boundary.
@@ -47,10 +47,7 @@
 //! # struct Error;
 //!
 //! pub fn send_request(req: HttpRequest) -> Result<(), Error> {
-//!     let root = Span::root(
-//!         "send_request",
-//!         SpanContext::new(TraceId::random(), SpanId::default()),
-//!     );
+//!     let root = Span::root("send_request", SpanContext::random());
 //!     let _guard = root.set_local_parent();
 //!
 //!     // ...
@@ -65,7 +62,7 @@
 //!
 //! ```toml
 //! [dependencies]
-//! minitrace = { version = "0.4", features = ["enable"] }
+//! minitrace = { version = "0.5", features = ["enable"] }
 //! ```
 //!
 //! Executables should initialize a reporter implementation early in the program's runtime.
@@ -115,15 +112,15 @@
 //! minitrace::set_reporter(ConsoleReporter, Config::default());
 //!
 //! {
-//!     let root = Span::root(
-//!         "root",
-//!         SpanContext::new(TraceId::random(), SpanId::default()),
-//!     );
+//!     let root_span = Span::root("root", SpanContext::random());
 //!     {
-//!         let _child_span = Span::enter_with_parent("a child span", &root);
+//!         let child_span = Span::enter_with_parent("a child span", &root_span);
 //!
-//!         // perform some work
+//!         // ...
+//!
+//!         // child_span ends here.
 //!     }
+//!     // root_span ends here.
 //! }
 //!
 //! minitrace::flush();
@@ -147,10 +144,7 @@
 //! minitrace::set_reporter(ConsoleReporter, Config::default());
 //!
 //! {
-//!     let root = Span::root(
-//!         "root",
-//!         SpanContext::new(TraceId::random(), SpanId::default()),
-//!     );
+//!     let root = Span::root("root", SpanContext::random());
 //!     {
 //!         let _guard = root.set_local_parent();
 //!
@@ -182,16 +176,13 @@
 //! minitrace::set_reporter(ConsoleReporter, Config::default());
 //!
 //! {
-//!     let root = Span::root(
-//!         "root",
-//!         SpanContext::new(TraceId::random(), SpanId::default()),
-//!     );
+//!     let root = Span::root("root", SpanContext::random());
 //!
 //!     Event::add_to_parent("event in root", &root, || []);
 //!
 //!     {
 //!         let _guard = root.set_local_parent();
-//!         let mut span1 = LocalSpan::enter_with_local_parent("a child span");
+//!         let _span1 = LocalSpan::enter_with_local_parent("a child span");
 //!
 //!         Event::add_to_local_parent("event in span1", || [("key".into(), "value".into())]);
 //!     }
@@ -225,13 +216,11 @@
 //! minitrace::set_reporter(ConsoleReporter, Config::default());
 //!
 //! {
-//!     let root = Span::root(
-//!         "root",
-//!         SpanContext::new(TraceId::random(), SpanId::default()),
-//!     );
-//!     let _g = root.set_local_parent();
+//!     let root = Span::root("root", SpanContext::random());
+//!     let _guard = root.set_local_parent();
 //!
 //!     do_something(100);
+//!
 //!     block_on(
 //!         async {
 //!             do_something_async(100).await;

@@ -32,10 +32,7 @@ mod test_util {
     where F: FnOnce() -> Result<()> + 'static {
         minitrace::set_reporter(ConsoleReporter, Config::default());
         {
-            let root = Span::root(
-                closure_name::<F>(),
-                SpanContext::new(TraceId::random(), SpanId::default()),
-            );
+            let root = Span::root(closure_name::<F>(), SpanContext::random());
             let _guard = root.set_local_parent();
             test().expect("test success");
         }
@@ -53,10 +50,7 @@ mod test_util {
             .enable_all()
             .build()
             .unwrap();
-        let root = Span::root(
-            closure_name::<F>(),
-            SpanContext::new(TraceId::random(), SpanId::default()),
-        );
+        let root = Span::root(closure_name::<F>(), SpanContext::random());
         rt.block_on(test().in_span(root)).unwrap();
         minitrace::flush();
     }

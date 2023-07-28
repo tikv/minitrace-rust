@@ -30,7 +30,7 @@ fn main() {
         .init();
 
     {
-        let parent = SpanContext::new(TraceId::random(), SpanId::default());
+        let parent = SpanContext::random();
         let root = Span::root("root", parent);
         let _span_guard = root.set_local_parent();
 

@@ -33,7 +33,7 @@ impl LocalSpan {
     /// ```
     /// use minitrace::prelude::*;
     ///
-    /// let root = Span::root("root", SpanContext::new(TraceId(12), SpanId::default()));
+    /// let root = Span::root("root", SpanContext::random());
     /// let _g = root.set_local_parent();
     ///
     /// let child = Span::enter_with_local_parent("child");
