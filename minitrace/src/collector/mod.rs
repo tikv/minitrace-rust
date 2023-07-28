@@ -99,7 +99,7 @@ impl SpanContext {
         Self { trace_id, span_id }
     }
 
-    /// Create a new `SpanContext` trace id with a random trace id.
+    /// Create a new `SpanContext` with a random trace id.
     ///
     /// # Examples
     ///
