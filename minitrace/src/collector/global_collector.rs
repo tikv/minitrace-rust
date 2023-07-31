@@ -436,7 +436,7 @@ fn amend_local_span(
             continue;
         }
 
-        let end_unix_time_ns = if span.end_instant == span.begin_instant {
+        let end_time_unix_ns = if span.end_instant == span.begin_instant {
             local_spans.end_time.as_unix_nanos(anchor)
         } else {
             span.end_instant.as_unix_nanos(anchor)
@@ -446,7 +446,7 @@ fn amend_local_span(
             span_id: span.id,
             parent_id,
             begin_time_unix_ns,
-            duration_ns: end_unix_time_ns.saturating_sub(begin_time_unix_ns),
+            duration_ns: end_time_unix_ns.saturating_sub(begin_time_unix_ns),
             name: span.name,
             properties: span.properties.clone(),
             events: vec![],
@@ -474,13 +474,13 @@ fn amend_span(
         return;
     }
 
-    let end_unix_time_ns = raw_span.end_instant.as_unix_nanos(anchor);
+    let end_time_unix_ns = raw_span.end_instant.as_unix_nanos(anchor);
     spans.push(SpanRecord {
         trace_id,
         span_id: raw_span.id,
         parent_id,
         begin_time_unix_ns,
-        duration_ns: end_unix_time_ns.saturating_sub(begin_time_unix_ns),
+        duration_ns: end_time_unix_ns.saturating_sub(begin_time_unix_ns),
         name: raw_span.name,
         properties: raw_span.properties.clone(),
         events: vec![],
