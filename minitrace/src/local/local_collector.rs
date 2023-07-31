@@ -12,7 +12,7 @@ use crate::local::local_span_stack::LOCAL_SPAN_STACK;
 use crate::util::CollectToken;
 use crate::util::RawSpans;
 
-/// Collector to collect [`LocalSpan`].
+/// A collector to collect [`LocalSpan`].
 ///
 /// `LocalCollector` allows to collect `LocalSpan` manually without a local parent. The collected `LocalSpan` can later be
 /// attached to a parent.

@@ -223,10 +223,10 @@ impl Span {
     ///
     /// [`LocalSpan`]: crate::local::LocalSpan
     /// [`LocalSpan::enter_with_local_parent()`]: crate::local::LocalSpan::enter_with_local_parent
-    pub fn set_local_parent(&self) -> Option<impl Drop> {
+    pub fn set_local_parent(&self) -> LocalParentGuard {
         #[cfg(not(feature = "enable"))]
         {
-            None::<Span>
+            LocalParentGuard::noop()
         }
 
         #[cfg(feature = "enable")]
@@ -383,10 +383,11 @@ impl Span {
     pub(crate) fn attach_into_stack(
         &self,
         stack: &Rc<RefCell<LocalSpanStack>>,
-    ) -> Option<impl Drop> {
+    ) -> LocalParentGuard {
         self.inner
             .as_ref()
             .map(move |inner| inner.capture_local_spans(stack.clone()))
+            .unwrap_or_else(LocalParentGuard::noop)
     }
 }
 
@@ -404,19 +405,11 @@ impl SpanInner {
     }
 
     #[inline]
-    fn capture_local_spans(&self, stack: Rc<RefCell<LocalSpanStack>>) -> impl Drop {
+    fn capture_local_spans(&self, stack: Rc<RefCell<LocalSpanStack>>) -> LocalParentGuard {
         let token = self.issue_collect_token().collect();
         let collector = LocalCollector::new(Some(token), stack);
-        let collect = self.collect.clone();
-        defer::defer(move || {
-            let (spans, token) = collector.collect_spans_and_token();
-            debug_assert!(token.is_some());
-            let token = token.unwrap_or_else(|| [].iter().collect());
 
-            if !spans.spans.is_empty() {
-                collect.submit_spans(SpanSet::LocalSpansInner(spans), token);
-            }
-        })
+        LocalParentGuard::new(collector, self.collect.clone())
     }
 
     #[inline]
@@ -468,6 +461,50 @@ impl Drop for Span {
     }
 }
 
+/// A guard created by [`Span::set_local_parent()`].
+pub struct LocalParentGuard {
+    #[cfg(feature = "enable")]
+    inner: Option<LocalParentGuardInner>,
+}
+
+struct LocalParentGuardInner {
+    collector: LocalCollector,
+    collect: GlobalCollect,
+}
+
+impl LocalParentGuard {
+    pub(crate) fn noop() -> LocalParentGuard {
+        LocalParentGuard {
+            #[cfg(feature = "enable")]
+            inner: None,
+        }
+    }
+
+    pub(crate) fn new(collector: LocalCollector, collect: GlobalCollect) -> LocalParentGuard {
+        LocalParentGuard {
+            #[cfg(feature = "enable")]
+            inner: Some(LocalParentGuardInner { collector, collect }),
+        }
+    }
+}
+
+impl Drop for LocalParentGuard {
+    fn drop(&mut self) {
+        #[cfg(feature = "enable")]
+        if let Some(inner) = self.inner.take() {
+            let (spans, token) = inner.collector.collect_spans_and_token();
+            debug_assert!(token.is_some());
+            if let Some(token) = token {
+                if !spans.spans.is_empty() {
+                    inner
+                        .collect
+                        .submit_spans(SpanSet::LocalSpansInner(spans), token);
+                }
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::sync::atomic::AtomicUsize;
@@ -490,7 +527,7 @@ mod tests {
     fn noop_basic() {
         let span = Span::noop();
         let stack = Rc::new(RefCell::new(LocalSpanStack::with_capacity(16)));
-        assert!(span.attach_into_stack(&stack).is_none());
+        assert!(span.attach_into_stack(&stack).inner.is_none());
         assert!(stack.borrow_mut().enter_span("span1").is_none());
     }
 
@@ -804,11 +841,11 @@ parent5 []
             {
                 let parent_ctx = SpanContext::random();
                 let root = Span::root("root", parent_ctx, collect.clone());
-                let _g = root.attach_into_stack(&stack).unwrap();
+                let _g = root.attach_into_stack(&stack);
                 let child =
                     Span::enter_with_stack("child", &mut stack.borrow_mut(), collect.clone());
                 {
-                    let _g = child.attach_into_stack(&stack).unwrap();
+                    let _g = child.attach_into_stack(&stack);
                     let _s = Span::enter_with_stack("grandchild", &mut stack.borrow_mut(), collect);
                 }
                 let _s = LocalSpan::enter_with_stack("local", stack);
