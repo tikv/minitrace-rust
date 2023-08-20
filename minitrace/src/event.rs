@@ -54,8 +54,9 @@ impl Event {
     {
         #[cfg(feature = "enable")]
         {
-            let _ =
-                LOCAL_SPAN_STACK.try_with(|stack| stack.borrow_mut().add_event(name, properties));
+            LOCAL_SPAN_STACK
+                .try_with(|stack| stack.borrow_mut().add_event(name, properties))
+                .ok();
         }
     }
 }
