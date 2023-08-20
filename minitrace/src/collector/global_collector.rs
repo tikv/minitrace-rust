@@ -50,11 +50,11 @@ fn register_receiver(rx: Receiver<CollectCommand>) {
 }
 
 fn send_command(cmd: CollectCommand) {
-    COMMAND_SENDER.with(|sender| sender.send(cmd).ok());
+    let _ = COMMAND_SENDER.try_with(|sender| sender.send(cmd).ok());
 }
 
 fn force_send_command(cmd: CollectCommand) {
-    COMMAND_SENDER.with(|sender| sender.force_send(cmd));
+    let _ = COMMAND_SENDER.try_with(|sender| sender.force_send(cmd));
 }
 
 /// Sets the reporter and its configuration for the current application.

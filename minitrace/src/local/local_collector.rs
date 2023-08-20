@@ -103,8 +103,9 @@ impl LocalCollector {
 
         #[cfg(feature = "enable")]
         {
-            let stack = LOCAL_SPAN_STACK.with(Rc::clone);
-            Self::new(None, stack)
+            LOCAL_SPAN_STACK
+                .try_with(|stack| Self::new(None, stack.clone()))
+                .unwrap_or(LocalCollector { inner: None })
         }
     }
 

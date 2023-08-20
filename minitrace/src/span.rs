@@ -196,9 +196,11 @@ impl Span {
         {
             #[cfg(not(test))]
             let collect = GlobalCollect;
-            LOCAL_SPAN_STACK.with(move |stack| {
-                Self::enter_with_stack(name, &mut (*stack).borrow_mut(), collect)
-            })
+            LOCAL_SPAN_STACK
+                .try_with(move |stack| {
+                    Self::enter_with_stack(name, &mut (*stack).borrow_mut(), collect)
+                })
+                .unwrap_or(Self::noop())
         }
     }
 
@@ -231,7 +233,9 @@ impl Span {
 
         #[cfg(feature = "enable")]
         {
-            LOCAL_SPAN_STACK.with(|s| self.attach_into_stack(s))
+            LOCAL_SPAN_STACK
+                .try_with(|s| self.attach_into_stack(s))
+                .unwrap_or(None)
         }
     }
 

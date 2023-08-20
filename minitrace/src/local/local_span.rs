@@ -47,8 +47,9 @@ impl LocalSpan {
 
         #[cfg(feature = "enable")]
         {
-            let stack = LOCAL_SPAN_STACK.with(Rc::clone);
-            Self::enter_with_stack(name, stack)
+            LOCAL_SPAN_STACK
+                .try_with(|stack| Self::enter_with_stack(name, stack.clone()))
+                .unwrap_or(LocalSpan { inner: None })
         }
     }
 

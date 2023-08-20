@@ -14,15 +14,17 @@ impl SpanId {
     #[inline]
     /// Create a non-zero `SpanId`
     pub(crate) fn next_id() -> SpanId {
-        LOCAL_ID_GENERATOR.with(|g| {
-            let (prefix, mut suffix) = g.get();
+        LOCAL_ID_GENERATOR
+            .try_with(|g| {
+                let (prefix, mut suffix) = g.get();
 
-            suffix = suffix.wrapping_add(1);
+                suffix = suffix.wrapping_add(1);
 
-            g.set((prefix, suffix));
+                g.set((prefix, suffix));
 
-            SpanId(((prefix as u64) << 32) | (suffix as u64))
-        })
+                SpanId(((prefix as u64) << 32) | (suffix as u64))
+            })
+            .unwrap_or_else(|_| SpanId(rand::random()))
     }
 }
 
