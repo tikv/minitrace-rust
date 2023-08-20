@@ -23,6 +23,7 @@ use crate::util::CollectToken;
 
 /// A thread-safe span.
 #[must_use]
+#[derive(Default)]
 pub struct Span {
     #[cfg(feature = "enable")]
     pub(crate) inner: Option<SpanInner>,
@@ -200,7 +201,7 @@ impl Span {
                 .try_with(move |stack| {
                     Self::enter_with_stack(name, &mut (*stack).borrow_mut(), collect)
                 })
-                .unwrap_or(Self::noop())
+                .unwrap_or_default()
         }
     }
 
@@ -235,7 +236,7 @@ impl Span {
         {
             LOCAL_SPAN_STACK
                 .try_with(|s| self.attach_into_stack(s))
-                .unwrap_or(None)
+                .unwrap_or_default()
         }
     }
 

@@ -40,6 +40,7 @@ use crate::util::RawSpans;
 /// [`Span`]: crate::Span
 /// [`LocalSpan`]: crate::local::LocalSpan
 #[must_use]
+#[derive(Default)]
 pub struct LocalCollector {
     #[cfg(feature = "enable")]
     inner: Option<LocalCollectorInner>,
@@ -98,14 +99,14 @@ impl LocalCollector {
     pub fn start() -> Self {
         #[cfg(not(feature = "enable"))]
         {
-            LocalCollector {}
+            LocalCollector::default()
         }
 
         #[cfg(feature = "enable")]
         {
             LOCAL_SPAN_STACK
                 .try_with(|stack| Self::new(None, stack.clone()))
-                .unwrap_or(LocalCollector { inner: None })
+                .unwrap_or_default()
         }
     }
 

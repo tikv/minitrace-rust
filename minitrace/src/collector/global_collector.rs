@@ -432,7 +432,7 @@ fn amend_local_span(
                 timestamp_unix_ns: begin_time_unix_ns,
                 properties: span.properties.clone(),
             };
-            events.entry(parent_id).or_insert(vec![]).push(event);
+            events.entry(parent_id).or_default().push(event);
             continue;
         }
 
@@ -470,7 +470,7 @@ fn amend_span(
             timestamp_unix_ns: begin_time_unix_ns,
             properties: raw_span.properties.clone(),
         };
-        events.entry(parent_id).or_insert(vec![]).push(event);
+        events.entry(parent_id).or_default().push(event);
         return;
     }
 
