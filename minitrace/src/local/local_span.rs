@@ -12,6 +12,7 @@ use crate::local::local_span_stack::LOCAL_SPAN_STACK;
 ///
 /// [`Span`]: crate::Span
 #[must_use]
+#[derive(Default)]
 pub struct LocalSpan {
     #[cfg(feature = "enable")]
     inner: Option<LocalSpanInner>,
@@ -42,13 +43,14 @@ impl LocalSpan {
     pub fn enter_with_local_parent(name: &'static str) -> Self {
         #[cfg(not(feature = "enable"))]
         {
-            LocalSpan {}
+            LocalSpan::default()
         }
 
         #[cfg(feature = "enable")]
         {
-            let stack = LOCAL_SPAN_STACK.with(Rc::clone);
-            Self::enter_with_stack(name, stack)
+            LOCAL_SPAN_STACK
+                .try_with(|stack| Self::enter_with_stack(name, stack.clone()))
+                .unwrap_or_default()
         }
     }
 

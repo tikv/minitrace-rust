@@ -1,7 +1,6 @@
 // Copyright 2023 TiKV Project Authors. Licensed under Apache-2.0.
 
 use std::borrow::Cow;
-use std::rc::Rc;
 
 use crate::local::local_span_stack::LOCAL_SPAN_STACK;
 use crate::Span;
@@ -55,9 +54,9 @@ impl Event {
     {
         #[cfg(feature = "enable")]
         {
-            let stack = LOCAL_SPAN_STACK.with(Rc::clone);
-            let mut stack = stack.borrow_mut();
-            stack.add_event(name, properties);
+            LOCAL_SPAN_STACK
+                .try_with(|stack| stack.borrow_mut().add_event(name, properties))
+                .ok();
         }
     }
 }

@@ -35,7 +35,7 @@ impl SpanQueue {
 
         let span = RawSpan::begin_with(
             SpanId::next_id(),
-            self.next_parent_id.unwrap_or(SpanId::default()),
+            self.next_parent_id.unwrap_or_default(),
             Instant::now(),
             name,
             false,
@@ -74,7 +74,7 @@ impl SpanQueue {
 
         let mut span = RawSpan::begin_with(
             SpanId::next_id(),
-            self.next_parent_id.unwrap_or(SpanId::default()),
+            self.next_parent_id.unwrap_or_default(),
             Instant::now(),
             name,
             true,
