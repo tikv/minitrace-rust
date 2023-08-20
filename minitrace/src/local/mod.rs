@@ -12,3 +12,4 @@ pub(crate) mod span_queue;
 pub use self::local_collector::LocalCollector;
 pub use self::local_collector::LocalSpans;
 pub use self::local_span::LocalSpan;
+pub use crate::span::LocalParentGuard;

@@ -193,11 +193,11 @@ span []
         span_line2.add_properties(&span, || [("k1".into(), "v1".into())]);
         span_line1.finish_span(span);
 
-        let raw_spans = span_line1.collect(1).unwrap().0.into_inner().1;
+        let raw_spans = span_line1.collect(1).unwrap().0.into_inner();
         assert_eq!(raw_spans.len(), 1);
         assert_eq!(raw_spans[0].properties.len(), 0);
 
-        let raw_spans = span_line2.collect(2).unwrap().0.into_inner().1;
+        let raw_spans = span_line2.collect(2).unwrap().0.into_inner();
         assert!(raw_spans.is_empty());
     }
 
@@ -228,11 +228,11 @@ span []
         let (spans, collect_token) = span_line1.collect(1).unwrap();
         let collect_token = collect_token.unwrap();
         assert_eq!(collect_token.as_slice(), &[item]);
-        assert_eq!(spans.into_inner().1.len(), 1);
+        assert_eq!(spans.into_inner().len(), 1);
 
         let (spans, collect_token) = span_line2.collect(2).unwrap();
         assert!(collect_token.is_none());
-        assert!(spans.into_inner().1.is_empty());
+        assert!(spans.into_inner().is_empty());
     }
 
     #[test]
