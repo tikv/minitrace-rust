@@ -30,12 +30,16 @@ pub type CollectToken = Reusable<'static, Vec<CollectTokenItem>>;
 
 impl Default for RawSpans {
     fn default() -> Self {
-        RAW_SPANS_PULLER.with(|puller| puller.borrow_mut().pull())
+        RAW_SPANS_PULLER
+            .try_with(|puller| puller.borrow_mut().pull())
+            .unwrap_or_else(|_| Reusable::new(&*RAW_SPANS_POOL, vec![]))
     }
 }
 
 fn new_collect_token(items: impl IntoIterator<Item = CollectTokenItem>) -> CollectToken {
-    let mut token = COLLECT_TOKEN_ITEMS_PULLER.with(|puller| puller.borrow_mut().pull());
+    let mut token = COLLECT_TOKEN_ITEMS_PULLER
+        .try_with(|puller| puller.borrow_mut().pull())
+        .unwrap_or_else(|_| Reusable::new(&*COLLECT_TOKEN_ITEMS_POOL, vec![]));
     token.extend(items);
     token
 }

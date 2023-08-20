@@ -167,7 +167,8 @@ impl SpanContext {
 
         #[cfg(feature = "enable")]
         {
-            let stack = LOCAL_SPAN_STACK.with(Rc::clone);
+            let stack = LOCAL_SPAN_STACK.try_with(Rc::clone).ok()?;
+
             let mut stack = stack.borrow_mut();
             let collect_token = stack.current_collect_token()?[0];
 
