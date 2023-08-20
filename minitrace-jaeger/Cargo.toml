@@ -1,6 +1,6 @@
 [package]
 name = "minitrace-jaeger"
-version = "0.5.0"
+version = "0.5.1"
 authors = ["The TiKV Project Authors"]
 license = "Apache-2.0"
 edition = "2021"
