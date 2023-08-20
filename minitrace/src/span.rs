@@ -467,6 +467,7 @@ impl Drop for Span {
 }
 
 /// A guard created by [`Span::set_local_parent()`].
+#[derive(Default)]
 pub struct LocalParentGuard {
     #[cfg(feature = "enable")]
     inner: Option<LocalParentGuardInner>,
