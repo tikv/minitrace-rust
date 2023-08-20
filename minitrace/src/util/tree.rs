@@ -55,7 +55,7 @@ impl Tree {
     pub fn from_raw_spans(raw_spans: RawSpans) -> Vec<Tree> {
         let mut children = HashMap::new();
 
-        let spans = raw_spans.into_inner().1;
+        let spans = raw_spans.into_inner();
         children.insert(SpanId::default(), ("", vec![], vec![]));
         for span in &spans {
             children.insert(span.id, (span.name, vec![], span.properties.clone()));

@@ -113,6 +113,7 @@
 //!
 //! {
 //!     let root_span = Span::root("root", SpanContext::random());
+//!
 //!     {
 //!         let child_span = Span::enter_with_parent("a child span", &root_span);
 //!
@@ -120,6 +121,7 @@
 //!
 //!         // child_span ends here.
 //!     }
+//!
 //!     // root_span ends here.
 //! }
 //!
@@ -145,6 +147,7 @@
 //!
 //! {
 //!     let root = Span::root("root", SpanContext::random());
+//!
 //!     {
 //!         let _guard = root.set_local_parent();
 //!

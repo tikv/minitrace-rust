@@ -1,5 +1,6 @@
 // Copyright 2022 TiKV Project Authors. Licensed under Apache-2.0.
 
+use std::mem::ManuallyDrop;
 use std::ops::Deref;
 use std::ops::DerefMut;
 
@@ -19,16 +20,6 @@ impl<T> Pool<T> {
             init,
             reset,
         }
-    }
-
-    #[inline]
-    #[allow(dead_code)]
-    pub fn pull(&self) -> Reusable<T> {
-        self.objects
-            .lock()
-            .pop()
-            .map(|obj| Reusable::new(self, obj))
-            .unwrap_or_else(|| Reusable::new(self, (self.init)()))
     }
 
     #[inline]
@@ -78,18 +69,25 @@ impl<'a, T> Puller<'a, T> {
 
 pub struct Reusable<'a, T> {
     pool: &'a Pool<T>,
-    obj: Option<T>,
+    obj: ManuallyDrop<T>,
 }
 
 impl<'a, T> Reusable<'a, T> {
     #[inline]
-    pub fn new(pool: &'a Pool<T>, t: T) -> Self {
-        Self { pool, obj: Some(t) }
+    pub fn new(pool: &'a Pool<T>, obj: T) -> Self {
+        Self {
+            pool,
+            obj: ManuallyDrop::new(obj),
+        }
     }
 
     #[inline]
-    pub fn into_inner(mut self) -> (&'a Pool<T>, T) {
-        (self.pool, self.obj.take().unwrap())
+    pub fn into_inner(mut self) -> T {
+        unsafe {
+            let obj = ManuallyDrop::take(&mut self.obj);
+            std::mem::forget(self);
+            obj
+        }
     }
 }
 
@@ -97,7 +95,7 @@ impl<'a, T> std::fmt::Debug for Reusable<'a, T>
 where T: std::fmt::Debug
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.obj.as_ref().unwrap().fmt(f)
+        self.obj.fmt(f)
     }
 }
 
@@ -116,22 +114,22 @@ impl<'a, T> Deref for Reusable<'a, T> {
 
     #[inline]
     fn deref(&self) -> &Self::Target {
-        self.obj.as_ref().unwrap()
+        &self.obj
     }
 }
 
 impl<'a, T> DerefMut for Reusable<'a, T> {
     #[inline]
     fn deref_mut(&mut self) -> &mut Self::Target {
-        self.obj.as_mut().unwrap()
+        &mut self.obj
     }
 }
 
 impl<'a, T> Drop for Reusable<'a, T> {
     #[inline]
     fn drop(&mut self) {
-        if let Some(obj) = self.obj.take() {
-            self.pool.recycle(obj);
+        unsafe {
+            self.pool.recycle(ManuallyDrop::take(&mut self.obj));
         }
     }
 }
