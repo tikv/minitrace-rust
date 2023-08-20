@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+## v0.5.1
+- Fix panics due to destruction of Thread Local Storage value
+
 ## v0.5.0
 
 - Add `Event` type to represent single points in time during the span's lifetime.
