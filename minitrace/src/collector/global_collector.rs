@@ -54,7 +54,9 @@ fn send_command(cmd: CollectCommand) {
 }
 
 fn force_send_command(cmd: CollectCommand) {
-    COMMAND_SENDER.try_with(|sender| sender.force_send(cmd)).ok();
+    COMMAND_SENDER
+        .try_with(|sender| sender.force_send(cmd))
+        .ok();
 }
 
 /// Sets the reporter and its configuration for the current application.
@@ -470,7 +472,7 @@ fn amend_span(
             timestamp_unix_ns: begin_time_unix_ns,
             properties: raw_span.properties.clone(),
         };
-        events.entry(parent_id).or_default.push(event);
+        events.entry(parent_id).or_default().push(event);
         return;
     }
 
