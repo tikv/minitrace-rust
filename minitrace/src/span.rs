@@ -339,7 +339,8 @@ impl Span {
     ///
     /// let mut root = Span::root("root", SpanContext::random());
     ///
-    /// // ..
+    /// root.cancel();
+    /// ```
     #[inline]
     pub fn cancel(&mut self) {
         #[cfg(feature = "enable")]
