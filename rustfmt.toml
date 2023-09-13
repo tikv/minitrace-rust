@@ -8,6 +8,3 @@ trailing_comma = "Vertical"
 overflow_delimited_expr = true
 format_code_in_doc_comments = true
 normalize_comments = true
-ignore = [
-    "minitrace-tests/embassy/*",
-]
