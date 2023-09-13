@@ -22,7 +22,11 @@ jobs:
           RUSTDOCFLAGS: "-Zprofile -Ccodegen-units=1 -Cinline-threshold=0 -Clink-dead-code -Coverflow-checks=off"
         run: |
           cargo test --workspace --all-features --no-fail-fast
+          cargo run --example asynchronous
           cargo run --example get_started
+          cargo run --example log
+          cargo run --example synchronous
+          cargo run --example unit_test
       - id: coverage
         uses: actions-rs/grcov@v0.1
       - name: Coveralls upload
