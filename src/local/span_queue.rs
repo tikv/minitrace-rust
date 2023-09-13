@@ -147,10 +147,10 @@ span1 []
         let mut queue = SpanQueue::with_capacity(16);
         {
             let span1 = queue.start_span("span1").unwrap();
-            queue.add_properties(&span1, [
-                ("k1".into(), "v1".into()),
-                ("k2".into(), "v2".into()),
-            ]);
+            queue.add_properties(
+                &span1,
+                [("k1".into(), "v1".into()), ("k2".into(), "v2".into())],
+            );
             {
                 let span2 = queue.start_span("span2").unwrap();
                 queue.add_properties(&span2, [("k1".into(), "v1".into())]);

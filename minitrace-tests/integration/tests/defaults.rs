@@ -6,8 +6,8 @@
 //   - `dev`: Generate all missing `*.expanded.rs` files, and flag changes.
 //   - `ci`: Generate nothing, and fail on mismatches.
 //
-use crate::tests::*; //IntegrationTest;
 use super::IntegrationTest;
+use crate::tests::*; //IntegrationTest;
 
 inventory::submit!(IntegrationTest {
     name: "indev",
@@ -25,11 +25,12 @@ pub fn indev() {
     macrotest::expand_args(
         src,
         &[
-            "--features", "minitrace-tests/default minitrace-tests/as",
+            "--features",
+            "minitrace-tests/default minitrace-tests/as",
             "--manifest-path",
             "./Cargo.toml",
-            ],
-        );
+        ],
+    );
     #[cfg(feature = "tk")]
     macrotest::expand_args(
         src,

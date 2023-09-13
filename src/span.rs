@@ -254,7 +254,9 @@ impl Span {
     /// ```
     #[inline]
     pub fn with_property<F>(self, property: F) -> Self
-    where F: FnOnce() -> (Cow<'static, str>, Cow<'static, str>) {
+    where
+        F: FnOnce() -> (Cow<'static, str>, Cow<'static, str>),
+    {
         self.with_properties(move || [property()])
     }
 

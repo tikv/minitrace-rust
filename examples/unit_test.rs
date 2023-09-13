@@ -29,7 +29,9 @@ mod test_util {
     use super::*;
 
     pub fn setup_minitrace<F>(test: F)
-    where F: FnOnce() -> Result<()> + 'static {
+    where
+        F: FnOnce() -> Result<()> + 'static,
+    {
         minitrace::set_reporter(ConsoleReporter, Config::default());
         {
             let root = Span::root(closure_name::<F>(), SpanContext::random());
