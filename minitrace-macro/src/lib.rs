@@ -54,7 +54,6 @@
 mod trace;
 
 extern crate proc_macro;
-extern crate proc_macro_error;
 
 /// An attribute macro designed to eliminate boilerplate code.
 ///

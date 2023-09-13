@@ -17,8 +17,7 @@ keywords = ["tracing", "span", "datadog", "jaeger", "opentelemetry"]
 proc-macro = true
 
 [dependencies]
-darling = "0.14"
-proc-macro-error = "1"
+darling = "0.20"
 proc-macro2 = "1"
 quote = "1"
 # The macro `quote_spanned!` is added to syn in 1.0.84
