@@ -43,7 +43,9 @@ pub fn expand_issue_001_dev() {
     build_issues_dev();
 }
 
-#[cfg(not(feature = "ci"))]
+// #[cfg(not(feature = "ci"))]
+#[ignore]
+// Integration tests to be migrated once PR #127 lands and closes #113
 fn build_issues_dev() {
     let t = trybuild::TestCases::new();
     t.pass("tests/expand/issues/*.expanded.rs");
@@ -51,6 +53,7 @@ fn build_issues_dev() {
 
 #[test]
 #[ignore]
+// Integration tests to be migrated once PR #127 lands and closes #113
 #[cfg(feature = "ci")]
 pub fn issues_ci() {
     // To test generated macro result files
@@ -58,6 +61,9 @@ pub fn issues_ci() {
     build_issues_ci();
 }
 
+#[test]
+#[ignore]
+// Integration tests to be migrated once PR #127 lands and closes #113
 #[cfg(feature = "ci")]
 fn build_issues_ci() {
     let t = trybuild::TestCases::new();
