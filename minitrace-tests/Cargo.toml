@@ -33,13 +33,15 @@ inventory = "0.2.2"
 # NOTE:
 # Features are only recognized via the command line in the following tests.
 #
-# cargo test --features minitrace-tests/tk --manifest-path minitrace-tests/Cargo.toml indev-tokio -- --nocapture
+# cargo test --features "minitrace-tests/default minitrace-tests/tk" \
+#            --manifest-path minitrace-tests/Cargo.toml \
+#            indev-tokio -- --nocapture
 #
-[[test]]
-name = "indev-tokio"
-path = "integration/indev.rs"
-harness = false
-required-features = ["default", "tk"]
+# [[test]]
+# name = "indev-tokio"
+# path = "integration/indev.rs"
+# harness = false
+# required-features = ["default", "tk"]
 
 # [[test]]
 # name = "dev-tokio"

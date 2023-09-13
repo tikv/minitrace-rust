@@ -1,4 +1,6 @@
 #[test]
+#[ignore]
+// Integration tests to be migrated once PR #127 lands and closes #113
 pub fn expand_defaults_dev() {
     // To generate macro result files
     macrotest::expand("tests/expand/defaults/*.rs");
@@ -6,6 +8,8 @@ pub fn expand_defaults_dev() {
 
 #[test]
 #[cfg(feature = "ci")]
+#[ignore]
+// Integration tests to be migrated once PR #127 lands and closes #113
 pub fn expand_defaults_ci() {
     // To test generated macro result files
     macrotest::expand_without_refresh("tests/expand/defaults/*.rs");
@@ -13,6 +17,7 @@ pub fn expand_defaults_ci() {
 
 #[test]
 #[ignore]
+// Integration tests to be migrated once PR #127 lands and closes #113
 pub fn expand_non_defaults_dev() {
     // To generate macro result files
     macrotest::expand("tests/expand/non-defaults/*.rs");
@@ -20,6 +25,8 @@ pub fn expand_non_defaults_dev() {
 
 #[test]
 #[cfg(feature = "ci")]
+#[ignore]
+// Integration tests to be migrated once PR #127 lands and closes #113
 pub fn expand_non_defaults_ci() {
     // To test generated macro result files
     macrotest::expand_without_refresh("tests/expand/non-defaults/*.rs");

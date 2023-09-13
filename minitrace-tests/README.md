@@ -37,7 +37,7 @@ Thanks to the following for [how to do this](https://www.infinyon.com/blog/2021/
 4. Run the single `indev` test case:
 
     ```bash
-    cargo test --features "default minitrace-tests/tk" --manifest-path minitrace-tests/Cargo.toml \
+    cargo test --features "minitrace-tests/default minitrace-tests/tk" --manifest-path minitrace-tests/Cargo.toml \
                indev-tokio \
                -- --nocapture
     ```
