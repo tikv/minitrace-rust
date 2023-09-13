@@ -1,0 +1,5 @@
+error: expected literal
+ --> tests/trace/ui/err/007-interleaved.rs:4:16
+  |
+4 | #[trace(name = struct)]
+  |                ^^^^^^

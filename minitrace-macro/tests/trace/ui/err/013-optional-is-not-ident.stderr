@@ -1,0 +1,5 @@
+error: unknown option
+ --> tests/trace/ui/err/013-optional-is-not-ident.rs:3:21
+  |
+3 | #[trace(name = "a", some::unknown=true)]
+  |                     ^^^^

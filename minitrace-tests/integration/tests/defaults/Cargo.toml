@@ -1,0 +1,21 @@
+[package]
+name = "random-thingy"
+version = "0.0.0"
+authors = ["Mark Van de Vyver <mark@taqtiqa.com>"]
+description = "Integration tests for Minitrace development"
+license = "MIT OR Apache-2.0"
+rust-version = "1.56.0"
+edition = "2021"
+
+[features]
+ci = []
+as = ["minintrace-tests/as"]
+ea = ["minintrace-tests/ea"]
+tk = ["minintrace-tests/tk"]
+
+# [lib]
+# doctest = false
+
+# Avoid adding crates, this is widely used in tests. It should compile fast!
+[dependencies]
+minitrace = { path = "../../" }

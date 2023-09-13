@@ -1,0 +1,5 @@
+error: expected literal
+ --> tests/trace/ui/err/002-name-is-symbol.rs:3:16
+  |
+3 | #[trace(name = struct)]
+  |                ^^^^^^

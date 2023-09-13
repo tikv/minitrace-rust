@@ -3,6 +3,7 @@ name = "minitrace-macro"
 version = "0.5.1"
 authors = ["The TiKV Project Authors"]
 license = "Apache-2.0"
+rust-version = "1.56.0"
 edition = "2021"
 description = "Attribute procedural macro for minitrace-rust"
 homepage = "https://github.com/tikv/minitrace-rust"
@@ -16,17 +17,31 @@ keywords = ["tracing", "span", "datadog", "jaeger", "opentelemetry"]
 proc-macro = true
 
 [dependencies]
-# The macro `quote_spanned!` is added to syn in 1.0.84
+darling = "0.14"
 proc-macro-error = "1"
 proc-macro2 = "1"
 quote = "1"
-syn = { version = "1.0.84", features = ["full", "parsing", "extra-traits", "proc-macro", "visit-mut"] }
+# The macro `quote_spanned!` is added to syn in 1.0.84
+syn = { version = "1.0.84", features = ["full", "parsing", "extra-traits", "proc-macro", "visit", "visit-mut"] }
+thiserror = "1.0.30"
+tree-flat = "0.1.1"
 
 [dev-dependencies]
+aquamarine = "0.1"
+futures = "0.3"
+futures-timer = "3.0"
 logcall = "0.1.4"
-minitrace = { path = "../minitrace" }
+macrotest = "1"
+minitrace = { path = "../" }
+minitrace-jaeger  = { path = "../minitrace-jaeger" }
+rand = "0.8"
+test-utilities = { path = "../test-utilities" }
 tokio = { version = "1", features = ["full"] }
 trybuild = "1"
 # The procedural macro `trace` only supports async-trait higher than 0.1.52
 async-trait = "0.1.52"
 log = "0.4"
+
+[features]
+default = []
+ci = []

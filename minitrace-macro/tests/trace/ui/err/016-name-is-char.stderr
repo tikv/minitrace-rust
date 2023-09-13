@@ -1,0 +1,5 @@
+error: `name` value should be a string
+ --> tests/trace/ui/err/016-name-is-char.rs:3:9
+  |
+3 | #[trace(name = 'b')]
+  |         ^^^^

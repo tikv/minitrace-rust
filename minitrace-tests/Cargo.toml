@@ -1,0 +1,48 @@
+[package]
+name = "minitrace-tests"
+version = "0.5.1"
+authors = ["Mark Van de Vyver <mark@taqtiqa.com>"]
+description = "Integration tests for Minitrace development"
+license = "MIT OR Apache-2.0"
+rust-version = "1.56.0"
+edition = "2021"
+
+[features]
+default = ["minitrace/enable"]
+ci = []
+as = ["async-std"]
+tk = ["tokio"]
+
+[lib]
+
+# Avoid adding crates, this is widely used in tests. It should compile fast!
+[dependencies]
+async-std = { version = "1.11.0", features = ["attributes"], optional = true }
+futures = "0.3.21"
+futures-timer = "3.0.2"
+macrotest = "1"
+minitrace = { version = "0.5.1", path = "../", features = ["enable"]}
+test-utilities = { path = "../test-utilities" }
+tokio = { version = "1.17.0", features = ["full"], optional = true }
+trybuild = "1"
+
+[dev-dependencies]
+tokio = { version = "1.17.0", features = ["full"] }
+inventory = "0.2.2"
+
+# NOTE:
+# Features are only recognized via the command line in the following tests.
+#
+# cargo test --features minitrace-tests/tk --manifest-path minitrace-tests/Cargo.toml indev-tokio -- --nocapture
+#
+[[test]]
+name = "indev-tokio"
+path = "integration/indev.rs"
+harness = false
+required-features = ["default", "tk"]
+
+# [[test]]
+# name = "dev-tokio"
+# path = "integration/main.rs"
+# harness = false
+# required-features = ["tk"]

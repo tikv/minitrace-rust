@@ -1,0 +1,5 @@
+error: unknown option
+ --> tests/trace/ui/err/012-optional-is-unknown-ident.rs:3:21
+  |
+3 | #[trace(name = "a", some_unknown = true)]
+  |                     ^^^^^^^^^^^^

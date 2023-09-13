@@ -1,0 +1,19 @@
+// SPDX-License-Identifier: Apache-2.0 OR MIT
+// Copyright 2022 Tokio project authors
+
+use minitrace::trace;
+
+// Reproduces a compile error when returning an `impl Trait` from an
+// instrumented async fn (see https://github.com/tokio-rs/tracing/issues/1615)
+#[trace]
+async fn re_a(n: i32) -> Result<impl Iterator<Item = i32>, ()> {
+    let n = n;
+    Ok((0..10).filter(move |x| *x < n))
+}
+
+// Reproduces a compile error when returning an `impl Trait` from an
+// instrumented async fn (see https://github.com/tokio-rs/tracing/issues/1615)
+#[trace("err")]
+async fn re_b(n: i32) -> Result<impl Iterator<Item = i32>, &'static str> {
+    Ok((0..10).filter(move |x| *x < n))
+}

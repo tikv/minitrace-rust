@@ -1,0 +1,60 @@
+[package]
+name = "minitrace"
+version = "0.5.0"
+authors = ["The TiKV Project Authors"]
+license = "Apache-2.0"
+rust-version = "1.56.0"
+edition = "2021"
+description = "A high-performance timeline tracing library for Rust"
+homepage = "https://github.com/tikv/minitrace-rust"
+repository = "https://github.com/tikv/minitrace-rust"
+documentation = "https://docs.rs/minitrace"
+readme = "README.md"
+keywords = ["tracing", "span", "datadog", "jaeger", "opentracing"]
+
+[dependencies]
+minstant = "0.1"
+minitrace-macro = { path = "../minitrace-macro" }
+pin-project = "1.0"
+parking_lot = "0.11"
+futures = "0.3"
+# TODO: Remove once_cell once #![feature(once_cell)] is stabilized
+once_cell = "1"
+# TODO: Remove retain_mut once #![feature(vec_retain_mut)] is stabilized
+retain_mut = "0.1"
+
+[dev-dependencies]
+# The procedural macro `trace` only supports async-trait higher than 0.1.52
+async-trait = "0.1.52"
+criterion = { version = "0.3", features = ["html_reports"] }
+crossbeam = "0.8"
+minitrace-jaeger = { path = "../minitrace-jaeger" }
+minitrace-datadog = { path = "../minitrace-datadog" }
+tokio = { version = "1", features = ["rt", "time", "macros"] }
+rustracing = "0.5"
+opentelemetry = { version = "0.16", default-features = false, features = ["trace"] }
+opentelemetry-jaeger = "0.15"
+tracing-opentelemetry = "0.15"
+tracing = "0.1"
+tracing-core = "0.1"
+tracing-subscriber = "0.2"
+rand = "0.8"
+futures = "0.3"
+futures-timer = "3"
+mockall = "0.11"
+
+[[bench]]
+name = "trace"
+harness = false
+
+[[bench]]
+name = "compare"
+harness = false
+
+[[bench]]
+name = "spsc"
+harness = false
+
+[[bench]]
+name = "object_pool"
+harness = false

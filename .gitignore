@@ -3,3 +3,4 @@
 
 .idea
 Cargo.lock
+*.log

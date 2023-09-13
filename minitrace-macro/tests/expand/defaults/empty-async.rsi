@@ -1,0 +1,2 @@
+#[trace]
+async fn f() {}

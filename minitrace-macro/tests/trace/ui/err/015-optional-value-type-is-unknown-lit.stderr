@@ -1,0 +1,5 @@
+error: `enter_on_poll` value should be an boolean
+ --> tests/trace/ui/err/015-optional-value-type-is-unknown-lit.rs:3:21
+  |
+3 | #[trace(name = "a", enter_on_poll = 'y')]
+  |                     ^^^^^^^^^^^^^

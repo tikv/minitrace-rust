@@ -1,0 +1,5 @@
+error: Too many arguments. This attribute takes up to two (2) arguments
+ --> tests/trace/ui/err/006-has-too-many-arguments.rs:3:9
+  |
+3 | #[trace(a=true, b=true, c=true, d=true)]
+  |         ^

@@ -1,0 +1,5 @@
+error: expected path
+ --> tests/trace/ui/err/009-optional-is-known-str.rs:3:21
+  |
+3 | #[trace(name = "a", "enter_on_poll" = true)]
+  |                     ^^^^^^^^^^^^^^^

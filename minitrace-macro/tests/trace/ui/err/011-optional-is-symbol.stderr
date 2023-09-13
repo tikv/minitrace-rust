@@ -1,0 +1,7 @@
+error: expected `=`
+ --> tests/trace/ui/err/011-optional-is-symbol.rs:3:1
+  |
+3 | #[trace(name = "a", type)]
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |
+  = note: this error originates in the attribute macro `trace` (in Nightly builds, run with -Z macro-backtrace for more info)

@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Refactor `minitrace-macro` to pipeline model (issue #113).
+- Issue #142: Attribute arguments are all keyword/named arguments. Position arguments deprecated.
+- Issue #128: Attribute parsing errors should not break IDE completion, etc.
+- Issue #112: Fixed
+
 ## v0.5.1
 
 - Fix panics due to destruction of Thread Local Storage value
@@ -19,7 +24,7 @@
 - Remove `LocalSpanGuard` and merge it into `LocalSpan`.
 - Remove `LocalSpan::with_property`, `LocalSpan::with_properties`, `Span::with_property` and `Span::with_properties`.
 - Add `LocalSpan::add_property`, `LocalSpan::add_properties`, `Span::add_property` and `Span::add_properties`.
-- Remove `LocalParentGuard`. `Span::set_local_parent` returns a general `Option<Guard<impl FnOnce()>>` instead. 
+- Remove `LocalParentGuard`. `Span::set_local_parent` returns a general `Option<Guard<impl FnOnce()>>` instead.
 
 ## v0.3.1
 

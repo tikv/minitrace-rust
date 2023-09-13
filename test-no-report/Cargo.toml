@@ -8,4 +8,4 @@ readme = "README.md"
 publish = false
 
 [dependencies]
-minitrace = { path = "../minitrace" }
+minitrace = { path = "../" }

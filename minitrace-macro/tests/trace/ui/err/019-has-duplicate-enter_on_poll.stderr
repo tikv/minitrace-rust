@@ -1,0 +1,5 @@
+error: `enter_on_poll` provided twice
+ --> tests/trace/ui/err/019-has-duplicate-enter_on_poll.rs:3:31
+  |
+3 | #[trace(enter_on_poll = true, enter_on_poll = false)]
+  |                               ^^^^^^^^^^^^^

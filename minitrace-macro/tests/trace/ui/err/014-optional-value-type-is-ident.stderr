@@ -1,0 +1,5 @@
+error: expected literal
+ --> tests/trace/ui/err/014-optional-value-type-is-ident.rs:3:37
+  |
+3 | #[trace(name = "a", enter_on_poll = y)]
+  |                                     ^

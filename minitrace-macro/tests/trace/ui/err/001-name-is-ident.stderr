@@ -1,0 +1,5 @@
+error: expected literal
+ --> tests/trace/ui/err/001-name-is-ident.rs:3:16
+  |
+3 | #[trace(name = b)]
+  |                ^

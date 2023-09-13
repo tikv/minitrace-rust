@@ -1,5 +1,0 @@
-error: expected `fn`
- --> tests/ui/err/item-is-not-a-function.rs:4:1
-  |
-4 | struct S;
-  | ^^^^^^
