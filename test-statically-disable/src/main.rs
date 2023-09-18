@@ -2,7 +2,7 @@
 
 // The libraries may have tracing instrument embedded in the code for tracing purposes. However,
 // if the executable does not enable minitrace, it will be statically disabled. This results in
-// zero overhead to the libraries, achieved through conditional compilation with the "report" feature.
+// zero overhead to the libraries, achieved through conditional compilation with the "enable" feature.
 //
 // The following test is designed to confirm that minitrace compiles when it's statically disabled in the executable.
 

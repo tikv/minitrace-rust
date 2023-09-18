@@ -1,5 +1,5 @@
 [package]
-name = "test-no-report"
+name = "test-statically-disable"
 version = "0.0.1"
 authors = ["The TiKV Project Authors"]
 license = "Apache-2.0"

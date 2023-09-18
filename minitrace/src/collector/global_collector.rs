@@ -1,5 +1,6 @@
 // Copyright 2021 TiKV Project Authors. Licensed under Apache-2.0.
 
+use std::cell::UnsafeCell;
 use std::collections::HashMap;
 use std::sync::atomic::AtomicBool;
 use std::sync::atomic::AtomicUsize;
@@ -38,10 +39,10 @@ static SPSC_RXS: Lazy<Mutex<Vec<Receiver<CollectCommand>>>> = Lazy::new(|| Mutex
 static REPORTER_READY: AtomicBool = AtomicBool::new(false);
 
 thread_local! {
-    static COMMAND_SENDER: Sender<CollectCommand> = {
+    static COMMAND_SENDER: UnsafeCell<Sender<CollectCommand>> = {
         let (tx, rx) = spsc::bounded(10240);
         register_receiver(rx);
-        tx
+        UnsafeCell::new(tx)
     };
 }
 
@@ -50,12 +51,14 @@ fn register_receiver(rx: Receiver<CollectCommand>) {
 }
 
 fn send_command(cmd: CollectCommand) {
-    COMMAND_SENDER.try_with(|sender| sender.send(cmd).ok()).ok();
+    COMMAND_SENDER
+        .try_with(|sender| unsafe { (*sender.get()).send(cmd).ok() })
+        .ok();
 }
 
 fn force_send_command(cmd: CollectCommand) {
     COMMAND_SENDER
-        .try_with(|sender| sender.force_send(cmd))
+        .try_with(|sender| unsafe { (*sender.get()).force_send(cmd) })
         .ok();
 }
 
@@ -251,10 +254,11 @@ impl GlobalCollector {
                         Ok(Some(CollectCommand::CommitCollect(cmd))) => commit_collects.push(cmd),
                         Ok(Some(CollectCommand::SubmitSpans(cmd))) => submit_spans.push(cmd),
                         Ok(None) => {
+                            // Channel is empty.
                             return true;
                         }
                         Err(_) => {
-                            // Channel disconnected. It must be because the sender thread has stopped.
+                            // Channel closed. Remove it from the channel list.
                             return false;
                         }
                     }

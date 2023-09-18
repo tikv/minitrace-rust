@@ -7,6 +7,16 @@ use criterion::Criterion;
 use minitrace::local::LocalCollector;
 use minitrace::prelude::*;
 
+fn init_minitrace() {
+    struct DummyReporter;
+
+    impl minitrace::collector::Reporter for DummyReporter {
+        fn report(&mut self, _spans: &[minitrace::prelude::SpanRecord]) {}
+    }
+
+    minitrace::set_reporter(DummyReporter, minitrace::collector::Config::default());
+}
+
 fn dummy_iter(i: usize) {
     #[trace]
     fn dummy() {}
@@ -25,7 +35,6 @@ fn dummy_rec(i: usize) {
 
 fn bench_trace_wide_raw(c: &mut Criterion) {
     let mut group = c.benchmark_group("trace_wide_raw");
-
     for len in &[1, 10, 100, 1000, 10000] {
         group.bench_function(len.to_string(), |b| {
             b.iter(|| {
@@ -37,23 +46,18 @@ fn bench_trace_wide_raw(c: &mut Criterion) {
     }
 
     group.finish();
+    minitrace::flush();
 }
 
 fn bench_trace_wide(c: &mut Criterion) {
+    init_minitrace();
+
     let mut group = c.benchmark_group("trace_wide");
 
     for len in &[1, 10, 100, 1000, 10000] {
-        group.bench_function(format!("with-collect-{}", len), |b| {
+        group.bench_function(len.to_string(), |b| {
             b.iter(|| {
                 let root = Span::root("root", SpanContext::new(TraceId(12), SpanId::default()));
-                let _sg = root.set_local_parent();
-                dummy_iter(*len - 1);
-            })
-        });
-        group.bench_function(format!("without-collect-{}", len), |b| {
-            b.iter(|| {
-                let root: Span =
-                    Span::root("root", SpanContext::new(TraceId(12), SpanId::default()));
                 let _sg = root.set_local_parent();
                 dummy_iter(*len - 1);
             })
@@ -61,6 +65,7 @@ fn bench_trace_wide(c: &mut Criterion) {
     }
 
     group.finish();
+    minitrace::flush()
 }
 
 fn bench_trace_deep_raw(c: &mut Criterion) {
@@ -77,20 +82,16 @@ fn bench_trace_deep_raw(c: &mut Criterion) {
     }
 
     group.finish();
+    minitrace::flush()
 }
 
 fn bench_trace_deep(c: &mut Criterion) {
+    init_minitrace();
+
     let mut group = c.benchmark_group("trace_deep");
 
     for len in &[1, 10, 100, 1000] {
-        group.bench_function(format!("with-collect-{}", len), |b| {
-            b.iter(|| {
-                let root = Span::root("root", SpanContext::new(TraceId(12), SpanId::default()));
-                let _sg = root.set_local_parent();
-                dummy_rec(*len - 1);
-            })
-        });
-        group.bench_function(format!("without-collect-{}", len), |b| {
+        group.bench_function(len.to_string(), |b| {
             b.iter(|| {
                 let root = Span::root("root", SpanContext::new(TraceId(12), SpanId::default()));
                 let _sg = root.set_local_parent();
@@ -100,9 +101,12 @@ fn bench_trace_deep(c: &mut Criterion) {
     }
 
     group.finish();
+    minitrace::flush()
 }
 
 fn bench_trace_future(c: &mut Criterion) {
+    init_minitrace();
+
     async fn f(i: u32) {
         for _ in 0..i - 1 {
             async {}.enter_on_poll(black_box("")).await
@@ -121,6 +125,7 @@ fn bench_trace_future(c: &mut Criterion) {
     }
 
     group.finish();
+    minitrace::flush()
 }
 
 criterion_group!(
