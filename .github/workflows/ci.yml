@@ -46,4 +46,4 @@ jobs:
         cargo run --example asynchronous
         cargo run --example synchronous
         cargo run --example get_started
-        cargo run --package test-no-report
+        cargo run --package test-statically-disable
