@@ -84,6 +84,33 @@ fn spsc_comparison(c: &mut Criterion) {
                 total_time
             })
         });
+        bgroup.bench_function(format!("minitrace-legacy/{}", len), |b| {
+            b.iter_custom(|iters| {
+                let mut total_time = Duration::default();
+                for _ in 0..iters {
+                    let (tx, mut rx) = minitrace::util::legacy_spsc::bounded(10240);
+
+                    let start = Instant::now();
+
+                    std::thread::spawn(move || {
+                        for i in 0..len {
+                            while tx.send(i).is_err() {}
+                        }
+                    });
+
+                    for _ in 0..len {
+                        loop {
+                            if let Ok(_) = rx.try_recv() {
+                                break;
+                            }
+                        }
+                    }
+
+                    total_time += start.elapsed();
+                }
+                total_time
+            })
+        });
     }
 
     bgroup.finish();
@@ -132,6 +159,23 @@ fn spsc_send_only_comparison(c: &mut Criterion) {
                 let mut total_time = Duration::default();
                 for _ in 0..iters {
                     let (mut tx, _rx) = minitrace::util::spsc::bounded(10240);
+
+                    let start = Instant::now();
+
+                    for i in 0..len {
+                        tx.send(i).unwrap();
+                    }
+
+                    total_time += start.elapsed();
+                }
+                total_time
+            })
+        });
+        bgroup.bench_function(format!("minitrace-legacy/{}", len), |b| {
+            b.iter_custom(|iters| {
+                let mut total_time = Duration::default();
+                for _ in 0..iters {
+                    let (tx, _rx) = minitrace::util::legacy_spsc::bounded(10240);
 
                     let start = Instant::now();
 
