@@ -73,7 +73,7 @@ fn spsc_comparison(c: &mut Criterion) {
 
                     for _ in 0..len {
                         loop {
-                            if let Ok(_) = rx.try_recv() {
+                            if let Ok(Some(_)) = rx.try_recv() {
                                 break;
                             }
                         }
@@ -100,7 +100,7 @@ fn spsc_comparison(c: &mut Criterion) {
 
                     for _ in 0..len {
                         loop {
-                            if let Ok(_) = rx.try_recv() {
+                            if let Ok(Some(_)) = rx.try_recv() {
                                 break;
                             }
                         }
