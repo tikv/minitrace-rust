@@ -1,31 +1,28 @@
 // Copyright 2022 TiKV Project Authors. Licensed under Apache-2.0.
 
-use std::sync::Arc;
-
-use parking_lot::Mutex;
+use rtrb::Consumer;
+use rtrb::Producer;
+use rtrb::PushError;
+use rtrb::RingBuffer;
 
 pub fn bounded<T>(capacity: usize) -> (Sender<T>, Receiver<T>) {
-    let page = Arc::new(Mutex::new(Vec::with_capacity(capacity)));
+    let (tx, rx) = RingBuffer::new(capacity);
     (
         Sender {
-            page: page.clone(),
-            capacity,
+            tx,
+            pending_messages: Vec::new(),
         },
-        Receiver {
-            page,
-            received: Vec::with_capacity(capacity),
-        },
+        Receiver { rx },
     )
 }
 
 pub struct Sender<T> {
-    page: Arc<Mutex<Vec<T>>>,
-    capacity: usize,
+    tx: Producer<T>,
+    pending_messages: Vec<T>,
 }
 
 pub struct Receiver<T> {
-    page: Arc<Mutex<Vec<T>>>,
-    received: Vec<T>,
+    rx: Consumer<T>,
 }
 
 #[derive(Debug)]
@@ -35,41 +32,37 @@ pub struct ChannelFull;
 pub struct ChannelClosed;
 
 impl<T> Sender<T> {
-    pub fn send(&self, value: T) -> Result<(), ChannelFull> {
-        let mut page = self.page.lock();
-        if page.len() < self.capacity {
-            page.push(value);
-            Ok(())
-        } else {
-            Err(ChannelFull)
+    pub fn send(&mut self, value: T) -> Result<(), ChannelFull> {
+        while let Some(value) = self.pending_messages.pop() {
+            if let Err(PushError::Full(value)) = self.tx.push(value) {
+                self.pending_messages.push(value);
+                return Err(ChannelFull);
+            }
         }
+
+        self.tx.push(value).map_err(|_| ChannelFull)
     }
 
-    pub fn force_send(&self, value: T) {
-        let mut page = self.page.lock();
-        page.push(value);
+    pub fn force_send(&mut self, value: T) {
+        while let Some(value) = self.pending_messages.pop() {
+            if let Err(PushError::Full(value)) = self.tx.push(value) {
+                self.pending_messages.push(value);
+                break;
+            }
+        }
+
+        if let Err(PushError::Full(value)) = self.tx.push(value) {
+            self.pending_messages.push(value);
+        }
     }
 }
 
 impl<T> Receiver<T> {
     pub fn try_recv(&mut self) -> Result<Option<T>, ChannelClosed> {
-        match self.received.pop() {
-            Some(val) => Ok(Some(val)),
-            None => {
-                let mut page = self.page.lock();
-                std::mem::swap(&mut *page, &mut self.received);
-                match self.received.pop() {
-                    Some(val) => Ok(Some(val)),
-                    None => {
-                        let is_disconnected = Arc::strong_count(&self.page) < 2;
-                        if is_disconnected {
-                            Err(ChannelClosed)
-                        } else {
-                            Ok(None)
-                        }
-                    }
-                }
-            }
+        match self.rx.pop() {
+            Ok(val) => Ok(Some(val)),
+            Err(_) if self.rx.is_abandoned() => Err(ChannelClosed),
+            Err(_) => Ok(None),
         }
     }
 }
