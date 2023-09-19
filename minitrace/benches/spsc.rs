@@ -72,7 +72,11 @@ fn spsc_comparison(c: &mut Criterion) {
                     });
 
                     for _ in 0..len {
-                        while rx.try_recv().is_err() {}
+                        loop {
+                            if let Ok(_) = rx.try_recv() {
+                                break;
+                            }
+                        }
                     }
 
                     total_time += start.elapsed();
