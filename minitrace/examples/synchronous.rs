@@ -71,14 +71,15 @@ impl ReportAll {
                     },
                     opentelemetry_otlp::TonicConfig::default(),
                 )
-                .unwrap(),
+                .expect("initialize oltp exporter"),
                 opentelemetry::trace::SpanKind::Server,
                 Cow::Owned(opentelemetry::sdk::Resource::new([
-                    opentelemetry::KeyValue::new("service.name", "synchronous"),
+                    opentelemetry::KeyValue::new("service.name", "synchronous(opentelemetry)"),
                 ])),
                 opentelemetry::InstrumentationLibrary::new(
                     "example-crate",
                     Some(env!("CARGO_PKG_VERSION")),
+                    None::<&'static str>,
                     None,
                 ),
             ),
