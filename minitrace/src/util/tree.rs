@@ -230,7 +230,6 @@ impl Tree {
         t.children.remove(0)
     }
 
-    #[allow(clippy::type_complexity)]
     fn build_tree(id: SpanId, raw: &mut TreeChildren) -> Tree {
         let (name, children, properties) = raw.get(&id).cloned().unwrap();
         Tree {
