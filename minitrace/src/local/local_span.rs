@@ -63,12 +63,16 @@ impl LocalSpan {
     /// ```
     /// use minitrace::prelude::*;
     ///
-    /// let span = LocalSpan::enter_with_local_parent("a child span")
-    ///     .with_property(|| ("key".into(), "value".into()));
+    /// let span =
+    ///     LocalSpan::enter_with_local_parent("a child span").with_property(|| ("key", "value"));
     /// ```
     #[inline]
-    pub fn with_property<F>(self, property: F) -> Self
-    where F: FnOnce() -> (Cow<'static, str>, Cow<'static, str>) {
+    pub fn with_property<K, V, F>(self, property: F) -> Self
+    where
+        K: Into<Cow<'static, str>>,
+        V: Into<Cow<'static, str>>,
+        F: FnOnce() -> (K, V),
+    {
         self.with_properties(|| [property()])
     }
 
@@ -79,17 +83,15 @@ impl LocalSpan {
     /// ```
     /// use minitrace::prelude::*;
     ///
-    /// let span = LocalSpan::enter_with_local_parent("a child span").with_properties(|| {
-    ///     vec![
-    ///         ("key1".into(), "value1".into()),
-    ///         ("key2".into(), "value2".into()),
-    ///     ]
-    /// });
+    /// let span = LocalSpan::enter_with_local_parent("a child span")
+    ///     .with_properties(|| vec![("key1", "value1"), ("key2", "value2")]);
     /// ```
     #[inline]
-    pub fn with_properties<I, F>(self, properties: F) -> Self
+    pub fn with_properties<K, V, I, F>(self, properties: F) -> Self
     where
-        I: IntoIterator<Item = (Cow<'static, str>, Cow<'static, str>)>,
+        K: Into<Cow<'static, str>>,
+        V: Into<Cow<'static, str>>,
+        I: IntoIterator<Item = (K, V)>,
         F: FnOnce() -> I,
     {
         #[cfg(feature = "enable")]
@@ -156,8 +158,8 @@ mod tests {
         {
             let _g = LocalSpan::enter_with_stack("span1", stack.clone());
             {
-                let _span = LocalSpan::enter_with_stack("span2", stack)
-                    .with_property(|| ("k1".into(), "v1".into()));
+                let _span =
+                    LocalSpan::enter_with_stack("span2", stack).with_property(|| ("k1", "v1"));
             }
         }
 
@@ -174,8 +176,7 @@ span1 []
 
     #[test]
     fn local_span_noop() {
-        let _span1 = LocalSpan::enter_with_local_parent("span1")
-            .with_property(|| ("k1".into(), "v1".into()));
+        let _span1 = LocalSpan::enter_with_local_parent("span1").with_property(|| ("k1", "v1"));
     }
 
     #[test]
@@ -194,8 +195,8 @@ span1 []
         {
             let span1 = LocalSpan::enter_with_stack("span1", stack.clone());
             {
-                let _span2 = LocalSpan::enter_with_stack("span2", stack)
-                    .with_property(|| ("k1".into(), "v1".into()));
+                let _span2 =
+                    LocalSpan::enter_with_stack("span2", stack).with_property(|| ("k1", "v1"));
 
                 drop(span1);
             }

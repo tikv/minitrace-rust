@@ -249,12 +249,15 @@ impl Span {
     /// ```
     /// use minitrace::prelude::*;
     ///
-    /// let root =
-    ///     Span::root("root", SpanContext::random()).with_property(|| ("key".into(), "value".into()));
+    /// let root = Span::root("root", SpanContext::random()).with_property(|| ("key", "value"));
     /// ```
     #[inline]
-    pub fn with_property<F>(self, property: F) -> Self
-    where F: FnOnce() -> (Cow<'static, str>, Cow<'static, str>) {
+    pub fn with_property<K, V, F>(self, property: F) -> Self
+    where
+        K: Into<Cow<'static, str>>,
+        V: Into<Cow<'static, str>>,
+        F: FnOnce() -> (K, V),
+    {
         self.with_properties(move || [property()])
     }
 
@@ -265,17 +268,15 @@ impl Span {
     /// ```
     /// use minitrace::prelude::*;
     ///
-    /// let root = Span::root("root", SpanContext::random()).with_properties(|| {
-    ///     vec![
-    ///         ("key1".into(), "value1".into()),
-    ///         ("key2".into(), "value2".into()),
-    ///     ]
-    /// });
+    /// let root = Span::root("root", SpanContext::random())
+    ///     .with_properties(|| vec![("key1", "value1"), ("key2", "value2")]);
     /// ```
     #[inline]
-    pub fn with_properties<I, F>(mut self, properties: F) -> Self
+    pub fn with_properties<K, V, I, F>(mut self, properties: F) -> Self
     where
-        I: IntoIterator<Item = (Cow<'static, str>, Cow<'static, str>)>,
+        K: Into<Cow<'static, str>>,
+        V: Into<Cow<'static, str>>,
+        I: IntoIterator<Item = (K, V)>,
         F: FnOnce() -> I,
     {
         #[cfg(feature = "enable")]
@@ -400,14 +401,16 @@ impl Span {
 #[cfg(feature = "enable")]
 impl SpanInner {
     #[inline]
-    fn add_properties<I, F>(&mut self, properties: F)
+    fn add_properties<K, V, I, F>(&mut self, properties: F)
     where
-        I: IntoIterator<Item = (Cow<'static, str>, Cow<'static, str>)>,
+        K: Into<Cow<'static, str>>,
+        V: Into<Cow<'static, str>>,
+        I: IntoIterator<Item = (K, V)>,
         F: FnOnce() -> I,
     {
-        for prop in properties() {
-            self.raw_span.properties.push(prop);
-        }
+        self.raw_span
+            .properties
+            .extend(properties().into_iter().map(|(k, v)| (k.into(), v.into())));
     }
 
     #[inline]
@@ -609,8 +612,8 @@ mod tests {
         let routine = |collect| {
             let parent_ctx = SpanContext::random();
             let root = Span::root("root", parent_ctx, collect);
-            let child1 = Span::enter_with_parent("child1", &root)
-                .with_properties(|| [("k1".into(), "v1".into())]);
+            let child1 =
+                Span::enter_with_parent("child1", &root).with_properties(|| [("k1", "v1")]);
             let grandchild = Span::enter_with_parent("grandchild", &child1);
             let child2 = Span::enter_with_parent("child2", &root);
 
@@ -678,7 +681,7 @@ root []
                 [&parent1, &parent2, &parent3, &parent4, &parent5, &child1],
                 collect,
             )
-            .with_property(|| ("k1".into(), "v1".into()));
+            .with_property(|| ("k1", "v1"));
 
             crossbeam::scope(move |scope| {
                 let mut rng = thread_rng();

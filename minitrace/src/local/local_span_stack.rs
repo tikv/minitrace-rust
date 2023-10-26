@@ -98,9 +98,11 @@ impl LocalSpanStack {
     }
 
     #[inline]
-    pub fn add_properties<I, F>(&mut self, local_span_handle: &LocalSpanHandle, properties: F)
+    pub fn add_properties<K, V, I, F>(&mut self, local_span_handle: &LocalSpanHandle, properties: F)
     where
-        I: IntoIterator<Item = (Cow<'static, str>, Cow<'static, str>)>,
+        K: Into<Cow<'static, str>>,
+        V: Into<Cow<'static, str>>,
+        I: IntoIterator<Item = (K, V)>,
         F: FnOnce() -> I,
     {
         debug_assert!(self.current_span_line().is_some());
@@ -355,7 +357,7 @@ span1 []
                     .into(),
                 ))
                 .unwrap();
-            span_stack.add_properties(&span1, || [("k1".into(), "v1".into())]);
+            span_stack.add_properties(&span1, || [("k1", "v1")]);
             let _ = span_stack.unregister_and_collect(span_line2).unwrap();
         }
         span_stack.exit_span(span1);
