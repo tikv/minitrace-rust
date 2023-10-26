@@ -50,7 +50,7 @@ pub struct SpanRecord {
     pub parent_id: SpanId,
     pub begin_time_unix_ns: u64,
     pub duration_ns: u64,
-    pub name: &'static str,
+    pub name: Cow<'static, str>,
     pub properties: Vec<(Cow<'static, str>, Cow<'static, str>)>,
     pub events: Vec<EventRecord>,
 }
@@ -58,7 +58,7 @@ pub struct SpanRecord {
 /// A record of an event that occurred during the execution of a span.
 #[derive(Clone, Debug, Default)]
 pub struct EventRecord {
-    pub name: &'static str,
+    pub name: Cow<'static, str>,
     pub timestamp_unix_ns: u64,
     pub properties: Vec<(Cow<'static, str>, Cow<'static, str>)>,
 }

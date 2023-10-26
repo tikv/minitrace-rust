@@ -6,6 +6,7 @@ pub mod spsc;
 #[doc(hidden)]
 pub mod tree;
 
+use std::borrow::Cow;
 use std::cell::RefCell;
 use std::iter::FromIterator;
 
@@ -20,20 +21,34 @@ use crate::util::object_pool::Reusable;
 static RAW_SPANS_POOL: Lazy<Pool<Vec<RawSpan>>> = Lazy::new(|| Pool::new(Vec::new, Vec::clear));
 static COLLECT_TOKEN_ITEMS_POOL: Lazy<Pool<Vec<CollectTokenItem>>> =
     Lazy::new(|| Pool::new(Vec::new, Vec::clear));
+#[allow(clippy::type_complexity)]
+static PROPERTIES_POOL: Lazy<Pool<Vec<(Cow<'static, str>, Cow<'static, str>)>>> =
+    Lazy::new(|| Pool::new(Vec::new, Vec::clear));
 
 thread_local! {
     static RAW_SPANS_PULLER: RefCell<Puller<'static, Vec<RawSpan>>> = RefCell::new(RAW_SPANS_POOL.puller(512));
     static COLLECT_TOKEN_ITEMS_PULLER: RefCell<Puller<'static, Vec<CollectTokenItem>>>  = RefCell::new(COLLECT_TOKEN_ITEMS_POOL.puller(512));
+    #[allow(clippy::type_complexity)]
+    static PROPERTIES_PULLER: RefCell<Puller<'static, Vec<(Cow<'static, str>, Cow<'static, str>)>>>  = RefCell::new(PROPERTIES_POOL.puller(512));
 }
 
 pub type RawSpans = Reusable<'static, Vec<RawSpan>>;
 pub type CollectToken = Reusable<'static, Vec<CollectTokenItem>>;
+pub type Properties = Reusable<'static, Vec<(Cow<'static, str>, Cow<'static, str>)>>;
 
 impl Default for RawSpans {
     fn default() -> Self {
         RAW_SPANS_PULLER
             .try_with(|puller| puller.borrow_mut().pull())
             .unwrap_or_else(|_| Reusable::new(&*RAW_SPANS_POOL, vec![]))
+    }
+}
+
+impl Default for Properties {
+    fn default() -> Self {
+        PROPERTIES_PULLER
+            .try_with(|puller| puller.borrow_mut().pull())
+            .unwrap_or_else(|_| Reusable::new(&*PROPERTIES_POOL, vec![]))
     }
 }
 

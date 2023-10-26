@@ -5,14 +5,15 @@ use std::borrow::Cow;
 use minstant::Instant;
 
 use crate::collector::SpanId;
+use crate::util::Properties;
 
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub struct RawSpan {
     pub id: SpanId,
     pub parent_id: SpanId,
     pub begin_instant: Instant,
-    pub name: &'static str,
-    pub properties: Vec<(Cow<'static, str>, Cow<'static, str>)>,
+    pub name: Cow<'static, str>,
+    pub properties: Properties,
     pub is_event: bool,
 
     // Will write this field at post processing
@@ -25,15 +26,15 @@ impl RawSpan {
         id: SpanId,
         parent_id: SpanId,
         begin_instant: Instant,
-        name: &'static str,
+        name: impl Into<Cow<'static, str>>,
         is_event: bool,
     ) -> Self {
         RawSpan {
             id,
             parent_id,
             begin_instant,
-            name,
-            properties: vec![],
+            name: name.into(),
+            properties: Properties::default(),
             is_event,
             end_instant: begin_instant,
         }
@@ -42,5 +43,22 @@ impl RawSpan {
     #[inline]
     pub(crate) fn end_with(&mut self, end_instant: Instant) {
         self.end_instant = end_instant;
+    }
+}
+
+impl Clone for RawSpan {
+    fn clone(&self) -> Self {
+        let mut properties = Properties::default();
+        properties.extend(self.properties.iter().cloned());
+
+        RawSpan {
+            id: self.id,
+            parent_id: self.parent_id,
+            begin_instant: self.begin_instant,
+            name: self.name.clone(),
+            properties,
+            is_event: self.is_event,
+            end_instant: self.end_instant,
+        }
     }
 }

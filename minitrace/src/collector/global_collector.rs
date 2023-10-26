@@ -434,7 +434,7 @@ fn amend_local_span(
 
         if span.is_event {
             let event = EventRecord {
-                name: span.name,
+                name: span.name.clone(),
                 timestamp_unix_ns: begin_time_unix_ns,
                 properties: span.properties.clone(),
             };
@@ -453,7 +453,7 @@ fn amend_local_span(
             parent_id,
             begin_time_unix_ns,
             duration_ns: end_time_unix_ns.saturating_sub(begin_time_unix_ns),
-            name: span.name,
+            name: span.name.clone(),
             properties: span.properties.clone(),
             events: vec![],
         });
@@ -472,7 +472,7 @@ fn amend_span(
 
     if raw_span.is_event {
         let event = EventRecord {
-            name: raw_span.name,
+            name: raw_span.name.clone(),
             timestamp_unix_ns: begin_time_unix_ns,
             properties: raw_span.properties.clone(),
         };
@@ -487,7 +487,7 @@ fn amend_span(
         parent_id,
         begin_time_unix_ns,
         duration_ns: end_time_unix_ns.saturating_sub(begin_time_unix_ns),
-        name: raw_span.name,
+        name: raw_span.name.clone(),
         properties: raw_span.properties.clone(),
         events: vec![],
     });

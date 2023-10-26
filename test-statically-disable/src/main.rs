@@ -24,8 +24,8 @@ fn main() {
     );
 
     let mut root = Span::root("root", SpanContext::new(TraceId(0), SpanId(0)))
-        .with_property(|| ("k1".into(), "v1".into()))
-        .with_properties(|| [("k2".into(), "v2".into())]);
+        .with_property(|| ("k1", "v1"))
+        .with_properties(|| [("k2", "v2")]);
 
     Event::add_to_parent("event", &root, || []);
     Event::add_to_local_parent("event", || []);
@@ -35,8 +35,8 @@ fn main() {
     Event::add_to_local_parent("event", || []);
 
     let _span1 = LocalSpan::enter_with_local_parent("span1")
-        .with_property(|| ("k".into(), "v".into()))
-        .with_properties(|| [("k".into(), "v".into())]);
+        .with_property(|| ("k", "v"))
+        .with_properties(|| [("k", "v")]);
 
     let _span2 = LocalSpan::enter_with_local_parent("span2");
 
