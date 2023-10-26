@@ -54,7 +54,7 @@ let reporter = OpenTelemetryReporter::new(
     .unwrap(),
     SpanKind::Server,
     Cow::Owned(Resource::new([KeyValue::new("service.name", "asynchronous")])),
-    InstrumentationLibrary::new("example-crate", Some(env!("CARGO_PKG_VERSION")), None),
+    InstrumentationLibrary::new("example-crate", Some(env!("CARGO_PKG_VERSION")), None::<&'static str>, None),
 );
 minitrace::set_reporter(reporter, Config::default());
 
