@@ -57,13 +57,13 @@ impl OpenTelemetryReporter {
             .iter()
             .map(move |span| SpanData {
                 span_context: SpanContext::new(
-                    span.trace_id.0.to_be_bytes().into(),
-                    span.span_id.0.to_be_bytes().into(),
+                    span.trace_id.0.into(),
+                    span.span_id.0.into(),
                     TraceFlags::default(),
                     false,
                     TraceState::default(),
                 ),
-                parent_span_id: span.parent_id.0.to_be_bytes().into(),
+                parent_span_id: span.parent_id.0.into(),
                 name: span.name.clone(),
                 start_time: UNIX_EPOCH + Duration::from_nanos(span.begin_time_unix_ns),
                 end_time: UNIX_EPOCH

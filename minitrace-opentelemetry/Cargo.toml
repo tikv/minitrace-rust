@@ -1,6 +1,6 @@
 [package]
 name = "minitrace-opentelemetry"
-version = "0.5.1"
+version = "0.6.0"
 authors = ["The TiKV Project Authors"]
 license = "Apache-2.0"
 edition = "2021"
@@ -16,9 +16,9 @@ keywords = ["tracing", "span", "datadog", "jaeger", "opentelemetry"]
 futures = { version = "0.3", features = ["executor"] }
 log = "0.4"
 minitrace = { path = "../minitrace" }
-opentelemetry = { version = "0.19", features = ["trace"] }
+opentelemetry = { version = "0.20", features = ["trace"] }
 
 [dev-dependencies]
-opentelemetry-otlp = { version = "0.12", features = ["trace"] }
+opentelemetry-otlp = { version = "0.13", features = ["trace"] }
 rand = "0.8"
 tokio = { version = "1", features = ["rt-multi-thread"] }

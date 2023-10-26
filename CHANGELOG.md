@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## v0.6.0
+
 - Span name and event name now accept both `&'static str` and `String` (`Into<Cow<'static, str>>`), which previously only accept `&'static str`.
 - `with_property` and `with_properties` now accept `impl Into<Cow<'static, str>>`, which previously accept `Cow<'static, str>`.
 
