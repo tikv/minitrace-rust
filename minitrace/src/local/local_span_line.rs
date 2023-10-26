@@ -33,7 +33,7 @@ impl SpanLine {
     }
 
     #[inline]
-    pub fn start_span(&mut self, name: &'static str) -> Option<LocalSpanHandle> {
+    pub fn start_span(&mut self, name: impl Into<Cow<'static, str>>) -> Option<LocalSpanHandle> {
         Some(LocalSpanHandle {
             span_handle: self.span_queue.start_span(name)?,
             span_line_epoch: self.epoch,
@@ -48,7 +48,7 @@ impl SpanLine {
     }
 
     #[inline]
-    pub fn add_event<I, F>(&mut self, name: &'static str, properties: F)
+    pub fn add_event<I, F>(&mut self, name: impl Into<Cow<'static, str>>, properties: F)
     where
         I: IntoIterator<Item = (Cow<'static, str>, Cow<'static, str>)>,
         F: FnOnce() -> I,

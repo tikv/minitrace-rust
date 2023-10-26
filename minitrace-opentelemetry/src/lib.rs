@@ -64,7 +64,7 @@ impl OpenTelemetryReporter {
                     TraceState::default(),
                 ),
                 parent_span_id: span.parent_id.0.to_be_bytes().into(),
-                name: span.name.into(),
+                name: span.name.clone(),
                 start_time: UNIX_EPOCH + Duration::from_nanos(span.begin_time_unix_ns),
                 end_time: UNIX_EPOCH
                     + Duration::from_nanos(span.begin_time_unix_ns + span.duration_ns),
@@ -94,7 +94,7 @@ impl OpenTelemetryReporter {
         let mut queue = EvictedQueue::new(u32::MAX);
         queue.extend(events.iter().map(|event| {
             Event::new(
-                event.name,
+                event.name.clone(),
                 UNIX_EPOCH + Duration::from_nanos(event.timestamp_unix_ns),
                 event
                     .properties

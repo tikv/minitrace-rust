@@ -37,7 +37,7 @@ impl DatadogReporter {
         spans
             .iter()
             .map(move |s| DatadogSpan {
-                name: s.name,
+                name: &s.name,
                 service: &self.service_name,
                 trace_type: &self.trace_type,
                 resource: &self.resource,

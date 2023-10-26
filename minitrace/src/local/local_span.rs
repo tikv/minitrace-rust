@@ -40,7 +40,7 @@ impl LocalSpan {
     /// let child = Span::enter_with_local_parent("child");
     /// ```
     #[inline]
-    pub fn enter_with_local_parent(name: &'static str) -> Self {
+    pub fn enter_with_local_parent(name: impl Into<Cow<'static, str>>) -> Self {
         #[cfg(not(feature = "enable"))]
         {
             LocalSpan::default()
@@ -107,7 +107,10 @@ impl LocalSpan {
 #[cfg(feature = "enable")]
 impl LocalSpan {
     #[inline]
-    pub(crate) fn enter_with_stack(name: &'static str, stack: Rc<RefCell<LocalSpanStack>>) -> Self {
+    pub(crate) fn enter_with_stack(
+        name: impl Into<Cow<'static, str>>,
+        stack: Rc<RefCell<LocalSpanStack>>,
+    ) -> Self {
         let span_handle = {
             let mut stack = stack.borrow_mut();
             stack.enter_span(name)

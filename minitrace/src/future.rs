@@ -30,6 +30,7 @@
 //! [`in_span()`]:(FutureExt::in_span)
 //! [`enter_on_poll()`]:(FutureExt::enter_on_poll)
 
+use std::borrow::Cow;
 use std::task::Poll;
 
 use crate::local::LocalSpan;
@@ -98,8 +99,11 @@ pub trait FutureExt: std::future::Future + Sized {
     ///
     /// [`Future::poll()`]:(std::future::Future::poll)
     #[inline]
-    fn enter_on_poll(self, name: &'static str) -> EnterOnPoll<Self> {
-        EnterOnPoll { inner: self, name }
+    fn enter_on_poll(self, name: impl Into<Cow<'static, str>>) -> EnterOnPoll<Self> {
+        EnterOnPoll {
+            inner: self,
+            name: name.into(),
+        }
     }
 }
 
@@ -135,7 +139,7 @@ impl<T: std::future::Future> std::future::Future for InSpan<T> {
 pub struct EnterOnPoll<T> {
     #[pin]
     inner: T,
-    name: &'static str,
+    name: Cow<'static, str>,
 }
 
 impl<T: std::future::Future> std::future::Future for EnterOnPoll<T> {
@@ -143,7 +147,7 @@ impl<T: std::future::Future> std::future::Future for EnterOnPoll<T> {
 
     fn poll(self: std::pin::Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> Poll<Self::Output> {
         let this = self.project();
-        let _guard = LocalSpan::enter_with_local_parent(this.name);
+        let _guard = LocalSpan::enter_with_local_parent(this.name.clone());
         this.inner.poll(cx)
     }
 }

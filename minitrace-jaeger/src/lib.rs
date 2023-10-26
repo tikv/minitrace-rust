@@ -74,7 +74,7 @@ impl JaegerReporter {
                     .iter()
                     .map(|event| Log {
                         timestamp: (event.timestamp_unix_ns / 1_000) as i64,
-                        fields: [("name".into(), event.name.into())]
+                        fields: [("name".into(), event.name.clone())]
                             .iter()
                             .chain(&event.properties)
                             .map(|(k, v)| Tag::String {

@@ -33,7 +33,7 @@ impl LocalSpanStack {
     }
 
     #[inline]
-    pub fn enter_span(&mut self, name: &'static str) -> Option<LocalSpanHandle> {
+    pub fn enter_span(&mut self, name: impl Into<Cow<'static, str>>) -> Option<LocalSpanHandle> {
         let span_line = self.current_span_line()?;
         span_line.start_span(name)
     }
@@ -50,7 +50,7 @@ impl LocalSpanStack {
     }
 
     #[inline]
-    pub fn add_event<I, F>(&mut self, name: &'static str, properties: F)
+    pub fn add_event<I, F>(&mut self, name: impl Into<Cow<'static, str>>, properties: F)
     where
         I: IntoIterator<Item = (Cow<'static, str>, Cow<'static, str>)>,
         F: FnOnce() -> I,

@@ -20,7 +20,7 @@ impl Event {
     ///
     /// Event::add_to_parent("event in root", &root, || [("key".into(), "value".into())]);
     /// ```
-    pub fn add_to_parent<I, F>(name: &'static str, parent: &Span, properties: F)
+    pub fn add_to_parent<I, F>(name: impl Into<Cow<'static, str>>, parent: &Span, properties: F)
     where
         I: IntoIterator<Item = (Cow<'static, str>, Cow<'static, str>)>,
         F: FnOnce() -> I,
@@ -47,7 +47,7 @@ impl Event {
     ///
     /// Event::add_to_local_parent("event in root", || [("key".into(), "value".into())]);
     /// ```
-    pub fn add_to_local_parent<I, F>(name: &'static str, properties: F)
+    pub fn add_to_local_parent<I, F>(name: impl Into<Cow<'static, str>>, properties: F)
     where
         I: IntoIterator<Item = (Cow<'static, str>, Cow<'static, str>)>,
         F: FnOnce() -> I,

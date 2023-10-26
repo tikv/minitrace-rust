@@ -1,5 +1,7 @@
 // Copyright 2021 TiKV Project Authors. Licensed under Apache-2.0.
 
+use std::borrow::Cow;
+
 use minstant::Instant;
 
 use crate::collector::SpanId;
@@ -10,7 +12,7 @@ pub struct RawSpan {
     pub id: SpanId,
     pub parent_id: SpanId,
     pub begin_instant: Instant,
-    pub name: &'static str,
+    pub name: Cow<'static, str>,
     pub properties: Properties,
     pub is_event: bool,
 
@@ -24,14 +26,14 @@ impl RawSpan {
         id: SpanId,
         parent_id: SpanId,
         begin_instant: Instant,
-        name: &'static str,
+        name: impl Into<Cow<'static, str>>,
         is_event: bool,
     ) -> Self {
         RawSpan {
             id,
             parent_id,
             begin_instant,
-            name,
+            name: name.into(),
             properties: Properties::default(),
             is_event,
             end_instant: begin_instant,
@@ -53,7 +55,7 @@ impl Clone for RawSpan {
             id: self.id,
             parent_id: self.parent_id,
             begin_instant: self.begin_instant,
-            name: self.name,
+            name: self.name.clone(),
             properties: properties,
             is_event: self.is_event,
             end_instant: self.end_instant,

@@ -28,7 +28,7 @@ impl SpanQueue {
     }
 
     #[inline]
-    pub fn start_span(&mut self, name: &'static str) -> Option<SpanHandle> {
+    pub fn start_span(&mut self, name: impl Into<Cow<'static, str>>) -> Option<SpanHandle> {
         if self.span_queue.len() >= self.capacity {
             return None;
         }
@@ -63,7 +63,7 @@ impl SpanQueue {
     }
 
     #[inline]
-    pub fn add_event<I, F>(&mut self, name: &'static str, properties: F)
+    pub fn add_event<I, F>(&mut self, name: impl Into<Cow<'static, str>>, properties: F)
     where
         I: IntoIterator<Item = (Cow<'static, str>, Cow<'static, str>)>,
         F: FnOnce() -> I,

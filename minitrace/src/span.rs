@@ -68,7 +68,7 @@ impl Span {
     /// ```
     #[inline]
     pub fn root(
-        name: &'static str,
+        name: impl Into<Cow<'static, str>>,
         parent: SpanContext,
         #[cfg(test)] collect: GlobalCollect,
     ) -> Self {
@@ -108,7 +108,7 @@ impl Span {
     ///
     /// let child = Span::enter_with_parent("child", &root);
     #[inline]
-    pub fn enter_with_parent(name: &'static str, parent: &Span) -> Self {
+    pub fn enter_with_parent(name: impl Into<Cow<'static, str>>, parent: &Span) -> Self {
         #[cfg(not(feature = "enable"))]
         {
             Self::noop()
@@ -147,7 +147,7 @@ impl Span {
     /// let child = Span::enter_with_parents("child", [&parent1, &parent2]);
     #[inline]
     pub fn enter_with_parents<'a>(
-        name: &'static str,
+        name: impl Into<Cow<'static, str>>,
         parents: impl IntoIterator<Item = &'a Span>,
         #[cfg(test)] collect: GlobalCollect,
     ) -> Self {
@@ -185,7 +185,7 @@ impl Span {
     /// ```
     #[inline]
     pub fn enter_with_local_parent(
-        name: &'static str,
+        name: impl Into<Cow<'static, str>>,
         #[cfg(test)] collect: GlobalCollect,
     ) -> Self {
         #[cfg(not(feature = "enable"))]
@@ -358,7 +358,7 @@ impl Span {
     #[inline]
     fn new(
         collect_token: CollectToken,
-        name: &'static str,
+        name: impl Into<Cow<'static, str>>,
         collect_id: Option<usize>,
         collect: GlobalCollect,
     ) -> Self {
@@ -377,7 +377,7 @@ impl Span {
     }
 
     pub(crate) fn enter_with_stack(
-        name: &'static str,
+        name: impl Into<Cow<'static, str>>,
         stack: &mut LocalSpanStack,
         collect: GlobalCollect,
     ) -> Self {
