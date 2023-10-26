@@ -13,6 +13,15 @@ use crate::collector::SpanSet;
 use crate::util::CollectToken;
 use crate::util::RawSpans;
 
+type TreeChildren = HashMap<
+    SpanId,
+    (
+        Cow<'static, str>,
+        Vec<SpanId>,
+        Vec<(Cow<'static, str>, Cow<'static, str>)>,
+    ),
+>;
+
 #[derive(Debug, PartialOrd, PartialEq, Ord, Eq)]
 pub struct Tree {
     name: Cow<'static, str>,
@@ -53,14 +62,7 @@ impl Tree {
     }
 
     pub fn from_raw_spans(raw_spans: RawSpans) -> Vec<Tree> {
-        let mut children: HashMap<
-            SpanId,
-            (
-                Cow<'static, str>,
-                Vec<SpanId>,
-                Vec<(Cow<'static, str>, Cow<'static, str>)>,
-            ),
-        > = HashMap::new();
+        let mut children: TreeChildren = HashMap::new();
 
         let spans = raw_spans.into_inner();
         children.insert(SpanId::default(), ("".into(), vec![], vec![]));
@@ -204,14 +206,7 @@ impl Tree {
     }
 
     pub fn from_span_records(span_records: Vec<SpanRecord>) -> Tree {
-        let mut children: HashMap<
-            SpanId,
-            (
-                Cow<'static, str>,
-                Vec<SpanId>,
-                Vec<(Cow<'static, str>, Cow<'static, str>)>,
-            ),
-        > = HashMap::new();
+        let mut children: TreeChildren = HashMap::new();
 
         children.insert(SpanId::default(), ("".into(), vec![], vec![]));
         for span in &span_records {
@@ -236,17 +231,7 @@ impl Tree {
     }
 
     #[allow(clippy::type_complexity)]
-    fn build_tree(
-        id: SpanId,
-        raw: &mut HashMap<
-            SpanId,
-            (
-                Cow<'static, str>,
-                Vec<SpanId>,
-                Vec<(Cow<'static, str>, Cow<'static, str>)>,
-            ),
-        >,
-    ) -> Tree {
+    fn build_tree(id: SpanId, raw: &mut TreeChildren) -> Tree {
         let (name, children, properties) = raw.get(&id).cloned().unwrap();
         Tree {
             name,

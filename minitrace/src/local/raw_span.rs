@@ -56,7 +56,7 @@ impl Clone for RawSpan {
             parent_id: self.parent_id,
             begin_instant: self.begin_instant,
             name: self.name.clone(),
-            properties: properties,
+            properties,
             is_event: self.is_event,
             end_instant: self.end_instant,
         }
