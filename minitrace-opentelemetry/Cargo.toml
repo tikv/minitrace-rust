@@ -1,10 +1,10 @@
 [package]
 name = "minitrace-opentelemetry"
-version = "0.6.0"
+version = "0.6.1"
 authors = ["The TiKV Project Authors"]
 license = "Apache-2.0"
 edition = "2021"
-description = "Jaeger reporter for minitrace-rust"
+description = "Opentelemetry reporter for minitrace-rust"
 homepage = "https://github.com/tikv/minitrace-rust"
 repository = "https://github.com/tikv/minitrace-rust"
 documentation = "https://docs.rs/minitrace-jaeger"
