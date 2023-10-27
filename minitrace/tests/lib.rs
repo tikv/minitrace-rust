@@ -390,7 +390,7 @@ fn test_macro() {
         }
     }
 
-    #[trace(enter_on_poll = true)]
+    #[trace(short_name = true, enter_on_poll = true)]
     async fn work(millis: &u64) {
         let _g = Span::enter_with_local_parent("work-inner");
         tokio::time::sleep(std::time::Duration::from_millis(*millis))
@@ -399,7 +399,7 @@ fn test_macro() {
     }
 
     impl Bar {
-        #[trace]
+        #[trace(short_name = true)]
         async fn work2(&self, millis: &u64) {
             let _g = Span::enter_with_local_parent("work-inner");
             tokio::time::sleep(std::time::Duration::from_millis(*millis))
@@ -408,7 +408,7 @@ fn test_macro() {
         }
     }
 
-    #[trace]
+    #[trace(short_name = true)]
     async fn work3<'a>(millis1: &'a u64, millis2: &u64) {
         let _g = Span::enter_with_local_parent("work-inner");
         tokio::time::sleep(std::time::Duration::from_millis(*millis1))
@@ -476,6 +476,16 @@ root []
 #[test]
 #[serial]
 fn macro_example() {
+    #[trace(short_name = true)]
+    fn do_something_short_name(i: u64) {
+        std::thread::sleep(std::time::Duration::from_millis(i));
+    }
+
+    #[trace(short_name = true)]
+    async fn do_something_async_short_name(i: u64) {
+        futures_timer::Delay::new(std::time::Duration::from_millis(i)).await;
+    }
+
     #[trace]
     fn do_something(i: u64) {
         std::thread::sleep(std::time::Duration::from_millis(i));
@@ -483,16 +493,6 @@ fn macro_example() {
 
     #[trace]
     async fn do_something_async(i: u64) {
-        futures_timer::Delay::new(std::time::Duration::from_millis(i)).await;
-    }
-
-    #[trace(path_name = true)]
-    fn do_something_path_name(i: u64) {
-        std::thread::sleep(std::time::Duration::from_millis(i));
-    }
-
-    #[trace(path_name = true)]
-    async fn do_something_async_path_name(i: u64) {
         futures_timer::Delay::new(std::time::Duration::from_millis(i)).await;
     }
 
@@ -504,18 +504,18 @@ fn macro_example() {
         let _g = root.set_local_parent();
         do_something(100);
         block_on(do_something_async(100));
-        do_something_path_name(100);
-        block_on(do_something_async_path_name(100));
+        do_something_short_name(100);
+        block_on(do_something_async_short_name(100));
     }
 
     minitrace::flush();
 
     let expected_graph = r#"
 root []
-    do_something []
-    do_something_async []
-    lib::macro_example::{{closure}}::do_something_async_path_name []
-    lib::macro_example::{{closure}}::do_something_path_name []
+    do_something_async_short_name []
+    do_something_short_name []
+    lib::macro_example::{{closure}}::do_something []
+    lib::macro_example::{{closure}}::do_something_async []
 "#;
     assert_eq!(
         tree_str_from_span_records(collected_spans.lock().clone()),
@@ -589,7 +589,7 @@ root []
 #[test]
 #[serial]
 fn max_spans_per_trace() {
-    #[trace]
+    #[trace(short_name = true)]
     fn recursive(n: usize) {
         if n > 1 {
             recursive(n - 1);

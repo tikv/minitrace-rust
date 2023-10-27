@@ -24,8 +24,8 @@ struct Args {
 }
 
 enum Name {
-    Function(String),
-    FullPath,
+    Plain(String),
+    FullName,
 }
 
 impl Args {
@@ -36,7 +36,7 @@ impl Args {
 
         let mut args = HashSet::new();
         let mut func_name = func_name;
-        let mut path_name = false;
+        let mut short_name = false;
         let mut enter_on_poll = false;
 
         for arg in &input {
@@ -53,9 +53,9 @@ impl Args {
                     path,
                     lit: Lit::Bool(b),
                     ..
-                })) if path.is_ident("path_name") => {
-                    path_name = b.value;
-                    args.insert("path_name");
+                })) if path.is_ident("short_name") => {
+                    short_name = b.value;
+                    args.insert("short_name");
                 }
                 NestedMeta::Meta(Meta::NameValue(MetaNameValue {
                     path,
@@ -69,13 +69,15 @@ impl Args {
             }
         }
 
-        let name = if path_name {
-            if args.contains("name") {
-                abort_call_site!("`name` and `path_name` can not be used together");
+        let name = if args.contains("name") {
+            if short_name {
+                abort_call_site!("`name` and `short_name` can not be used together");
             }
-            Name::FullPath
+            Name::Plain(func_name)
+        } else if short_name {
+            Name::Plain(func_name)
         } else {
-            Name::Function(func_name)
+            Name::FullName
         };
 
         if args.len() != input.len() {
@@ -99,9 +101,9 @@ impl Args {
 ///
 /// ## Arguments
 ///
-/// * `name` - The name of the span. Defaults to the function name.
-/// * `path_name` - Whether to use the full path of the function as the span name. Defaults to `false`.
-/// * `enter_on_poll` - Whether to enter the span on poll, if set to `false`, `in_span` will be used.
+/// * `name` - The name of the span. Defaults to the full path of the function.
+/// * `short_name` - Whether to use the function name without path as the span name. Defaults to `false`.
+/// * `enter_on_poll` - Whether to enter the span on poll. If set to `false`, `in_span` will be used.
 ///    Only available for `async fn`. Defaults to `false`.
 ///
 /// # Examples
@@ -131,7 +133,7 @@ impl Args {
 /// # use minitrace::prelude::*;
 /// # use minitrace::local::LocalSpan;
 /// fn foo() {
-///     let __guard__ = LocalSpan::enter_with_local_parent("foo");
+///     let __guard__ = LocalSpan::enter_with_local_parent("example::foo");
 ///     // ...
 /// }
 ///
@@ -139,7 +141,7 @@ impl Args {
 ///     async {
 ///         // ...
 ///     }
-///     .in_span(Span::enter_with_local_parent("bar"))
+///     .in_span(Span::enter_with_local_parent("example::bar"))
 ///     .await
 /// }
 ///
@@ -278,19 +280,11 @@ fn gen_block(
 
 fn gen_name(span: proc_macro2::Span, name: Name) -> proc_macro2::TokenStream {
     match name {
-        Name::Function(func_name) => quote_spanned!(span=>
-            #func_name
+        Name::Plain(name) => quote_spanned!(span=>
+            #name
         ),
-        Name::FullPath => quote_spanned!(span=>
-            {
-                fn f() {}
-                fn type_name_of<T>(_: T) -> &'static str {
-                    std::any::type_name::<T>()
-                }
-                let name = type_name_of(f);
-                let name = &name[..name.len() - 3];
-                name.trim_end_matches("::{{closure}}")
-            }
+        Name::FullName => quote_spanned!(span=>
+            minitrace::full_name!()
         ),
     }
 }
