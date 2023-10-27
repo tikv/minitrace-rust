@@ -61,6 +61,7 @@ macro_rules! full_name {
 /// fn foo() {
 ///    assert_eq!(file_location!(), "minitrace/src/macros.rs:8:15");
 /// }
+/// # #[cfg(not(target_os = "windows"))]
 /// # foo()
 #[macro_export]
 macro_rules! file_location {
