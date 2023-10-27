@@ -103,7 +103,7 @@ impl Args {
 ///
 /// * `name` - The name of the span. Defaults to the full path of the function.
 /// * `short_name` - Whether to use the function name without path as the span name. Defaults to `false`.
-/// * `enter_on_poll` - Whether to enter the span on poll, if set to `false`, `in_span` will be used.
+/// * `enter_on_poll` - Whether to enter the span on poll. If set to `false`, `in_span` will be used.
 ///    Only available for `async fn`. Defaults to `false`.
 ///
 /// # Examples
