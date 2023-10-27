@@ -486,13 +486,13 @@ fn macro_example() {
         futures_timer::Delay::new(std::time::Duration::from_millis(i)).await;
     }
 
-    #[trace(full_path = true)]
-    fn do_something_full_path(i: u64) {
+    #[trace(path_name = true)]
+    fn do_something_path_name(i: u64) {
         std::thread::sleep(std::time::Duration::from_millis(i));
     }
 
-    #[trace(full_path = true)]
-    async fn do_something_async_full_path(i: u64) {
+    #[trace(path_name = true)]
+    async fn do_something_async_path_name(i: u64) {
         futures_timer::Delay::new(std::time::Duration::from_millis(i)).await;
     }
 
@@ -504,8 +504,8 @@ fn macro_example() {
         let _g = root.set_local_parent();
         do_something(100);
         block_on(do_something_async(100));
-        do_something_full_path(100);
-        block_on(do_something_async_full_path(100));
+        do_something_path_name(100);
+        block_on(do_something_async_path_name(100));
     }
 
     minitrace::flush();
@@ -514,8 +514,8 @@ fn macro_example() {
 root []
     do_something []
     do_something_async []
-    lib::macro_example::{{closure}}::do_something_async_full_path []
-    lib::macro_example::{{closure}}::do_something_full_path []
+    lib::macro_example::{{closure}}::do_something_async_path_name []
+    lib::macro_example::{{closure}}::do_something_path_name []
 "#;
     assert_eq!(
         tree_str_from_span_records(collected_spans.lock().clone()),

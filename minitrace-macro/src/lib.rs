@@ -36,7 +36,7 @@ impl Args {
 
         let mut args = HashSet::new();
         let mut func_name = func_name;
-        let mut full_path = false;
+        let mut path_name = false;
         let mut enter_on_poll = false;
 
         for arg in &input {
@@ -53,9 +53,9 @@ impl Args {
                     path,
                     lit: Lit::Bool(b),
                     ..
-                })) if path.is_ident("full_path") => {
-                    full_path = b.value;
-                    args.insert("full_path");
+                })) if path.is_ident("path_name") => {
+                    path_name = b.value;
+                    args.insert("path_name");
                 }
                 NestedMeta::Meta(Meta::NameValue(MetaNameValue {
                     path,
@@ -69,9 +69,9 @@ impl Args {
             }
         }
 
-        let name = if full_path {
+        let name = if path_name {
             if args.contains("name") {
-                abort_call_site!("`name` and `full_path` can not be used together");
+                abort_call_site!("`name` and `path_name` can not be used together");
             }
             Name::FullPath
         } else {
@@ -100,7 +100,7 @@ impl Args {
 /// ## Arguments
 ///
 /// * `name` - The name of the span. Defaults to the function name.
-/// * `full_path` - Whether to use the full path of the function as the span name. Defaults to `false`.
+/// * `path_name` - Whether to use the full path of the function as the span name. Defaults to `false`.
 /// * `enter_on_poll` - Whether to enter the span on poll, if set to `false`, `in_span` will be used.
 ///    Only available for `async fn`. Defaults to `false`.
 ///

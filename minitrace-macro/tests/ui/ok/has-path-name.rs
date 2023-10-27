@@ -1,6 +1,6 @@
 use minitrace::trace;
 
-#[trace(name = "Name", full_path = false)]
+#[trace(path_name = true)]
 async fn f(a: u32) -> u32 {
     a
 }
