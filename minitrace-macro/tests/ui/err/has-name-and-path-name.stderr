@@ -1,5 +1,5 @@
 error: `name` and `path_name` can not be used together
- --> tests/ui/err/has-name-and-full-path.rs:3:1
+ --> tests/ui/err/has-name-and-path-name.rs:3:1
   |
 3 | #[trace(name = "Name", path_name = true)]
   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
