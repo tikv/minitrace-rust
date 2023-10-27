@@ -133,7 +133,7 @@ impl Args {
 /// # use minitrace::prelude::*;
 /// # use minitrace::local::LocalSpan;
 /// fn foo() {
-///     let __guard__ = LocalSpan::enter_with_local_parent("foo");
+///     let __guard__ = LocalSpan::enter_with_local_parent("example::foo");
 ///     // ...
 /// }
 ///
@@ -141,7 +141,7 @@ impl Args {
 ///     async {
 ///         // ...
 ///     }
-///     .in_span(Span::enter_with_local_parent("bar"))
+///     .in_span(Span::enter_with_local_parent("example::bar"))
 ///     .await
 /// }
 ///
@@ -284,15 +284,7 @@ fn gen_name(span: proc_macro2::Span, name: Name) -> proc_macro2::TokenStream {
             #name
         ),
         Name::FullName => quote_spanned!(span=>
-            {
-                fn f() {}
-                fn type_name_of<T>(_: T) -> &'static str {
-                    std::any::type_name::<T>()
-                }
-                let name = type_name_of(f);
-                let name = &name[..name.len() - 3];
-                name.trim_end_matches("::{{closure}}")
-            }
+            minitrace::full_name!()
         ),
     }
 }

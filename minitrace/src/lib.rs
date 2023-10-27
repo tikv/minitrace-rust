@@ -315,6 +315,7 @@ pub mod collector;
 mod event;
 pub mod future;
 pub mod local;
+mod macros;
 mod span;
 #[doc(hidden)]
 pub mod util;
