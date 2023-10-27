@@ -305,9 +305,6 @@
 //! [`Future`]: std::future::Future
 
 // Suppress a false-positive lint from clippy
-// TODO: remove me once https://github.com/rust-lang/rust-clippy/issues/11076 is released
-#![allow(unknown_lints)]
-#![allow(clippy::arc_with_non_send_sync)]
 #![allow(clippy::needless_doctest_main)]
 #![cfg_attr(not(feature = "enable"), allow(dead_code))]
 #![cfg_attr(not(feature = "enable"), allow(unused_mut))]

@@ -19,18 +19,24 @@ use syn::spanned::Spanned;
 use syn::*;
 
 struct Args {
-    name: String,
+    name: Name,
     enter_on_poll: bool,
 }
 
+enum Name {
+    Function(String),
+    FullPath,
+}
+
 impl Args {
-    fn parse(default_name: String, input: AttributeArgs) -> Args {
+    fn parse(func_name: String, input: AttributeArgs) -> Args {
         if input.len() > 2 {
             abort_call_site!("too many arguments");
         }
 
         let mut args = HashSet::new();
-        let mut name = default_name;
+        let mut func_name = func_name;
+        let mut full_path = false;
         let mut enter_on_poll = false;
 
         for arg in &input {
@@ -40,8 +46,16 @@ impl Args {
                     lit: Lit::Str(s),
                     ..
                 })) if path.is_ident("name") => {
-                    name = s.value();
+                    func_name = s.value();
                     args.insert("name");
+                }
+                NestedMeta::Meta(Meta::NameValue(MetaNameValue {
+                    path,
+                    lit: Lit::Bool(b),
+                    ..
+                })) if path.is_ident("full_path") => {
+                    full_path = b.value;
+                    args.insert("full_path");
                 }
                 NestedMeta::Meta(Meta::NameValue(MetaNameValue {
                     path,
@@ -54,6 +68,15 @@ impl Args {
                 _ => abort_call_site!("invalid argument"),
             }
         }
+
+        let name = if full_path {
+            if args.contains("name") {
+                abort_call_site!("`name` and `full_path` can not be used together");
+            }
+            Name::FullPath
+        } else {
+            Name::Function(func_name)
+        };
 
         if args.len() != input.len() {
             abort_call_site!("duplicated arguments");
@@ -73,6 +96,13 @@ impl Args {
 ///
 /// The `#[trace]` attribute requires a local parent context to function correctly. Ensure that
 /// the function annotated with `#[trace]` is called within the scope of `Span::set_local_parent()`.
+///
+/// ## Arguments
+///
+/// * `name` - The name of the span. Defaults to the function name.
+/// * `full_path` - Whether to use the full path of the function as the span name. Defaults to `false`.
+/// * `enter_on_poll` - Whether to enter the span on poll, if set to `false`, `in_span` will be used.
+///    Only available for `async fn`. Defaults to `false`.
 ///
 /// # Examples
 ///
@@ -205,7 +235,7 @@ fn gen_block(
     async_keyword: bool,
     args: Args,
 ) -> proc_macro2::TokenStream {
-    let name = args.name;
+    let name = gen_name(block.span(), args.name);
 
     // Generate the instrumented function body.
     // If the function is an `async fn`, this will wrap it in an async block.
@@ -243,6 +273,25 @@ fn gen_block(
             let __guard = minitrace::local::LocalSpan::enter_with_local_parent( #name );
             #block
         )
+    }
+}
+
+fn gen_name(span: proc_macro2::Span, name: Name) -> proc_macro2::TokenStream {
+    match name {
+        Name::Function(func_name) => quote_spanned!(span=>
+            #func_name
+        ),
+        Name::FullPath => quote_spanned!(span=>
+            {
+                fn f() {}
+                fn type_name_of<T>(_: T) -> &'static str {
+                    std::any::type_name::<T>()
+                }
+                let name = type_name_of(f);
+                let name = &name[..name.len() - 3];
+                name.trim_end_matches("::{{closure}}")
+            }
+        ),
     }
 }
 
