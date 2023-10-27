@@ -1,6 +1,6 @@
 use minitrace::trace;
 
-#[trace(name = "Name", path_name = true)]
+#[trace(name = "Name", full_name = true)]
 fn f() {}
 
 fn main() {}

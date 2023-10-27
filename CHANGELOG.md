@@ -4,7 +4,7 @@
 
 ## v0.6.1
 
-- Add macro attribute `#[trace(path_name = true)]` to use the full path of the function instead of only the function name.
+- Add macro attribute `#[trace(full_name = true)]` to use the full path of the function instead of only the function name.
 
 ## v0.6.0
 
