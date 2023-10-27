@@ -5,6 +5,7 @@
 ## v0.6.1
 
 - Macro will use the full path of the function as span name instead of the only function name. You can turn it off by setting `#[trace(short_name = true)]`.
+- Add utility macros `func_name!()`, `full_name!()`, and `file_location!()` to generate names for use in span.
 
 ## v0.6.0
 

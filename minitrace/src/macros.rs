@@ -1,16 +1,16 @@
 // Copyright 2020 TiKV Project Authors. Licensed under Apache-2.0.
 
 /// Get the name of the function where the macro is invoked. Returns a `&'static str`.
-/// 
+///
 /// # Example
-/// 
+///
 /// ```
 /// use minitrace::func_name;
-/// 
+///
 /// fn foo() {
 ///     assert_eq!(func_name!(), "foo");
 /// }
-/// # foo() 
+/// # foo()
 /// ```
 #[macro_export]
 macro_rules! func_name {
@@ -28,16 +28,16 @@ macro_rules! func_name {
 }
 
 /// Get the full path of the function where the macro is invoked. Returns a `&'static str`.
-/// 
+///
 /// # Example
-/// 
+///
 /// ```
 /// use minitrace::full_name;
-/// 
+///
 /// fn foo() {
 ///    assert_eq!(full_name!(), "rust_out::main::_doctest_main_minitrace_src_macros_rs_34_0::foo");
 /// }
-/// # foo() 
+/// # foo()
 #[macro_export]
 macro_rules! full_name {
     () => {{
@@ -52,12 +52,12 @@ macro_rules! full_name {
 }
 
 /// Get the source file location where the macro is invoked. Returns a `&'static str`.
-/// 
+///
 /// # Example
-/// 
+///
 /// ```
 /// use minitrace::file_location;
-/// 
+///
 /// fn foo() {
 ///    assert_eq!(file_location!(), "minitrace/src/macros.rs:8:15");
 /// }
