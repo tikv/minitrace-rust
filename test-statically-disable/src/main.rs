@@ -53,6 +53,8 @@ fn main() {
     assert!(SpanContext::current_local_parent().is_none());
     assert!(SpanContext::from_span(&span5).is_none());
 
+    assert!(root.elapsed().is_none());
+
     root.cancel();
 
     minitrace::flush();

@@ -19,7 +19,8 @@
 //! minitrace = "0.5"
 //! ```
 //!
-//! Libraries can attach their spans to the caller's span (if available) via the API boundary.
+//! Libraries can attach their spans to the caller's span (if caller has set [local parent](#local-span))
+//! via the API boundary.
 //!
 //! ```
 //! use minitrace::prelude::*;

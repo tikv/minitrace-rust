@@ -4,6 +4,7 @@ use std::borrow::Cow;
 use std::cell::RefCell;
 use std::rc::Rc;
 use std::sync::Arc;
+use std::time::Duration;
 
 use minstant::Instant;
 
@@ -269,7 +270,7 @@ impl Span {
     /// use minitrace::prelude::*;
     ///
     /// let root = Span::root("root", SpanContext::random())
-    ///     .with_properties(|| vec![("key1", "value1"), ("key2", "value2")]);
+    ///     .with_properties(|| [("key1", "value1"), ("key2", "value2")]);
     /// ```
     #[inline]
     pub fn with_properties<K, V, I, F>(mut self, properties: F) -> Self
@@ -321,6 +322,36 @@ impl Span {
                 inner.push_child_spans(local_spans.inner)
             }
         }
+    }
+
+    /// Returns the elapsed time since the span was created. If the `Span` is a noop span,
+    /// this function will return `None`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use minitrace::prelude::*;
+    /// use std::time::Duration;
+    ///
+    /// let mut root = Span::root("root", SpanContext::random());
+    ///
+    /// // ...
+    ///
+    /// if root
+    ///     .elapsed()
+    ///     .map(|elapsed| elapsed < Duration::from_secs(1))
+    ///     .unwrap_or(false)
+    /// {
+    ///     root.cancel();
+    /// }
+    #[inline]
+    pub fn elapsed(&self) -> Option<Duration> {
+        #[cfg(feature = "enable")]
+        if let Some(inner) = self.inner.as_ref() {
+            return Some(inner.raw_span.begin_instant.elapsed());
+        }
+
+        None
     }
 
     /// Dismisses the trace, preventing the reporting of any span records associated with it.
