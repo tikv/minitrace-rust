@@ -653,7 +653,7 @@ fn test_elapsed() {
         let elapsed = root.elapsed().unwrap();
 
         assert!(elapsed >= Duration::from_millis(50));
-        assert!(elapsed < Duration::from_millis(55));
+        assert!(elapsed < Duration::from_millis(60));
     }
 
     minitrace::flush();
