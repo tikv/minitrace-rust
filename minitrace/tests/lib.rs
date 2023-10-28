@@ -1,7 +1,10 @@
 // Copyright 2021 TiKV Project Authors. Licensed under Apache-2.0.
 
+use std::time::Duration;
+
 use futures::executor::block_on;
 use minitrace::collector::Config;
+use minitrace::collector::ConsoleReporter;
 use minitrace::collector::TestReporter;
 use minitrace::local::LocalCollector;
 use minitrace::prelude::*;
@@ -393,7 +396,7 @@ fn test_macro() {
     #[trace(short_name = true, enter_on_poll = true)]
     async fn work(millis: &u64) {
         let _g = Span::enter_with_local_parent("work-inner");
-        tokio::time::sleep(std::time::Duration::from_millis(*millis))
+        tokio::time::sleep(Duration::from_millis(*millis))
             .enter_on_poll("sleep")
             .await;
     }
@@ -402,7 +405,7 @@ fn test_macro() {
         #[trace(short_name = true)]
         async fn work2(&self, millis: &u64) {
             let _g = Span::enter_with_local_parent("work-inner");
-            tokio::time::sleep(std::time::Duration::from_millis(*millis))
+            tokio::time::sleep(Duration::from_millis(*millis))
                 .enter_on_poll("sleep")
                 .await;
         }
@@ -411,10 +414,10 @@ fn test_macro() {
     #[trace(short_name = true)]
     async fn work3<'a>(millis1: &'a u64, millis2: &u64) {
         let _g = Span::enter_with_local_parent("work-inner");
-        tokio::time::sleep(std::time::Duration::from_millis(*millis1))
+        tokio::time::sleep(Duration::from_millis(*millis1))
             .enter_on_poll("sleep")
             .await;
-        tokio::time::sleep(std::time::Duration::from_millis(*millis2))
+        tokio::time::sleep(Duration::from_millis(*millis2))
             .enter_on_poll("sleep")
             .await;
     }
@@ -478,22 +481,22 @@ root []
 fn macro_example() {
     #[trace(short_name = true)]
     fn do_something_short_name(i: u64) {
-        std::thread::sleep(std::time::Duration::from_millis(i));
+        std::thread::sleep(Duration::from_millis(i));
     }
 
     #[trace(short_name = true)]
     async fn do_something_async_short_name(i: u64) {
-        futures_timer::Delay::new(std::time::Duration::from_millis(i)).await;
+        futures_timer::Delay::new(Duration::from_millis(i)).await;
     }
 
     #[trace]
     fn do_something(i: u64) {
-        std::thread::sleep(std::time::Duration::from_millis(i));
+        std::thread::sleep(Duration::from_millis(i));
     }
 
     #[trace]
     async fn do_something_async(i: u64) {
-        futures_timer::Delay::new(std::time::Duration::from_millis(i)).await;
+        futures_timer::Delay::new(Duration::from_millis(i)).await;
     }
 
     let (reporter, collected_spans) = TestReporter::new();
@@ -635,4 +638,23 @@ root []
         tree_str_from_span_records(collected_spans.lock().clone()),
         expected_graph
     );
+}
+
+#[test]
+#[serial]
+fn test_elapsed() {
+    minitrace::set_reporter(ConsoleReporter, Config::default());
+
+    {
+        let root = Span::root("root", SpanContext::random());
+
+        std::thread::sleep(Duration::from_millis(50));
+
+        let elapsed = root.elapsed().unwrap();
+
+        assert!(elapsed >= Duration::from_millis(50));
+        assert!(elapsed < Duration::from_millis(65));
+    }
+
+    minitrace::flush();
 }

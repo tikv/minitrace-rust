@@ -84,7 +84,7 @@ impl LocalSpan {
     /// use minitrace::prelude::*;
     ///
     /// let span = LocalSpan::enter_with_local_parent("a child span")
-    ///     .with_properties(|| vec![("key1", "value1"), ("key2", "value2")]);
+    ///     .with_properties(|| [("key1", "value1"), ("key2", "value2")]);
     /// ```
     #[inline]
     pub fn with_properties<K, V, I, F>(self, properties: F) -> Self
