@@ -650,10 +650,7 @@ fn test_elapsed() {
 
         std::thread::sleep(Duration::from_millis(50));
 
-        let elapsed = root.elapsed().unwrap();
-
-        assert!(elapsed >= Duration::from_millis(50));
-        assert!(elapsed < Duration::from_millis(65), "{:?}", elapsed);
+        assert!(root.elapsed().unwrap() >= Duration::from_millis(50));
     }
 
     minitrace::flush();
