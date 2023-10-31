@@ -33,7 +33,7 @@ pub struct Span {
 pub(crate) struct SpanInner {
     pub(crate) raw_span: RawSpan,
     collect_token: CollectToken,
-    // If the span is not a root span, this field is `None`.
+    // If the span is not a root span, this field will be `None`.
     collect_id: Option<usize>,
     collect: GlobalCollect,
 }

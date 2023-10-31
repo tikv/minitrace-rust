@@ -313,7 +313,7 @@ struct AsyncTraitInfo<'a> {
 // to find if it matches the pattern
 // `async fn foo<...>(...) {...}; Box::pin(foo<...>(...))` (<=0.1.43), or if
 // it matches `Box::pin(async move { ... }) (>=0.1.44). We the return the
-// statement that must be instrumented, along with some other informations.
+// statement that must be instrumented, along with some other information.
 // 'gen_body' will then be able to use that information to instrument the
 // proper function/future.
 // (this follows the approach suggested in

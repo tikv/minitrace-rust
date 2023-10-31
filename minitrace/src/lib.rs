@@ -269,7 +269,7 @@
 //! `minitrace` is designed to be fast and lightweight, considering four scenarios:
 //!
 //! - **No Tracing**: `minitrace` is not included as dependency in the executable, while the
-//! libraries has been intrumented. In this case, it will be completely removed from libraries,
+//! libraries has been instrumented. In this case, it will be completely removed from libraries,
 //! causing zero overhead.
 //!
 //! - **Sample Tracing**: `minitrace` is enabled in the executable, but only a small portion
