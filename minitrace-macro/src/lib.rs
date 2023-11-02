@@ -97,7 +97,8 @@ impl Args {
 /// name but can be customized by passing a string literal as an argument using the `name` parameter.
 ///
 /// The `#[trace]` attribute requires a local parent context to function correctly. Ensure that
-/// the function annotated with `#[trace]` is called within the scope of `Span::set_local_parent()`.
+/// the function annotated with `#[trace]` is called within __a local context of a `Span`__, which is
+/// established by invoking the `Span::set_local_parent()` method.
 ///
 /// ## Arguments
 ///
