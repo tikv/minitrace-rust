@@ -136,6 +136,7 @@
 //! not cross threads, meaning:
 //! - The `Span` is not sent to other threads
 //! - In asynchronous code, the `Span`'s existence doesn't cross an `.await` point
+//!
 //! In such cases, we can use `LocalSpan` as a substitute for `Span`. This approach
 //! can effectively reduce overhead and greatly enhance performance.
 //!
