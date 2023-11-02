@@ -1,6 +1,6 @@
 [package]
 name = "minitrace-macro"
-version = "0.6.1"
+version = "0.6.2"
 authors = ["The TiKV Project Authors"]
 license = "Apache-2.0"
 edition = "2021"
@@ -24,7 +24,7 @@ syn = { version = "1.0.84", features = ["full", "parsing", "extra-traits", "proc
 
 [dev-dependencies]
 logcall = "0.1.4"
-minitrace = { version = "0.6.1", path = "../minitrace" }
+minitrace = { version = "0.6.2", path = "../minitrace" }
 tokio = { version = "1", features = ["full"] }
 trybuild = "1"
 # The procedural macro `trace` only supports async-trait higher than 0.1.52
