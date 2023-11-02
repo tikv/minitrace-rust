@@ -101,7 +101,7 @@
 //! A new `Span` can be started through [`Span::root()`], requiring the trace id and the
 //! parent span id from a remote source. If there's no remote parent span, the parent span
 //! id is typically set to its default value of zero.
-//! 
+//!
 //! Once we have the root `Span`, we can create a child `Span` using [`Span::enter_with_parent()`],
 //! thereby establishing the reference relationship between the spans.
 //!
@@ -129,11 +129,11 @@
 //!
 //! minitrace::flush();
 //! ```
-//! 
+//!
 //! Sometimes, passing a `Span` through a function to create a child `Span` can be inconvenient.
 //! We can employ a thread-local approach to avoid an explicit argument passing in the function.
 //! In minitrace, [`Span::set_local_parent()`] and [`Span::enter_with_local_parent()`] serve this purpose.
-//! 
+//!
 //! [`Span::set_local_parent()`] method sets __a local context of the `Span`__ for the current thread.
 //! [`Span::enter_with_local_parent()`] accesses the parent `Span` from the local context and creates
 //! a child `Span` with it.
@@ -144,22 +144,22 @@
 //! {
 //!     let root_span = Span::root("root", SpanContext::random());
 //!     let _guard = root.set_local_parent();
-//! 
+//!
 //!     foo();
 //!
 //!     // root_span ends here.
 //! }
-//! 
+//!
 //! fn foo() {
 //!     // The parent of this span is `root`.
 //!     let _child_span = Span::enter_with_local_parent("a child span");
-//! 
+//!
 //!     // ...
-//! 
+//!
 //!     // _child_span ends here.
 //! }
 //! ```
-//! 
+//!
 //! ## Local Span
 //!
 //! In a clear single-thread execution flow, where we can ensure that the `Span` does
@@ -225,7 +225,7 @@
 //! {
 //!     let root = Span::root("root", SpanContext::random());
 //!     let _guard = root.set_local_parent();
-//! 
+//!
 //!     Event::add_to_parent("event in root", &root, || []);
 //!     {
 //!         let _span1 = LocalSpan::enter_with_local_parent("a child span");
@@ -240,10 +240,10 @@
 //! ## Macro
 //!
 //! The attribute-macro [`trace`] helps to reduce boilerplate.
-//! 
+//!
 //! Note: For successful tracing a function using the [`trace`] macro, the function call should occur
 //! within __a local context of a `Span`__.
-//! 
+//!
 //! For more detailed usage instructions, please refer to [`trace`].
 //!
 //! ```
