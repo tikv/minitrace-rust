@@ -16,7 +16,7 @@
 //!
 //! ```toml
 //! [dependencies]
-//! minitrace = "0.5"
+//! minitrace = "0.6.1"
 //! ```
 //!
 //! Libraries can attach their spans to the caller's span (if caller has set [local parent](#local-span))
@@ -63,7 +63,7 @@
 //!
 //! ```toml
 //! [dependencies]
-//! minitrace = { version = "0.5", features = ["enable"] }
+//! minitrace = { version = "0.6.1", features = ["enable"] }
 //! ```
 //!
 //! Executables should initialize a reporter implementation early in the program's runtime.
@@ -101,8 +101,9 @@
 //! A new `Span` can be started through [`Span::root()`], requiring the trace id and the
 //! parent span id from a remote source. If there's no remote parent span, the parent span
 //! id is typically set to its default value of zero.
-//!
-//! [`Span::enter_with_parent()`] starts a child span given a parent span.
+//! 
+//! Once we have the root Span, we can create a child Span using [`Span::enter_with_parent()`],
+//! thereby establishing the reference relationship between the Spans.
 //!
 //! `Span` is thread-safe and can be sent across threads.
 //! ```
@@ -131,14 +132,27 @@
 //!
 //! ## Local Span
 //!
-//! A `Span` can be efficiently replaced with a [`LocalSpan`], reducing overhead
-//! significantly, provided it is not intended for sending to other threads.
+//! In a clear single-thread execution flow, where we can ensure that the `Span` does
+//! not cross threads, meaning:
+//! - The `Span` is not sent to other threads
+//! - In asynchronous code, the `Span`'s existence doesn't cross an `.await` point
+//! In such cases, we can use `LocalSpan` as a substitute for `Span`. This approach
+//! can effectively reduce overhead and greatly enhance performance.
 //!
-//! Before starting a `LocalSpan`, a scope of parent span should be set using
-//! [`Span::set_local_parent()`]. Use [`LocalSpan::enter_with_local_parent()`] to start
-//! a `LocalSpan`, which then becomes the new local parent.
+//! However, there is a precondition: The creation of `LocalSpan` must take place
+//! within __the local context of a `Span`__, which is established by invoking the
+//! [`Span::set_local_parent()`] method.
 //!
-//! If no local parent is set, the `enter_with_local_parent()` will do nothing.
+//! Therefore, if you plan to utilize `LocalSpan`, you need to conduct a necessary check:
+//! whether it is under __the local context of a `Span`__. However, if the code spans multiple
+//! function calls, this isn't always straightforward to confirm. As such, it's good practice
+//! to invoke [`Span::set_local_parent()`] immediately after the creation of `Span`.
+//!
+//! After __the local context of a `Span`__ is set using [`Span::set_local_parent()`],
+//! use [`LocalSpan::enter_with_local_parent()`] to start a `LocalSpan`, which then
+//! becomes the new local parent.
+//!
+//! If no local context is set, the [`LocalSpan::enter_with_local_parent()`] will do nothing.
 //! ```
 //! use minitrace::collector::Config;
 //! use minitrace::collector::ConsoleReporter;
@@ -148,10 +162,9 @@
 //!
 //! {
 //!     let root = Span::root("root", SpanContext::random());
+//!     let _guard = root.set_local_parent();
 //!
 //!     {
-//!         let _guard = root.set_local_parent();
-//!
 //!         // The parent of this span is `root`.
 //!         let _span1 = LocalSpan::enter_with_local_parent("a child span");
 //!
@@ -181,11 +194,10 @@
 //!
 //! {
 //!     let root = Span::root("root", SpanContext::random());
-//!
+//!     let _guard = root.set_local_parent();
+//! 
 //!     Event::add_to_parent("event in root", &root, || []);
-//!
 //!     {
-//!         let _guard = root.set_local_parent();
 //!         let _span1 = LocalSpan::enter_with_local_parent("a child span");
 //!
 //!         Event::add_to_local_parent("event in span1", || [("key".into(), "value".into())]);
@@ -197,9 +209,13 @@
 //!
 //! ## Macro
 //!
-//! The attribute-macro [`trace`] helps to reduce boilerplate. However, the function annotated
-//! by the `trace` always requires a local parent in the context, otherwise, no span will be
-//! recorded.
+//! The attribute-macro [`trace`] helps to reduce boilerplate.
+//! 
+//! Please note:
+//! For successful function tracing using the [`trace`] macro, the function call should occur
+//! within __the local context of the `Span`__.
+//! 
+//! For more detailed usage instructions, please refer to [`trace`].
 //!
 //! ```
 //! use futures::executor::block_on;
