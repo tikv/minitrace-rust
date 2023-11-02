@@ -211,9 +211,8 @@
 //!
 //! The attribute-macro [`trace`] helps to reduce boilerplate.
 //! 
-//! Please note:
-//! For successful function tracing using the [`trace`] macro, the function call should occur
-//! within __the local context of the `Span`__.
+//! Note: For successful tracing a function using the [`trace`] macro, the function call should occur
+//! within __the local context of a `Span`__.
 //! 
 //! For more detailed usage instructions, please refer to [`trace`].
 //!
