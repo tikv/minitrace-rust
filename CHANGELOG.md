@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## v0.6.2
+
+- Improve documentation.
+
 ## v0.6.1
 
 - Macro will use the full path of the function as span name instead of the only function name. You can turn it off by setting `#[trace(short_name = true)]`.
