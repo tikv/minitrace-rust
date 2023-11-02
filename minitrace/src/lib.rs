@@ -16,7 +16,7 @@
 //!
 //! ```toml
 //! [dependencies]
-//! minitrace = "0.6.1"
+//! minitrace = "0.6"
 //! ```
 //!
 //! Libraries can attach their spans to the caller's span (if caller has set [local parent](#local-span))
