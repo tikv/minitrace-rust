@@ -144,10 +144,9 @@
 //! within __the local context of a `Span`__, which is established by invoking the
 //! [`Span::set_local_parent()`] method.
 //!
-//! Therefore, if you plan to utilize `LocalSpan`, you need to conduct a necessary check:
-//! whether it is under __the local context of a `Span`__. However, if the code spans multiple
-//! function calls, this isn't always straightforward to confirm. As such, it's good practice
-//! to invoke [`Span::set_local_parent()`] immediately after the creation of `Span`.
+//! If the code spans multiple function calls, this isn't always straightforward to
+//! confirm if the precondition is met. As such, it's good practice to invoke
+//! [`Span::set_local_parent()`] immediately after the creation of `Span`.
 //!
 //! After __the local context of a `Span`__ is set using [`Span::set_local_parent()`],
 //! use [`LocalSpan::enter_with_local_parent()`] to start a `LocalSpan`, which then
