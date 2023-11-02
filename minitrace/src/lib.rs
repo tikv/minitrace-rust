@@ -167,15 +167,15 @@
 //! - The `Span` is not sent to or shared by other threads
 //! - In asynchronous code, the lifetime of the `Span` doesn't cross an `.await` point
 //!
-//! In such cases, we can use `LocalSpan` as a substitute for `Span`. This approach
-//! can effectively reduce overhead and greatly enhance performance.
+//! we can use `LocalSpan` as a substitute for `Span` to effectively reduce overhead
+//! and greatly enhance performance.
 //!
 //! However, there is a precondition: The creation of `LocalSpan` must take place
 //! within __a local context of a `Span`__, which is established by invoking the
 //! [`Span::set_local_parent()`] method.
 //!
 //! If the code spans multiple function calls, this isn't always straightforward to
-//! confirm if the precondition is met. As such, it's good practice to invoke
+//! confirm if the precondition is met. As such, it's recommended to invoke
 //! [`Span::set_local_parent()`] immediately after the creation of `Span`.
 //!
 //! After __a local context of a `Span`__ is set using [`Span::set_local_parent()`],
