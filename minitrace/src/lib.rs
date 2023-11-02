@@ -63,7 +63,7 @@
 //!
 //! ```toml
 //! [dependencies]
-//! minitrace = { version = "0.6.1", features = ["enable"] }
+//! minitrace = { version = "0.6", features = ["enable"] }
 //! ```
 //!
 //! Executables should initialize a reporter implementation early in the program's runtime.
