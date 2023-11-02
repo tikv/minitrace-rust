@@ -143,7 +143,7 @@
 //!
 //! {
 //!     let root_span = Span::root("root", SpanContext::random());
-//!     let _guard = root.set_local_parent();
+//!     let _guard = root_span.set_local_parent();
 //!
 //!     foo();
 //!
