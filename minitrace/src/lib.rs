@@ -102,8 +102,8 @@
 //! parent span id from a remote source. If there's no remote parent span, the parent span
 //! id is typically set to its default value of zero.
 //! 
-//! Once we have the root Span, we can create a child Span using [`Span::enter_with_parent()`],
-//! thereby establishing the reference relationship between the Spans.
+//! Once we have the root `Span`, we can create a child `Span` using [`Span::enter_with_parent()`],
+//! thereby establishing the reference relationship between the spans.
 //!
 //! `Span` is thread-safe and can be sent across threads.
 //! ```
@@ -129,26 +129,56 @@
 //!
 //! minitrace::flush();
 //! ```
+//! 
+//! Sometimes, passing a `Span` through a function to create a child `Span` can be inconvenient.
+//! We can employ a thread-local approach to avoid an explicit argument passing in the function.
+//! In minitrace, [`Span::set_local_parent()`] and [`Span::enter_with_local_parent()`] serve this purpose.
+//! 
+//! [`Span::set_local_parent()`] method sets __a local context of the `Span`__ for the current thread.
+//! [`Span::enter_with_local_parent()`] accesses the parent `Span` from the local context and creates
+//! a child `Span` with it.
 //!
+//! ```
+//! use minitrace::prelude::*;
+//!
+//! {
+//!     let root_span = Span::root("root", SpanContext::random());
+//!     let _guard = root.set_local_parent();
+//! 
+//!     foo();
+//!
+//!     // root_span ends here.
+//! }
+//! 
+//! fn foo() {
+//!     // The parent of this span is `root`.
+//!     let _child_span = Span::enter_with_local_parent("a child span");
+//! 
+//!     // ...
+//! 
+//!     // _child_span ends here.
+//! }
+//! ```
+//! 
 //! ## Local Span
 //!
 //! In a clear single-thread execution flow, where we can ensure that the `Span` does
 //! not cross threads, meaning:
-//! - The `Span` is not sent to other threads
-//! - In asynchronous code, the `Span`'s existence doesn't cross an `.await` point
+//! - The `Span` is not sent to or shared by other threads
+//! - In asynchronous code, the lifetime of the `Span` doesn't cross an `.await` point
 //!
 //! In such cases, we can use `LocalSpan` as a substitute for `Span`. This approach
 //! can effectively reduce overhead and greatly enhance performance.
 //!
 //! However, there is a precondition: The creation of `LocalSpan` must take place
-//! within __the local context of a `Span`__, which is established by invoking the
+//! within __a local context of a `Span`__, which is established by invoking the
 //! [`Span::set_local_parent()`] method.
 //!
 //! If the code spans multiple function calls, this isn't always straightforward to
 //! confirm if the precondition is met. As such, it's good practice to invoke
 //! [`Span::set_local_parent()`] immediately after the creation of `Span`.
 //!
-//! After __the local context of a `Span`__ is set using [`Span::set_local_parent()`],
+//! After __a local context of a `Span`__ is set using [`Span::set_local_parent()`],
 //! use [`LocalSpan::enter_with_local_parent()`] to start a `LocalSpan`, which then
 //! becomes the new local parent.
 //!
@@ -212,7 +242,7 @@
 //! The attribute-macro [`trace`] helps to reduce boilerplate.
 //! 
 //! Note: For successful tracing a function using the [`trace`] macro, the function call should occur
-//! within __the local context of a `Span`__.
+//! within __a local context of a `Span`__.
 //! 
 //! For more detailed usage instructions, please refer to [`trace`].
 //!
