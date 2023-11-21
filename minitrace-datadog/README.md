@@ -10,8 +10,8 @@
 
 ```toml
 [dependencies]
-minitrace = "0.5"
-minitrace-datadog = "0.5"
+minitrace = "0.6"
+minitrace-datadog = "0.6"
 ```
 
 ## Setup Datadog Agent
