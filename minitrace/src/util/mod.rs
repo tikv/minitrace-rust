@@ -76,7 +76,7 @@ impl FromIterator<CollectTokenItem> for CollectToken {
 
 impl<'a> FromIterator<&'a CollectTokenItem> for CollectToken {
     fn from_iter<T: IntoIterator<Item = &'a CollectTokenItem>>(iter: T) -> Self {
-        new_collect_token(iter.into_iter().copied())
+        new_collect_token(iter.into_iter().cloned())
     }
 }
 

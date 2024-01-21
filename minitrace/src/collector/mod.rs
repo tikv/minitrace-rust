@@ -10,6 +10,7 @@ pub(crate) mod global_collector;
 pub(crate) mod id;
 mod test_reporter;
 
+use std::any::Any;
 use std::borrow::Cow;
 use std::rc::Rc;
 use std::sync::Arc;
@@ -41,6 +42,64 @@ pub enum SpanSet {
     SharedLocalSpans(Arc<LocalSpansInner>),
 }
 
+/// A struct representing the metadata of a span. It can be used to store arbitrary data
+/// during the processing and reporting of the span.
+///
+/// The metadata is propagated from the root span to all its children, so it can help to identify span traces and their association with a particular flow.
+///
+/// Metadata is not sent to the collector, and is only available to the reporter as part of the `SpanRecord`.
+///
+/// # Examples
+///
+/// ```
+/// use minitrace::prelude::*;
+///
+/// let context = SpanContext::new_with_metadata(TraceId(12), SpanId::default(), SpanMetadata::create::<i32>(123));
+/// ```
+///
+/// In your reporter implementation, you can access the metadata by passing the explicit structure type:
+///
+/// ```
+/// struct MyReporter;
+///
+/// impl Reporter for MyReporter {
+///     fn report(&mut self, spans: &[SpanRecord]) {
+///         for span in spans {
+///             let metadata: &i32 = span.metadata::<i32>().unwrap();
+///         }
+///     }
+/// }
+/// ```
+///
+/// use minitrace::prelude::*;
+#[derive(Debug, Clone)]
+pub struct SpanMetadata {
+    inner: Arc<dyn Any + Send + Sync>,
+}
+
+impl SpanMetadata {
+    pub fn create<T: Send + Sync + 'static>(metadata: T) -> SpanMetadata {
+        Self {
+            inner: Arc::new(metadata),
+        }
+    }
+
+    pub fn data<T>(&self) -> Option<&T>
+    where
+        T: 'static,
+    {
+        self.inner.downcast_ref::<T>()
+    }
+}
+
+impl PartialEq for SpanMetadata {
+    fn eq(&self, other: &Self) -> bool {
+        Arc::ptr_eq(&self.inner, &other.inner)
+    }
+}
+
+impl Eq for SpanMetadata {}
+
 /// A record of a span that includes all the information about the span,
 /// such as its identifiers, timing information, name, and associated properties.
 #[derive(Clone, Debug, Default)]
@@ -53,6 +112,16 @@ pub struct SpanRecord {
     pub name: Cow<'static, str>,
     pub properties: Vec<(Cow<'static, str>, Cow<'static, str>)>,
     pub events: Vec<EventRecord>,
+    metadata: Option<SpanMetadata>,
+}
+
+impl SpanRecord {
+    pub fn metadata<T>(&self) -> Option<&T>
+    where
+        T: 'static,
+    {
+        self.metadata.as_ref()?.data::<T>()
+    }
 }
 
 /// A record of an event that occurred during the execution of a span.
@@ -64,26 +133,37 @@ pub struct EventRecord {
 }
 
 #[doc(hidden)]
-#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct CollectTokenItem {
     pub trace_id: TraceId,
     pub parent_id: SpanId,
     pub collect_id: usize,
     pub is_root: bool,
+    pub metadata: Option<SpanMetadata>,
+}
+
+impl CollectTokenItem {
+    pub fn metadata<T>(&self) -> Option<&T>
+    where
+        T: 'static,
+    {
+        self.metadata.as_ref()?.data::<T>()
+    }
 }
 
 /// A struct representing the context of a span, including its [`TraceId`] and [`SpanId`].
 ///
 /// [`TraceId`]: crate::collector::TraceId
 /// [`SpanId`]: crate::collector::SpanId
-#[derive(Clone, Copy, Debug, Default)]
+#[derive(Clone, Debug, Default)]
 pub struct SpanContext {
     pub trace_id: TraceId,
     pub span_id: SpanId,
+    pub metadata: Option<SpanMetadata>,
 }
 
 impl SpanContext {
-    /// Creates a new `SpanContext` with the given [`TraceId`] and [`SpanId`].
+    /// Creates a new `SpanContext` with the given [`TraceId`] and [`SpanId`] and [`SpanMetadata`].
     ///
     /// # Examples
     ///
@@ -96,7 +176,35 @@ impl SpanContext {
     /// [`TraceId`]: crate::collector::TraceId
     /// [`SpanId`]: crate::collector::SpanId
     pub fn new(trace_id: TraceId, span_id: SpanId) -> Self {
-        Self { trace_id, span_id }
+        Self {
+            trace_id,
+            span_id,
+            metadata: None,
+        }
+    }
+
+    /// Creates a new `SpanContext` with the given [`TraceId`] and [`SpanId`] and optional [`SpanMetadata`].
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use minitrace::prelude::*;
+    ///
+    /// let context = SpanContext::new(TraceId(12), SpanId::default());
+    /// ```
+    ///
+    /// [`TraceId`]: crate::collector::TraceId
+    /// [`SpanId`]: crate::collector::SpanId
+    pub fn new_with_metadata(
+        trace_id: TraceId,
+        span_id: SpanId,
+        metadata: Option<SpanMetadata>,
+    ) -> Self {
+        Self {
+            trace_id,
+            span_id,
+            metadata,
+        }
     }
 
     /// Create a new `SpanContext` with a random trace id.
@@ -112,6 +220,24 @@ impl SpanContext {
         Self {
             trace_id: TraceId(rand::random()),
             span_id: SpanId::default(),
+            metadata: None,
+        }
+    }
+
+    /// Create a new `SpanContext` with a random trace id.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use minitrace::prelude::*;
+    ///
+    /// let root = Span::root("root", SpanContext::random());
+    /// ```
+    pub fn random_with_metadata(metadata: SpanMetadata) -> Self {
+        Self {
+            trace_id: TraceId(rand::random()),
+            span_id: SpanId::default(),
+            metadata: Some(metadata),
         }
     }
 
@@ -142,6 +268,7 @@ impl SpanContext {
             Some(Self {
                 trace_id: collect_token.trace_id,
                 span_id: collect_token.parent_id,
+                metadata: collect_token.metadata.clone(),
             })
         }
     }
@@ -170,11 +297,12 @@ impl SpanContext {
             let stack = LOCAL_SPAN_STACK.try_with(Rc::clone).ok()?;
 
             let mut stack = stack.borrow_mut();
-            let collect_token = stack.current_collect_token()?[0];
+            let collect_token = stack.current_collect_token()?[0].clone();
 
             Some(Self {
                 trace_id: collect_token.trace_id,
                 span_id: collect_token.parent_id,
+                metadata: collect_token.metadata.clone(),
             })
         }
     }

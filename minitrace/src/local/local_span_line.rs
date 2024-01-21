@@ -77,6 +77,7 @@ impl SpanLine {
                 .iter()
                 .map(|item| CollectTokenItem {
                     trace_id: item.trace_id,
+                    metadata: item.metadata.clone(),
                     parent_id: self.span_queue.current_span_id().unwrap_or(item.parent_id),
                     collect_id: item.collect_id,
                     is_root: false,
@@ -139,40 +140,47 @@ span1 []
             parent_id: SpanId::default(),
             collect_id: 42,
             is_root: false,
+            metadata: None,
         };
         let token2 = CollectTokenItem {
             trace_id: TraceId(1235),
             parent_id: SpanId::default(),
             collect_id: 43,
             is_root: false,
+            metadata: None,
         };
-        let token = [token1, token2].iter().collect();
+        let token = [token1.clone(), token2.clone()].iter().collect();
         let mut span_line = SpanLine::new(16, 1, Some(token));
 
         let current_token = span_line.current_collect_token().unwrap();
-        assert_eq!(current_token.as_slice(), &[token1, token2]);
+        assert_eq!(current_token.as_slice(), &[token1.clone(), token2.clone()]);
 
         let span = span_line.start_span("span").unwrap();
         let current_token = span_line.current_collect_token().unwrap();
         assert_eq!(current_token.len(), 2);
-        assert_eq!(current_token.as_slice(), &[
-            CollectTokenItem {
-                trace_id: TraceId(1234),
-                parent_id: span_line.span_queue.current_span_id().unwrap(),
-                collect_id: 42,
-                is_root: false,
-            },
-            CollectTokenItem {
-                trace_id: TraceId(1235),
-                parent_id: span_line.span_queue.current_span_id().unwrap(),
-                collect_id: 43,
-                is_root: false,
-            }
-        ]);
+        assert_eq!(
+            current_token.as_slice(),
+            &[
+                CollectTokenItem {
+                    trace_id: TraceId(1234),
+                    parent_id: span_line.span_queue.current_span_id().unwrap(),
+                    collect_id: 42,
+                    is_root: false,
+                    metadata: None,
+                },
+                CollectTokenItem {
+                    trace_id: TraceId(1235),
+                    parent_id: span_line.span_queue.current_span_id().unwrap(),
+                    collect_id: 43,
+                    is_root: false,
+                    metadata: None,
+                }
+            ]
+        );
         span_line.finish_span(span);
 
         let current_token = span_line.current_collect_token().unwrap();
-        assert_eq!(current_token.as_slice(), &[token1, token2]);
+        assert_eq!(current_token.as_slice(), &[token1.clone(), token2.clone()]);
 
         let (spans, collect_token) = span_line.collect(1).unwrap();
         assert_eq!(collect_token.unwrap().as_slice(), &[token1, token2]);
@@ -210,8 +218,9 @@ span []
             parent_id: SpanId::default(),
             collect_id: 42,
             is_root: false,
+            metadata: None,
         };
-        let mut span_line1 = SpanLine::new(16, 1, Some(item.into()));
+        let mut span_line1 = SpanLine::new(16, 1, Some(item.clone().into()));
         let mut span_line2 = SpanLine::new(16, 2, None);
         assert_eq!(span_line1.span_line_epoch(), 1);
         assert_eq!(span_line2.span_line_epoch(), 2);

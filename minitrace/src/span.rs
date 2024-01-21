@@ -90,6 +90,7 @@ impl Span {
             let token = CollectTokenItem {
                 trace_id: parent.trace_id,
                 parent_id: parent.span_id,
+                metadata: parent.metadata,
                 collect_id,
                 is_root: true,
             }
@@ -472,6 +473,7 @@ impl SpanInner {
                 trace_id: collect_item.trace_id,
                 parent_id: self.raw_span.id,
                 collect_id: collect_item.collect_id,
+                metadata: collect_item.metadata.clone(),
                 is_root: false,
             })
     }
@@ -560,6 +562,7 @@ mod tests {
     use super::*;
     use crate::collector::ConsoleReporter;
     use crate::collector::MockGlobalCollect;
+    use crate::collector::SpanMetadata;
     use crate::local::LocalSpan;
     use crate::prelude::TraceId;
     use crate::util::tree::tree_str_from_span_sets;
@@ -593,6 +596,7 @@ mod tests {
                         parent_id: SpanId::default(),
                         collect_id: 42,
                         is_root: true,
+                        metadata: None,
                     }
                     .into(),
                 ),
@@ -611,6 +615,73 @@ mod tests {
             SpanContext::new(TraceId(12), SpanId::default()),
             mock,
         );
+    }
+
+    #[test]
+    fn metadata() {
+        crate::set_reporter(ConsoleReporter, crate::collector::Config::default());
+
+        let mut mock = MockGlobalCollect::new();
+        let mut seq = Sequence::new();
+        let span_sets = Arc::new(Mutex::new(Vec::new()));
+
+        let routine = |collect: Arc<MockGlobalCollect>| {
+            let metadata = "test".to_string();
+            let parent_ctx = SpanContext::random_with_metadata(SpanMetadata::create(metadata));
+            let root = Span::root("root", parent_ctx, collect);
+            let child1 = Span::enter_with_parent("child1", &root);
+            let grandchild = Span::enter_with_parent("grandchild", &child1);
+            let child2 = Span::enter_with_parent("child2", &root);
+
+            crossbeam::scope(move |scope| {
+                let mut rng = thread_rng();
+                let mut spans = [child1, grandchild, child2];
+                spans.shuffle(&mut rng);
+                for span in spans {
+                    scope.spawn(|_| drop(span));
+                }
+            })
+            .unwrap();
+        };
+
+        mock.expect_start_collect()
+            .times(1)
+            .in_sequence(&mut seq)
+            .return_const(42_usize);
+        mock.expect_submit_spans()
+            .times(4)
+            .in_sequence(&mut seq)
+            .withf(|_, collect_token| collect_token.len() == 1 && collect_token[0].collect_id == 42)
+            .returning({
+                let span_sets = span_sets.clone();
+                move |span_set, token| span_sets.lock().unwrap().push((span_set, token))
+            });
+        mock.expect_commit_collect()
+            .times(1)
+            .in_sequence(&mut seq)
+            .with(predicate::eq(42_usize))
+            .return_const(());
+        mock.expect_drop_collect().times(0);
+
+        routine(Arc::new(mock));
+
+        let span_sets = std::mem::take(&mut *span_sets.lock().unwrap());
+        assert_eq!(
+            tree_str_from_span_sets(span_sets.as_slice()),
+            r#"
+#42
+root []
+    child1 []
+        grandchild []
+    child2 []
+"#
+        );
+
+        assert!(span_sets.iter().all(|(_, items)| {
+            items
+                .iter()
+                .all(|item| item.metadata::<String>().is_some_and(|v| v == "test"))
+        }));
     }
 
     #[test]
@@ -701,11 +772,11 @@ root []
 
         let routine = |collect: GlobalCollect| {
             let parent_ctx = SpanContext::random();
-            let parent1 = Span::root("parent1", parent_ctx, collect.clone());
-            let parent2 = Span::root("parent2", parent_ctx, collect.clone());
-            let parent3 = Span::root("parent3", parent_ctx, collect.clone());
-            let parent4 = Span::root("parent4", parent_ctx, collect.clone());
-            let parent5 = Span::root("parent5", parent_ctx, collect.clone());
+            let parent1 = Span::root("parent1", parent_ctx.clone(), collect.clone());
+            let parent2 = Span::root("parent2", parent_ctx.clone(), collect.clone());
+            let parent3 = Span::root("parent3", parent_ctx.clone(), collect.clone());
+            let parent4 = Span::root("parent4", parent_ctx.clone(), collect.clone());
+            let parent5 = Span::root("parent5", parent_ctx.clone(), collect.clone());
             let child1 = Span::enter_with_parent("child1", &parent5);
             let child2 = Span::enter_with_parents(
                 "child2",
@@ -793,11 +864,11 @@ parent5 []
 
         let routine = |collect: GlobalCollect| {
             let parent_ctx = SpanContext::random();
-            let parent1 = Span::root("parent1", parent_ctx, collect.clone());
-            let parent2 = Span::root("parent2", parent_ctx, collect.clone());
-            let parent3 = Span::root("parent3", parent_ctx, collect.clone());
-            let parent4 = Span::root("parent4", parent_ctx, collect.clone());
-            let parent5 = Span::root("parent5", parent_ctx, collect);
+            let parent1 = Span::root("parent1", parent_ctx.clone(), collect.clone());
+            let parent2 = Span::root("parent2", parent_ctx.clone(), collect.clone());
+            let parent3 = Span::root("parent3", parent_ctx.clone(), collect.clone());
+            let parent4 = Span::root("parent4", parent_ctx.clone(), collect.clone());
+            let parent5 = Span::root("parent5", parent_ctx.clone(), collect);
 
             let stack = Rc::new(RefCell::new(LocalSpanStack::with_capacity(16)));
             let collector = LocalCollector::new(None, stack.clone());

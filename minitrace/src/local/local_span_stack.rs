@@ -147,8 +147,11 @@ mod tests {
             parent_id: SpanId::default(),
             collect_id: 42,
             is_root: false,
+            metadata: None,
         };
-        let span_line1 = span_stack.register_span_line(Some(token1.into())).unwrap();
+        let span_line1 = span_stack
+            .register_span_line(Some(token1.clone().into()))
+            .unwrap();
         {
             {
                 let span1 = span_stack.enter_span("span1").unwrap();
@@ -164,8 +167,11 @@ mod tests {
                 parent_id: SpanId::default(),
                 collect_id: 48,
                 is_root: false,
+                metadata: None,
             };
-            let span_line2 = span_stack.register_span_line(Some(token2.into())).unwrap();
+            let span_line2 = span_stack
+                .register_span_line(Some(token2.clone().into()))
+                .unwrap();
             {
                 let span3 = span_stack.enter_span("span3").unwrap();
                 {
@@ -212,6 +218,7 @@ span1 []
                             parent_id: SpanId::default(),
                             collect_id: 42,
                             is_root: false,
+                            metadata: None,
                         }
                         .into(),
                     ))
@@ -219,19 +226,18 @@ span1 []
                 {
                     let span_line4 = span_stack.register_span_line(None).unwrap();
                     {
-                        assert!(
-                            span_stack
-                                .register_span_line(Some(
-                                    CollectTokenItem {
-                                        trace_id: TraceId(1235),
-                                        parent_id: SpanId::default(),
-                                        collect_id: 43,
-                                        is_root: false,
-                                    }
-                                    .into()
-                                ))
-                                .is_none()
-                        );
+                        assert!(span_stack
+                            .register_span_line(Some(
+                                CollectTokenItem {
+                                    trace_id: TraceId(1235),
+                                    parent_id: SpanId::default(),
+                                    collect_id: 43,
+                                    is_root: false,
+                                    metadata: None,
+                                }
+                                .into()
+                            ))
+                            .is_none());
                         assert!(span_stack.register_span_line(None).is_none());
                     }
                     let _ = span_stack.unregister_and_collect(span_line4).unwrap();
@@ -239,19 +245,18 @@ span1 []
                 {
                     let span_line5 = span_stack.register_span_line(None).unwrap();
                     {
-                        assert!(
-                            span_stack
-                                .register_span_line(Some(
-                                    CollectTokenItem {
-                                        trace_id: TraceId(1236),
-                                        parent_id: SpanId::default(),
-                                        collect_id: 44,
-                                        is_root: false,
-                                    }
-                                    .into()
-                                ))
-                                .is_none()
-                        );
+                        assert!(span_stack
+                            .register_span_line(Some(
+                                CollectTokenItem {
+                                    trace_id: TraceId(1236),
+                                    parent_id: SpanId::default(),
+                                    collect_id: 44,
+                                    is_root: false,
+                                    metadata: None,
+                                }
+                                .into()
+                            ))
+                            .is_none());
                         assert!(span_stack.register_span_line(None).is_none());
                     }
                     let _ = span_stack.unregister_and_collect(span_line5).unwrap();
@@ -272,11 +277,15 @@ span1 []
             parent_id: SpanId(1),
             collect_id: 1,
             is_root: false,
+            metadata: None,
         };
-        let span_line1 = span_stack.register_span_line(Some(token1.into())).unwrap();
-        assert_eq!(span_stack.current_collect_token().unwrap().as_slice(), &[
-            token1
-        ]);
+        let span_line1 = span_stack
+            .register_span_line(Some(token1.clone().into()))
+            .unwrap();
+        assert_eq!(
+            span_stack.current_collect_token().unwrap().as_slice(),
+            &[token1.clone()]
+        );
         {
             let span_line2 = span_stack.register_span_line(None).unwrap();
             assert!(span_stack.current_collect_token().is_none());
@@ -286,11 +295,15 @@ span1 []
                     parent_id: SpanId(3),
                     collect_id: 3,
                     is_root: false,
+                    metadata: None,
                 };
-                let span_line3 = span_stack.register_span_line(Some(token3.into())).unwrap();
-                assert_eq!(span_stack.current_collect_token().unwrap().as_slice(), &[
-                    token3
-                ]);
+                let span_line3 = span_stack
+                    .register_span_line(Some(token3.clone().into()))
+                    .unwrap();
+                assert_eq!(
+                    span_stack.current_collect_token().unwrap().as_slice(),
+                    &[token3]
+                );
                 let _ = span_stack.unregister_and_collect(span_line3).unwrap();
             }
             assert!(span_stack.current_collect_token().is_none());
@@ -301,16 +314,21 @@ span1 []
                 parent_id: SpanId(4),
                 collect_id: 4,
                 is_root: false,
+                metadata: None,
             };
-            let span_line4 = span_stack.register_span_line(Some(token4.into())).unwrap();
-            assert_eq!(span_stack.current_collect_token().unwrap().as_slice(), &[
-                token4
-            ]);
+            let span_line4 = span_stack
+                .register_span_line(Some(token4.clone().into()))
+                .unwrap();
+            assert_eq!(
+                span_stack.current_collect_token().unwrap().as_slice(),
+                &[token4]
+            );
             let _ = span_stack.unregister_and_collect(span_line4).unwrap();
         }
-        assert_eq!(span_stack.current_collect_token().unwrap().as_slice(), &[
-            token1
-        ]);
+        assert_eq!(
+            span_stack.current_collect_token().unwrap().as_slice(),
+            &[token1]
+        );
         let _ = span_stack.unregister_and_collect(span_line1).unwrap();
         assert!(span_stack.current_collect_token().is_none());
     }
@@ -329,6 +347,7 @@ span1 []
                         parent_id: SpanId::default(),
                         collect_id: 42,
                         is_root: false,
+                        metadata: None,
                     }
                     .into(),
                 ))
@@ -353,6 +372,7 @@ span1 []
                         parent_id: SpanId::default(),
                         collect_id: 42,
                         is_root: false,
+                        metadata: None,
                     }
                     .into(),
                 ))
@@ -377,6 +397,7 @@ span1 []
                         parent_id: SpanId::default(),
                         collect_id: 42,
                         is_root: false,
+                        metadata: None,
                     }
                     .into(),
                 ))

@@ -155,8 +155,9 @@ mod tests {
             parent_id: SpanId::default(),
             collect_id: 42,
             is_root: false,
+            metadata: None,
         };
-        let collector = LocalCollector::new(Some(token.into()), stack.clone());
+        let collector = LocalCollector::new(Some(token.clone().into()), stack.clone());
 
         {
             let _g = LocalSpan::enter_with_stack("span1", stack.clone());
@@ -192,6 +193,7 @@ span1 []
             parent_id: SpanId::default(),
             collect_id: 42,
             is_root: false,
+            metadata: None,
         };
         let collector = LocalCollector::new(Some(token.into()), stack.clone());
 

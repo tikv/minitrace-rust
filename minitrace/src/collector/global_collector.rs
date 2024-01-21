@@ -13,6 +13,7 @@ use once_cell::sync::Lazy;
 use parking_lot::Mutex;
 
 use super::EventRecord;
+use super::SpanMetadata;
 use crate::collector::command::CollectCommand;
 use crate::collector::command::CommitCollect;
 use crate::collector::command::DropCollect;
@@ -169,11 +170,13 @@ enum SpanCollection {
         spans: SpanSet,
         trace_id: TraceId,
         parent_id: SpanId,
+        metadata: Option<SpanMetadata>,
     },
     Shared {
         spans: Arc<SpanSet>,
         trace_id: TraceId,
         parent_id: SpanId,
+        metadata: Option<SpanMetadata>,
     },
 }
 
@@ -205,14 +208,10 @@ impl GlobalCollector {
 
         std::thread::Builder::new()
             .name("minitrace-global-collector".to_string())
-            .spawn(move || {
-                loop {
-                    let begin_instant = std::time::Instant::now();
-                    GLOBAL_COLLECTOR.lock().handle_commands(false);
-                    std::thread::sleep(
-                        COLLECT_LOOP_INTERVAL.saturating_sub(begin_instant.elapsed()),
-                    );
-                }
+            .spawn(move || loop {
+                let begin_instant = std::time::Instant::now();
+                GLOBAL_COLLECTOR.lock().handle_commands(false);
+                std::thread::sleep(COLLECT_LOOP_INTERVAL.saturating_sub(begin_instant.elapsed()));
             })
             .unwrap();
 
@@ -291,7 +290,7 @@ impl GlobalCollector {
             debug_assert!(!collect_token.is_empty());
 
             if collect_token.len() == 1 {
-                let item = collect_token[0];
+                let item = collect_token[0].clone();
                 if let Some((buf, span_count)) = self.active_collectors.get_mut(&item.collect_id) {
                     if *span_count < self.config.max_spans_per_trace.unwrap_or(usize::MAX)
                         || item.is_root
@@ -301,6 +300,7 @@ impl GlobalCollector {
                             spans,
                             trace_id: item.trace_id,
                             parent_id: item.parent_id,
+                            metadata: item.metadata,
                         });
                     }
                 }
@@ -318,6 +318,7 @@ impl GlobalCollector {
                                 spans: spans.clone(),
                                 trace_id: item.trace_id,
                                 parent_id: item.parent_id,
+                                metadata: item.metadata.clone(),
                             });
                         }
                     }
@@ -339,6 +340,7 @@ impl GlobalCollector {
                             spans,
                             trace_id,
                             parent_id,
+                            metadata,
                         } => match spans {
                             SpanSet::Span(raw_span) => amend_span(
                                 &raw_span,
@@ -347,6 +349,7 @@ impl GlobalCollector {
                                 committed_records,
                                 dangling_events,
                                 &anchor,
+                                metadata,
                             ),
                             SpanSet::LocalSpansInner(local_spans) => amend_local_span(
                                 &local_spans,
@@ -355,6 +358,7 @@ impl GlobalCollector {
                                 committed_records,
                                 dangling_events,
                                 &anchor,
+                                metadata,
                             ),
                             SpanSet::SharedLocalSpans(local_spans) => amend_local_span(
                                 &local_spans,
@@ -363,12 +367,14 @@ impl GlobalCollector {
                                 committed_records,
                                 dangling_events,
                                 &anchor,
+                                metadata,
                             ),
                         },
                         SpanCollection::Shared {
                             spans,
                             trace_id,
                             parent_id,
+                            metadata,
                         } => match &*spans {
                             SpanSet::Span(raw_span) => amend_span(
                                 raw_span,
@@ -377,6 +383,7 @@ impl GlobalCollector {
                                 committed_records,
                                 dangling_events,
                                 &anchor,
+                                metadata,
                             ),
                             SpanSet::LocalSpansInner(local_spans) => amend_local_span(
                                 local_spans,
@@ -385,6 +392,7 @@ impl GlobalCollector {
                                 committed_records,
                                 dangling_events,
                                 &anchor,
+                                metadata,
                             ),
                             SpanSet::SharedLocalSpans(local_spans) => amend_local_span(
                                 local_spans,
@@ -393,6 +401,7 @@ impl GlobalCollector {
                                 committed_records,
                                 dangling_events,
                                 &anchor,
+                                metadata,
                             ),
                         },
                     }
@@ -423,6 +432,7 @@ fn amend_local_span(
     spans: &mut Vec<SpanRecord>,
     events: &mut HashMap<SpanId, Vec<EventRecord>>,
     anchor: &Anchor,
+    metadata: Option<SpanMetadata>,
 ) {
     for span in local_spans.spans.iter() {
         let begin_time_unix_ns = span.begin_instant.as_unix_nanos(anchor);
@@ -456,6 +466,7 @@ fn amend_local_span(
             name: span.name.clone(),
             properties: span.properties.clone(),
             events: vec![],
+            metadata: metadata.clone(),
         });
     }
 }
@@ -467,6 +478,7 @@ fn amend_span(
     spans: &mut Vec<SpanRecord>,
     events: &mut HashMap<SpanId, Vec<EventRecord>>,
     anchor: &Anchor,
+    metadata: Option<SpanMetadata>,
 ) {
     let begin_time_unix_ns = raw_span.begin_instant.as_unix_nanos(anchor);
 
@@ -490,6 +502,7 @@ fn amend_span(
         name: raw_span.name.clone(),
         properties: raw_span.properties.clone(),
         events: vec![],
+        metadata,
     });
 }
 
