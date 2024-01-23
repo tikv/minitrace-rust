@@ -4,6 +4,7 @@
 
 #![cfg_attr(test, allow(dead_code))]
 
+pub(crate) mod base;
 pub(crate) mod command;
 mod console_reporter;
 pub(crate) mod global_collector;
@@ -15,9 +16,11 @@ use std::rc::Rc;
 use std::sync::Arc;
 use std::time::Duration;
 
+pub use base::Collector;
 pub use console_reporter::ConsoleReporter;
 #[cfg(not(test))]
 pub(crate) use global_collector::GlobalCollect;
+pub use global_collector::GlobalCollector;
 #[cfg(test)]
 pub(crate) use global_collector::MockGlobalCollect;
 pub use global_collector::Reporter;
@@ -282,9 +285,11 @@ impl Config {
     ///
     /// ```
     /// use minitrace::collector::Config;
+    /// use minitrace::collector::GlobalCollector;
+    /// use minitrace::collector::ConsoleReporter;
     ///
     /// let config = Config::default().max_spans_per_trace(Some(100));
-    /// minitrace::set_reporter(minitrace::collector::ConsoleReporter, config);
+    /// minitrace::set_collector(GlobalCollector::new(ConsoleReporter, config));
     /// ```
     pub fn max_spans_per_trace(self, max_spans_per_trace: Option<usize>) -> Self {
         Self {
@@ -308,9 +313,11 @@ impl Config {
     /// use std::time::Duration;
     ///
     /// use minitrace::collector::Config;
+    /// use minitrace::collector::GlobalCollector;
+    /// use minitrace::collector::ConsoleReporter;
     ///
     /// let config = Config::default().batch_report_interval(Duration::from_secs(1));
-    /// minitrace::set_reporter(minitrace::collector::ConsoleReporter, config);
+    /// minitrace::set_collector(GlobalCollector::new(ConsoleReporter, config));
     /// ```
     pub fn batch_report_interval(self, batch_report_interval: Duration) -> Self {
         Self {
@@ -336,9 +343,11 @@ impl Config {
     /// use std::time::Duration;
     ///
     /// use minitrace::collector::Config;
+    /// use minitrace::collector::GlobalCollector;
+    /// use minitrace::collector::ConsoleReporter;
     ///
     /// let config = Config::default().batch_report_max_spans(Some(200));
-    /// minitrace::set_reporter(minitrace::collector::ConsoleReporter, config);
+    /// minitrace::set_collector(GlobalCollector::new(ConsoleReporter, config));
     /// ```
     pub fn batch_report_max_spans(self, batch_report_max_spans: Option<usize>) -> Self {
         Self {

@@ -24,13 +24,16 @@ async fn test_async() -> Result<()> {
 mod test_util {
     use minitrace::collector::Config;
     use minitrace::collector::ConsoleReporter;
+    use minitrace::collector::GlobalCollector;
     use minitrace::prelude::*;
 
     use super::*;
 
     pub fn setup_minitrace<F>(test: F)
-    where F: FnOnce() -> Result<()> + 'static {
-        minitrace::set_reporter(ConsoleReporter, Config::default());
+    where
+        F: FnOnce() -> Result<()> + 'static,
+    {
+        minitrace::set_collector(GlobalCollector::new(ConsoleReporter, Config::default()));
         {
             let root = Span::root(closure_name::<F>(), SpanContext::random());
             let _guard = root.set_local_parent();
@@ -44,7 +47,7 @@ mod test_util {
         F: FnOnce() -> Fut + 'static,
         Fut: std::future::Future<Output = Result<()>> + Send + 'static,
     {
-        minitrace::set_reporter(ConsoleReporter, Config::default());
+        minitrace::set_collector(GlobalCollector::new(ConsoleReporter, Config::default()));
         let rt = tokio::runtime::Builder::new_multi_thread()
             .worker_threads(3)
             .enable_all()

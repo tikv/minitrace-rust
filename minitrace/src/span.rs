@@ -559,6 +559,7 @@ mod tests {
 
     use super::*;
     use crate::collector::ConsoleReporter;
+    use crate::collector::GlobalCollector;
     use crate::collector::MockGlobalCollect;
     use crate::local::LocalSpan;
     use crate::prelude::TraceId;
@@ -574,7 +575,8 @@ mod tests {
 
     #[test]
     fn root_collect() {
-        crate::set_reporter(ConsoleReporter, crate::collector::Config::default());
+        let collector = GlobalCollector::new(ConsoleReporter, crate::collector::Config::default());
+        crate::set_collector(collector);
 
         let mut mock = MockGlobalCollect::new();
         let mut seq = Sequence::new();
@@ -615,7 +617,8 @@ mod tests {
 
     #[test]
     fn root_cancel() {
-        crate::set_reporter(ConsoleReporter, crate::collector::Config::default());
+        let collector = GlobalCollector::new(ConsoleReporter, crate::collector::Config::default());
+        crate::set_collector(collector);
 
         let mut mock = MockGlobalCollect::new();
         let mut seq = Sequence::new();
@@ -638,7 +641,8 @@ mod tests {
 
     #[test]
     fn span_with_parent() {
-        crate::set_reporter(ConsoleReporter, crate::collector::Config::default());
+        let collector = GlobalCollector::new(ConsoleReporter, crate::collector::Config::default());
+        crate::set_collector(collector);
 
         let routine = |collect| {
             let parent_ctx = SpanContext::random();
@@ -697,7 +701,8 @@ root []
 
     #[test]
     fn span_with_parents() {
-        crate::set_reporter(ConsoleReporter, crate::collector::Config::default());
+        let collector = GlobalCollector::new(ConsoleReporter, crate::collector::Config::default());
+        crate::set_collector(collector);
 
         let routine = |collect: GlobalCollect| {
             let parent_ctx = SpanContext::random();
@@ -789,7 +794,8 @@ parent5 []
 
     #[test]
     fn span_push_child_spans() {
-        crate::set_reporter(ConsoleReporter, crate::collector::Config::default());
+        let collector = GlobalCollector::new(ConsoleReporter, crate::collector::Config::default());
+        crate::set_collector(collector);
 
         let routine = |collect: GlobalCollect| {
             let parent_ctx = SpanContext::random();
@@ -874,7 +880,8 @@ parent5 []
 
     #[test]
     fn span_communicate_via_stack() {
-        crate::set_reporter(ConsoleReporter, crate::collector::Config::default());
+        let collector = GlobalCollector::new(ConsoleReporter, crate::collector::Config::default());
+        crate::set_collector(collector);
 
         let routine = |collect: GlobalCollect| {
             let stack = Rc::new(RefCell::new(LocalSpanStack::with_capacity(16)));

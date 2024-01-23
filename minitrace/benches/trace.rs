@@ -4,6 +4,7 @@ use criterion::black_box;
 use criterion::criterion_group;
 use criterion::criterion_main;
 use criterion::Criterion;
+use minitrace::collector::GlobalCollector;
 use minitrace::local::LocalCollector;
 use minitrace::prelude::*;
 
@@ -14,7 +15,10 @@ fn init_minitrace() {
         fn report(&mut self, _spans: &[minitrace::prelude::SpanRecord]) {}
     }
 
-    minitrace::set_reporter(DummyReporter, minitrace::collector::Config::default());
+    minitrace::set_collector(GlobalCollector::new(
+        DummyReporter,
+        minitrace::collector::Config::default(),
+    ));
 }
 
 fn dummy_iter(i: usize) {

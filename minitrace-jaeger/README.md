@@ -30,13 +30,14 @@ Web UI is available on [http://127.0.0.1:16686/](http://127.0.0.1:16686/)
 use std::net::SocketAddr;
 
 use minitrace::collector::Config;
+use minitrace::collector::GlobalCollector;
 use minitrace::prelude::*;
 
 // Initialize reporter
 let reporter =
     minitrace_jaeger::JaegerReporter::new("127.0.0.1:6831".parse().unwrap(), "asynchronous")
         .unwrap();
-minitrace::set_reporter(reporter, Config::default());
+minitrace::set_collector(GlobalCollector::new(reporter, Config::default()));
 
 {
     // Start tracing

@@ -33,6 +33,7 @@ Zipkin UI is available on [http://127.0.0.1:9411/](http://127.0.0.1:9411/)
 use std::borrow::Cow;
 use std::time::Duration;
 use minitrace::collector::Config;
+use minitrace::collector::GlobalCollector;
 use minitrace::prelude::*;
 use minitrace_opentelemetry::OpenTelemetryReporter;
 use opentelemetry_otlp::{SpanExporter, ExportConfig, Protocol, TonicConfig};
@@ -56,7 +57,7 @@ let reporter = OpenTelemetryReporter::new(
     Cow::Owned(Resource::new([KeyValue::new("service.name", "asynchronous")])),
     InstrumentationLibrary::new("example-crate", Some(env!("CARGO_PKG_VERSION")), None::<&'static str>, None),
 );
-minitrace::set_reporter(reporter, Config::default());
+minitrace::set_collector(GlobalCollector::new(reporter, Config::default()));
 
 {
     // Start tracing

@@ -5,6 +5,7 @@ use std::io::Write;
 use log::info;
 use minitrace::collector::Config;
 use minitrace::collector::ConsoleReporter;
+use minitrace::collector::GlobalCollector;
 use minitrace::prelude::*;
 use minitrace::Event;
 
@@ -15,7 +16,7 @@ fn plus(a: u64, b: u64) -> Result<u64, std::io::Error> {
 }
 
 fn main() {
-    minitrace::set_reporter(ConsoleReporter, Config::default());
+    minitrace::set_collector(GlobalCollector::new(ConsoleReporter, Config::default()));
     env_logger::Builder::from_default_env()
         .format(|buf, record| {
             // Add a event to the current local span representing the log record

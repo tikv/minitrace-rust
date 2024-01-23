@@ -6,6 +6,7 @@ use std::borrow::Cow;
 use std::time::Duration;
 
 use minitrace::collector::Config;
+use minitrace::collector::GlobalCollector;
 use minitrace::collector::Reporter;
 use minitrace::prelude::*;
 
@@ -37,7 +38,7 @@ async fn other_job() {
 
 #[tokio::main]
 async fn main() {
-    minitrace::set_reporter(ReportAll::new(), Config::default());
+    minitrace::set_collector(GlobalCollector::new(ReportAll::new(), Config::default()));
 
     {
         let parent = SpanContext::random();

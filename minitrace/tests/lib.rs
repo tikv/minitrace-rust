@@ -5,6 +5,7 @@ use std::time::Duration;
 use futures::executor::block_on;
 use minitrace::collector::Config;
 use minitrace::collector::ConsoleReporter;
+use minitrace::collector::GlobalCollector;
 use minitrace::collector::TestReporter;
 use minitrace::local::LocalCollector;
 use minitrace::prelude::*;
@@ -40,7 +41,7 @@ fn four_spans() {
 #[serial]
 fn single_thread_single_span() {
     let (reporter, collected_spans) = TestReporter::new();
-    minitrace::set_reporter(reporter, Config::default());
+    minitrace::set_collector(GlobalCollector::new(reporter, Config::default()));
 
     {
         let root = Span::root("root", SpanContext::random());
@@ -68,7 +69,7 @@ root []
 #[serial]
 fn single_thread_multiple_spans() {
     let (reporter, collected_spans) = TestReporter::new();
-    minitrace::set_reporter(reporter, Config::default());
+    minitrace::set_collector(GlobalCollector::new(reporter, Config::default()));
 
     {
         let root1 = Span::root("root1", SpanContext::new(TraceId(12), SpanId::default()));
@@ -148,7 +149,7 @@ root3 []
 #[serial]
 fn multiple_threads_single_span() {
     let (reporter, collected_spans) = TestReporter::new();
-    minitrace::set_reporter(reporter, Config::default());
+    minitrace::set_collector(GlobalCollector::new(reporter, Config::default()));
 
     crossbeam::scope(|scope| {
         let root = Span::root("root", SpanContext::random());
@@ -205,7 +206,7 @@ root []
 #[serial]
 fn multiple_threads_multiple_spans() {
     let (reporter, collected_spans) = TestReporter::new();
-    minitrace::set_reporter(reporter, Config::default());
+    minitrace::set_collector(GlobalCollector::new(reporter, Config::default()));
 
     crossbeam::scope(|scope| {
         let root1 = Span::root("root1", SpanContext::new(TraceId(12), SpanId::default()));
@@ -326,7 +327,7 @@ root2 []
 #[serial]
 fn multiple_spans_without_local_spans() {
     let (reporter, collected_spans) = TestReporter::new();
-    minitrace::set_reporter(reporter, Config::default());
+    minitrace::set_collector(GlobalCollector::new(reporter, Config::default()));
 
     {
         let root1 = Span::root("root1", SpanContext::new(TraceId(12), SpanId::default()));
@@ -423,7 +424,7 @@ fn test_macro() {
     }
 
     let (reporter, collected_spans) = TestReporter::new();
-    minitrace::set_reporter(reporter, Config::default());
+    minitrace::set_collector(GlobalCollector::new(reporter, Config::default()));
 
     {
         let root = Span::root("root", SpanContext::random());
@@ -500,7 +501,7 @@ fn macro_example() {
     }
 
     let (reporter, collected_spans) = TestReporter::new();
-    minitrace::set_reporter(reporter, Config::default());
+    minitrace::set_collector(GlobalCollector::new(reporter, Config::default()));
 
     {
         let root = Span::root("root", SpanContext::random());
@@ -530,7 +531,7 @@ root []
 #[serial]
 fn multiple_local_parent() {
     let (reporter, collected_spans) = TestReporter::new();
-    minitrace::set_reporter(reporter, Config::default());
+    minitrace::set_collector(GlobalCollector::new(reporter, Config::default()));
 
     {
         let root = Span::root("root", SpanContext::random());
@@ -563,7 +564,7 @@ root []
 #[serial]
 fn early_local_collect() {
     let (reporter, collected_spans) = TestReporter::new();
-    minitrace::set_reporter(reporter, Config::default());
+    minitrace::set_collector(GlobalCollector::new(reporter, Config::default()));
 
     {
         let local_collector = LocalCollector::start();
@@ -600,7 +601,10 @@ fn max_spans_per_trace() {
     }
 
     let (reporter, collected_spans) = TestReporter::new();
-    minitrace::set_reporter(reporter, Config::default().max_spans_per_trace(Some(5)));
+    minitrace::set_collector(GlobalCollector::new(
+        reporter,
+        Config::default().max_spans_per_trace(Some(5)),
+    ));
 
     {
         let root = Span::root("root", SpanContext::random());
@@ -643,7 +647,7 @@ root []
 #[test]
 #[serial]
 fn test_elapsed() {
-    minitrace::set_reporter(ConsoleReporter, Config::default());
+    minitrace::set_collector(GlobalCollector::new(ConsoleReporter, Config::default()));
 
     {
         let root = Span::root("root", SpanContext::random());

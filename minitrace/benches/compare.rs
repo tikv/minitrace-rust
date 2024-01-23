@@ -3,6 +3,7 @@
 use criterion::criterion_group;
 use criterion::criterion_main;
 use criterion::Criterion;
+use minitrace::collector::GlobalCollector;
 
 fn init_opentelemetry() {
     use tracing_subscriber::prelude::*;
@@ -21,7 +22,10 @@ fn init_minitrace() {
         fn report(&mut self, _spans: &[minitrace::prelude::SpanRecord]) {}
     }
 
-    minitrace::set_reporter(DummyReporter, minitrace::collector::Config::default());
+    minitrace::set_collector(GlobalCollector::new(
+        DummyReporter,
+        minitrace::collector::Config::default(),
+    ));
 }
 
 fn opentelemetry_harness(n: usize) {

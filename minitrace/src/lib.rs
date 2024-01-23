@@ -73,9 +73,10 @@
 //! ```
 //! use minitrace::collector::Config;
 //! use minitrace::collector::ConsoleReporter;
+//! use minitrace::collector::GlobalCollector;
 //!
 //! fn main() {
-//!     minitrace::set_reporter(ConsoleReporter, Config::default());
+//!     minitrace::set_collector(GlobalCollector::new(ConsoleReporter, Config::default()));
 //!
 //!     // ...
 //!
@@ -109,9 +110,10 @@
 //! ```
 //! use minitrace::collector::Config;
 //! use minitrace::collector::ConsoleReporter;
+//! use minitrace::collector::GlobalCollector;
 //! use minitrace::prelude::*;
 //!
-//! minitrace::set_reporter(ConsoleReporter, Config::default());
+//! minitrace::set_collector(GlobalCollector::new(ConsoleReporter, Config::default()));
 //!
 //! {
 //!     let root_span = Span::root("root", SpanContext::random());
@@ -186,9 +188,10 @@
 //! ```
 //! use minitrace::collector::Config;
 //! use minitrace::collector::ConsoleReporter;
+//! use minitrace::collector::GlobalCollector;
 //! use minitrace::prelude::*;
 //!
-//! minitrace::set_reporter(ConsoleReporter, Config::default());
+//! minitrace::set_collector(GlobalCollector::new(ConsoleReporter, Config::default()));
 //!
 //! {
 //!     let root = Span::root("root", SpanContext::random());
@@ -218,9 +221,10 @@
 //! ```
 //! use minitrace::collector::Config;
 //! use minitrace::collector::ConsoleReporter;
+//! use minitrace::collector::GlobalCollector;
 //! use minitrace::prelude::*;
 //!
-//! minitrace::set_reporter(ConsoleReporter, Config::default());
+//! minitrace::set_collector(GlobalCollector::new(ConsoleReporter, Config::default()));
 //!
 //! {
 //!     let root = Span::root("root", SpanContext::random());
@@ -250,6 +254,7 @@
 //! use futures::executor::block_on;
 //! use minitrace::collector::Config;
 //! use minitrace::collector::ConsoleReporter;
+//! use minitrace::collector::GlobalCollector;
 //! use minitrace::prelude::*;
 //!
 //! #[trace]
@@ -262,7 +267,7 @@
 //!     futures_timer::Delay::new(std::time::Duration::from_millis(i)).await;
 //! }
 //!
-//! minitrace::set_reporter(ConsoleReporter, Config::default());
+//! minitrace::set_collector(GlobalCollector::new(ConsoleReporter, Config::default()));
 //!
 //! {
 //!     let root = Span::root("root", SpanContext::random());
@@ -300,10 +305,10 @@
 //!
 //! use minitrace::collector::Config;
 //! use minitrace::collector::ConsoleReporter;
+//! use minitrace::collector::GlobalCollector;
 //!
-//! minitrace::set_reporter(
-//!     ConsoleReporter,
-//!     Config::default().batch_report_interval(Duration::from_secs(1)),
+//! minitrace::set_collector(
+//!     GlobalCollector::new(ConsoleReporter, Config::default().batch_report_interval(Duration::from_secs(1)))
 //! );
 //!
 //! minitrace::flush();
@@ -369,7 +374,7 @@ pub mod util;
 pub use minitrace_macro::trace;
 
 pub use crate::collector::global_collector::flush;
-pub use crate::collector::global_collector::set_reporter;
+pub use crate::collector::global_collector::set_collector;
 pub use crate::event::Event;
 pub use crate::span::Span;
 

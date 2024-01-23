@@ -2,10 +2,11 @@
 
 use minitrace::collector::Config;
 use minitrace::collector::ConsoleReporter;
+use minitrace::collector::GlobalCollector;
 use minitrace::prelude::*;
 
 fn main() {
-    minitrace::set_reporter(ConsoleReporter, Config::default());
+    minitrace::set_collector(GlobalCollector::new(ConsoleReporter, Config::default()));
 
     {
         let parent = SpanContext::random();

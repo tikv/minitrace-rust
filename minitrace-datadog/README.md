@@ -28,6 +28,7 @@ cargo run --example synchronous
 use std::net::SocketAddr;
 
 use minitrace::collector::Config;
+use minitrace::collector::GlobalCollector;
 use minitrace::prelude::*;
 
 // Initialize reporter
@@ -37,7 +38,8 @@ let reporter = minitrace_datadog::DatadogReporter::new(
     "db",
     "select",
 );
-minitrace::set_reporter(reporter, Config::default());
+
+minitrace::set_collector(GlobalCollector::new(reporter, Config::default()));
 
 {
     // Start tracing
