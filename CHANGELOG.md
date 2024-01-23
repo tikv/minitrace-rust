@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Add `LocalSpans::to_span_records()`.
+
 ## v0.6.2
 
 - Improve documentation.
