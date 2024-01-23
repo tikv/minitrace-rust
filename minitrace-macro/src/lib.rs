@@ -174,7 +174,7 @@ pub fn trace(
         // let's rewrite some statements!
         match internal_fun.kind {
             // async-trait <= 0.1.43
-            AsyncTraitKind::Function(_) => {
+            AsyncTraitKind::Function => {
                 unimplemented!(
                     "Please upgrade the crate `async-trait` to a version higher than 0.1.44"
                 )
@@ -185,7 +185,7 @@ pub fn trace(
                 // useful for crates exhibiting the same behaviors as async-trait
                 let instrumented_block = gen_block(&async_expr.block, true, false, args);
                 let async_attrs = &async_expr.attrs;
-                quote! {
+                quote::quote! {
                     Box::pin(#(#async_attrs) * #instrumented_block)
                 }
             }
@@ -292,7 +292,7 @@ fn gen_name(span: proc_macro2::Span, name: Name) -> proc_macro2::TokenStream {
 
 enum AsyncTraitKind<'a> {
     // old construction. Contains the function
-    Function(&'a ItemFn),
+    Function,
     // new construction. Contains a reference to the async block
     Async(&'a ExprAsync),
 }
@@ -396,13 +396,13 @@ fn get_async_trait_info(block: &Block, block_is_async: bool) -> Option<AsyncTrai
 
     // Was that function defined inside of the current block?
     // If so, retrieve the statement where it was declared and the function itself
-    let (stmt_func_declaration, func) = inside_funs
+    let (stmt_func_declaration, _) = inside_funs
         .into_iter()
         .find(|(_, fun)| fun.sig.ident == func_name)?;
 
     Some(AsyncTraitInfo {
         _source_stmt: stmt_func_declaration,
-        kind: AsyncTraitKind::Function(func),
+        kind: AsyncTraitKind::Function,
     })
 }
 
