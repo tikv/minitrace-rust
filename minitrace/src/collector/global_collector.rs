@@ -13,6 +13,7 @@ use once_cell::sync::Lazy;
 use parking_lot::Mutex;
 
 use super::EventRecord;
+use super::SpanContext;
 use crate::collector::command::CollectCommand;
 use crate::collector::command::CommitCollect;
 use crate::collector::command::DropCollect;
@@ -413,6 +414,24 @@ impl GlobalCollector {
                 .report(committed_records.drain(..).as_slice());
             self.last_report = std::time::Instant::now();
         }
+    }
+}
+
+impl LocalSpansInner {
+    pub fn to_span_records(&self, parent: SpanContext) -> Vec<SpanRecord> {
+        let anchor: Anchor = Anchor::new();
+        let mut dangling_events = HashMap::new();
+        let mut records = Vec::new();
+        amend_local_span(
+            self,
+            parent.trace_id,
+            parent.span_id,
+            &mut records,
+            &mut dangling_events,
+            &anchor,
+        );
+        mount_events(&mut records, &mut dangling_events);
+        records
     }
 }
 

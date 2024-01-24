@@ -9,6 +9,8 @@ use minstant::Instant;
 use crate::local::local_span_stack::LocalSpanStack;
 use crate::local::local_span_stack::SpanLineHandle;
 use crate::local::local_span_stack::LOCAL_SPAN_STACK;
+use crate::prelude::SpanContext;
+use crate::prelude::SpanRecord;
 use crate::util::CollectToken;
 use crate::util::RawSpans;
 
@@ -183,13 +185,64 @@ impl Drop for LocalCollector {
     }
 }
 
+impl LocalSpans {
+    /// Converts the `LocalSpans` to `SpanRecord`s.
+    ///
+    /// The converted spans will appear as if they were collected within the given parent context.
+    /// The parent of the top local span is set to the given parent.
+    ///
+    /// This function is particularly useful when you want to manually collect the span records
+    /// without involving the global collector. This function does not require that the global
+    /// collector is set up by [`set_reporter()`].
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use minitrace::local::LocalCollector;
+    /// use minitrace::local::LocalSpans;
+    /// use minitrace::prelude::*;
+    ///
+    /// // Collect local spans manually without a parent
+    /// let collector = LocalCollector::start();
+    /// let span = LocalSpan::enter_with_local_parent("a child span");
+    /// drop(span);
+    ///
+    /// // Collect local spans into a LocalSpans instance
+    /// let local_spans: LocalSpans = collector.collect();
+    ///
+    /// // Convert LocalSpans to SpanRecords with a given parent context
+    /// let parent_context = SpanContext::random();
+    /// let span_records = local_spans.to_span_records(parent_context);
+    ///
+    /// // Now you can manually handle the span records
+    /// for record in span_records {
+    ///     println!("{:?}", record);
+    /// }
+    /// ```
+    ///
+    ///  [`set_reporter()`]: crate::set_reporter
+    pub fn to_span_records(&self, parent: SpanContext) -> Vec<SpanRecord> {
+        #[cfg(not(feature = "enable"))]
+        {
+            vec![]
+        }
+
+        #[cfg(feature = "enable")]
+        {
+            self.inner.to_span_records(parent)
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::collector::CollectTokenItem;
     use crate::collector::SpanId;
+    use crate::prelude::LocalSpan;
     use crate::prelude::TraceId;
     use crate::util::tree::tree_str_from_raw_spans;
+    use crate::util::tree::tree_str_from_span_records;
 
     #[test]
     fn local_collector_basic() {
@@ -257,6 +310,28 @@ span1 []
             r"
 span1 []
 "
+        );
+    }
+
+    #[test]
+    fn local_spans_to_span_record() {
+        let collector = LocalCollector::start();
+        let span1 = LocalSpan::enter_with_local_parent("span1").with_property(|| ("k1", "v1"));
+        let span2 = LocalSpan::enter_with_local_parent("span2").with_property(|| ("k2", "v2"));
+        drop(span2);
+        drop(span1);
+
+        let local_spans: LocalSpans = collector.collect();
+
+        let parent_context = SpanContext::random();
+        let span_records = local_spans.to_span_records(parent_context);
+
+        assert_eq!(
+            tree_str_from_span_records(span_records),
+            r#"
+span1 [("k1", "v1")]
+    span2 [("k2", "v2")]
+"#
         );
     }
 }
