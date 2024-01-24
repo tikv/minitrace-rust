@@ -295,7 +295,7 @@ fn gen_name(span: proc_macro2::Span, func_name: &str, args: &Args) -> proc_macro
 
 fn gen_properties(span: proc_macro2::Span, args: &Args) -> proc_macro2::TokenStream {
     if args.properties.is_empty() {
-        return quote!();
+        return quote::quote!();
     }
 
     if args.enter_on_poll {
