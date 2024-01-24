@@ -43,6 +43,7 @@ fn main() {
     let local_collector = LocalCollector::start();
     let _ = LocalSpan::enter_with_local_parent("span3");
     let local_spans = local_collector.collect();
+    assert_eq!(local_spans.to_span_records(SpanContext::random()), vec![]);
 
     let span3 = Span::enter_with_parent("span3", &root);
     let span4 = Span::enter_with_local_parent("span4");
