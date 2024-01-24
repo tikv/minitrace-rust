@@ -175,13 +175,14 @@ impl Parse for Args {
 ///     .enter_on_poll("qux")
 ///     .await
 /// }
-/// 
+///
 /// async fn properties(a: u64) {
-///     let __span__ = Span::enter_with_local_parent("example::properties")
-///         .with_properties(|| [
+///     let __span__ = Span::enter_with_local_parent("example::properties").with_properties(|| {
+///         [
 ///             ("k1".into(), "v1".into()),
-///             ("a".into(), format!("argument `a` is {a:?}").into())
-///         ]);
+///             ("a".into(), format!("argument `a` is {a:?}").into()),
+///         ]
+///     });
 ///     async {
 ///         // ...
 ///     }
@@ -323,7 +324,8 @@ fn gen_properties(span: proc_macro2::Span, args: &Args) -> proc_macro2::TokenStr
 
 fn unescape_format_string(s: &str) -> (String, bool) {
     let unescaped_delete = s.replace("{{", "").replace("}}", "");
-    let contains_valid_format_string = unescaped_delete.contains("{") || unescaped_delete.contains("}");
+    let contains_valid_format_string =
+        unescaped_delete.contains("{") || unescaped_delete.contains("}");
     if contains_valid_format_string {
         return (s.to_string(), true);
     } else {
