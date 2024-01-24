@@ -229,7 +229,7 @@ impl LocalSpans {
 
         #[cfg(feature = "enable")]
         {
-            self.inner.as_ref().to_span_records(parent)
+            self.inner.to_span_records(parent)
         }
     }
 }

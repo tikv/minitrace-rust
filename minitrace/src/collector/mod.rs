@@ -43,7 +43,7 @@ pub enum SpanSet {
 
 /// A record of a span that includes all the information about the span,
 /// such as its identifiers, timing information, name, and associated properties.
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, PartialEq)]
 pub struct SpanRecord {
     pub trace_id: TraceId,
     pub span_id: SpanId,
@@ -56,7 +56,7 @@ pub struct SpanRecord {
 }
 
 /// A record of an event that occurred during the execution of a span.
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, PartialEq)]
 pub struct EventRecord {
     pub name: Cow<'static, str>,
     pub timestamp_unix_ns: u64,
