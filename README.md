@@ -58,6 +58,7 @@ Detailed results are available in [etc/benchmark-result](etc/benchmark-result).
 Feel free to open a PR and add your projects here:
 
 - [TiKV](https://github.com/tikv/tikv): A distributed transactional key-value database
+- [Conductor](https://github.com/the-guild-org/conductor): Open-source GraphQL Gateway
 
 ## FAQ
 
