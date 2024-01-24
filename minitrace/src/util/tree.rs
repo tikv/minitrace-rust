@@ -58,7 +58,6 @@ impl Tree {
             child.sort();
         }
         self.children.as_mut_slice().sort_unstable();
-        self.properties.as_mut_slice().sort_unstable();
     }
 
     pub fn from_raw_spans(raw_spans: RawSpans) -> Vec<Tree> {

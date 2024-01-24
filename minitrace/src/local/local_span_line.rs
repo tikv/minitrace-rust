@@ -57,11 +57,9 @@ impl SpanLine {
     }
 
     #[inline]
-    pub fn add_properties<K, V, I, F>(&mut self, handle: &LocalSpanHandle, properties: F)
+    pub fn add_properties<I, F>(&mut self, handle: &LocalSpanHandle, properties: F)
     where
-        K: Into<Cow<'static, str>>,
-        V: Into<Cow<'static, str>>,
-        I: IntoIterator<Item = (K, V)>,
+        I: IntoIterator<Item = (Cow<'static, str>, Cow<'static, str>)>,
         F: FnOnce() -> I,
     {
         if self.epoch == handle.span_line_epoch {
@@ -113,7 +111,7 @@ mod tests {
                 let span2 = span_line.start_span("span2").unwrap();
                 {
                     let span3 = span_line.start_span("span3").unwrap();
-                    span_line.add_properties(&span3, || [("k1", "v1")]);
+                    span_line.add_properties(&span3, || [("k1".into(), "v1".into())]);
                     span_line.finish_span(span3);
                 }
                 span_line.finish_span(span2);
@@ -192,7 +190,7 @@ span []
         assert_eq!(span_line2.span_line_epoch(), 2);
 
         let span = span_line1.start_span("span").unwrap();
-        span_line2.add_properties(&span, || [("k1", "v1")]);
+        span_line2.add_properties(&span, || [("k1".into(), "v1".into())]);
         span_line1.finish_span(span);
 
         let raw_spans = span_line1.collect(1).unwrap().0.into_inner();

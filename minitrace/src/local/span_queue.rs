@@ -85,12 +85,8 @@ impl SpanQueue {
     }
 
     #[inline]
-    pub fn add_properties<K, V, I>(&mut self, span_handle: &SpanHandle, properties: I)
-    where
-        K: Into<Cow<'static, str>>,
-        V: Into<Cow<'static, str>>,
-        I: IntoIterator<Item = (K, V)>,
-    {
+    pub fn add_properties<I>(&mut self, span_handle: &SpanHandle, properties: I)
+    where I: IntoIterator<Item = (Cow<'static, str>, Cow<'static, str>)> {
         debug_assert!(span_handle.index < self.span_queue.len());
 
         let span = &mut self.span_queue[span_handle.index];
@@ -149,10 +145,13 @@ span1 []
         let mut queue = SpanQueue::with_capacity(16);
         {
             let span1 = queue.start_span("span1").unwrap();
-            queue.add_properties(&span1, [("k1", "v1"), ("k2", "v2")]);
+            queue.add_properties(&span1, [
+                ("k1".into(), "v1".into()),
+                ("k2".into(), "v2".into()),
+            ]);
             {
                 let span2 = queue.start_span("span2").unwrap();
-                queue.add_properties(&span2, [("k1", "v1")]);
+                queue.add_properties(&span2, [("k1".into(), "v1".into())]);
                 queue.finish_span(span2);
             }
             queue.finish_span(span1);
