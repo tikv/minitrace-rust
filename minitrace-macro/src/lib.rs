@@ -179,8 +179,11 @@ impl Parse for Args {
 /// async fn properties(a: u64) {
 ///     let __span__ = Span::enter_with_local_parent("example::properties").with_properties(|| {
 ///         [
-///             ("k1".into(), "v1".into()),
-///             ("a".into(), format!("argument `a` is {a:?}").into()),
+///             (std::borrow::Cow::from("k1"), std::borrow::Cow::from("v1")),
+///             (
+///                 std::borrow::Cow::from("a"),
+///                 std::borrow::Cow::from(format!("argument `a` is {a:?}")),
+///             ),
 ///         ]
 ///     });
 ///     async {
@@ -310,16 +313,18 @@ fn gen_properties(span: proc_macro2::Span, args: &Args) -> proc_macro2::TokenStr
 
         if need_format {
             quote_spanned!(span=>
-                (#k.into(), format!(#v).into())
+                (std::borrow::Cow::from(#k), std::borrow::Cow::from(format!(#v)))
             )
         } else {
             quote_spanned!(span=>
-                (#k.into(), #v.into())
+                (std::borrow::Cow::from(#k), std::borrow::Cow::from(#v))
             )
         }
     });
     let properties = Punctuated::<_, Token![,]>::from_iter(properties);
-    quote_spanned!(span=> #properties)
+    quote_spanned!(span=>
+        .with_properties(|| [ #properties ])
+    )
 }
 
 fn unescape_format_string(s: &str) -> (String, bool) {
@@ -359,7 +364,7 @@ fn gen_block(
         } else {
             quote_spanned!(block.span()=>
                 {
-                    let __span__ = minitrace::Span::enter_with_local_parent( #name ).with_properties(|| [ #properties ]);
+                    let __span__ = minitrace::Span::enter_with_local_parent( #name ) #properties;
                     minitrace::future::FutureExt::in_span(
                         async move { #block },
                         __span__,
@@ -381,7 +386,7 @@ fn gen_block(
         }
 
         quote_spanned!(block.span()=>
-            let __guard__ = minitrace::local::LocalSpan::enter_with_local_parent( #name ).with_properties(|| [ #properties ]);
+            let __guard__ = minitrace::local::LocalSpan::enter_with_local_parent( #name ) #properties;
             #block
         )
     }

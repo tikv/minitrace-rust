@@ -316,10 +316,8 @@ span1 []
     #[test]
     fn local_spans_to_span_record() {
         let collector = LocalCollector::start();
-        let span1 = LocalSpan::enter_with_local_parent("span1")
-            .with_property(|| ("k1".into(), "v1".into()));
-        let span2 = LocalSpan::enter_with_local_parent("span2")
-            .with_property(|| ("k2".into(), "v2".into()));
+        let span1 = LocalSpan::enter_with_local_parent("span1").with_property(|| ("k1", "v1"));
+        let span2 = LocalSpan::enter_with_local_parent("span2").with_property(|| ("k2", "v2"));
         drop(span2);
         drop(span1);
 
