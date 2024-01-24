@@ -9,11 +9,6 @@ use std::time::UNIX_EPOCH;
 use minitrace::collector::EventRecord;
 use minitrace::collector::Reporter;
 use minitrace::prelude::*;
-use opentelemetry::sdk::export::trace::SpanData;
-use opentelemetry::sdk::export::trace::SpanExporter;
-use opentelemetry::sdk::trace::EvictedHashMap;
-use opentelemetry::sdk::trace::EvictedQueue;
-use opentelemetry::sdk::Resource;
 use opentelemetry::trace::Event;
 use opentelemetry::trace::SpanContext;
 use opentelemetry::trace::SpanKind;
@@ -25,6 +20,10 @@ use opentelemetry::Key;
 use opentelemetry::KeyValue;
 use opentelemetry::StringValue;
 use opentelemetry::Value;
+use opentelemetry_sdk::export::trace::SpanData;
+use opentelemetry_sdk::export::trace::SpanExporter;
+use opentelemetry_sdk::trace::EvictedQueue;
+use opentelemetry_sdk::Resource;
 
 /// [OpenTelemetry](https://github.com/open-telemetry/opentelemetry-rust) reporter for `minitrace`.
 ///
@@ -63,6 +62,7 @@ impl OpenTelemetryReporter {
                     false,
                     TraceState::default(),
                 ),
+                dropped_attributes_count: 0,
                 parent_span_id: span.parent_id.0.into(),
                 name: span.name.clone(),
                 start_time: UNIX_EPOCH + Duration::from_nanos(span.begin_time_unix_ns),
@@ -79,10 +79,10 @@ impl OpenTelemetryReporter {
             .collect()
     }
 
-    fn convert_properties(properties: &[(Cow<'static, str>, Cow<'static, str>)]) -> EvictedHashMap {
-        let mut map = EvictedHashMap::new(u32::MAX, properties.len());
+    fn convert_properties(properties: &[(Cow<'static, str>, Cow<'static, str>)]) -> Vec<KeyValue> {
+        let mut map = Vec::new();
         for (k, v) in properties {
-            map.insert(KeyValue::new(
+            map.push(KeyValue::new(
                 cow_to_otel_key(k.clone()),
                 cow_to_otel_value(v.clone()),
             ));

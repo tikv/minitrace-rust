@@ -8,6 +8,7 @@ use std::time::Duration;
 use minitrace::collector::Config;
 use minitrace::collector::Reporter;
 use minitrace::prelude::*;
+use opentelemetry_otlp::WithExportConfig;
 
 fn func1(i: u64) {
     let _guard = LocalSpan::enter_with_local_parent("func1");
@@ -61,19 +62,17 @@ impl ReportAll {
                 "select",
             ),
             opentelemetry: minitrace_opentelemetry::OpenTelemetryReporter::new(
-                opentelemetry_otlp::SpanExporter::new_tonic(
-                    opentelemetry_otlp::ExportConfig {
-                        endpoint: "http://127.0.0.1:4317".to_string(),
-                        protocol: opentelemetry_otlp::Protocol::Grpc,
-                        timeout: Duration::from_secs(
-                            opentelemetry_otlp::OTEL_EXPORTER_OTLP_TIMEOUT_DEFAULT,
-                        ),
-                    },
-                    opentelemetry_otlp::TonicConfig::default(),
-                )
-                .expect("initialize oltp exporter"),
+                opentelemetry_otlp::new_exporter()
+                    .tonic()
+                    .with_endpoint("http://127.0.0.1:4317".to_string())
+                    .with_protocol(opentelemetry_otlp::Protocol::Grpc)
+                    .with_timeout(Duration::from_secs(
+                        opentelemetry_otlp::OTEL_EXPORTER_OTLP_TIMEOUT_DEFAULT,
+                    ))
+                    .build_span_exporter()
+                    .expect("initialize oltp exporter"),
                 opentelemetry::trace::SpanKind::Server,
-                Cow::Owned(opentelemetry::sdk::Resource::new([
+                Cow::Owned(opentelemetry_sdk::Resource::new([
                     opentelemetry::KeyValue::new("service.name", "synchronous(opentelemetry)"),
                 ])),
                 opentelemetry::InstrumentationLibrary::new(
