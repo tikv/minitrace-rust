@@ -359,7 +359,7 @@ fn gen_block(
         } else {
             quote_spanned!(block.span()=>
                 {
-                    let __span__ = minitrace::Span::enter_with_local_parent( #name ).with_properties(|| [#properties]);
+                    let __span__ = minitrace::Span::enter_with_local_parent( #name ).with_properties(|| [ #properties ]);
                     minitrace::future::FutureExt::in_span(
                         async move { #block },
                         __span__,
@@ -381,7 +381,7 @@ fn gen_block(
         }
 
         quote_spanned!(block.span()=>
-            let __guard__ = minitrace::local::LocalSpan::enter_with_local_parent( #name ).with_properties(|| [#properties]);
+            let __guard__ = minitrace::local::LocalSpan::enter_with_local_parent( #name ).with_properties(|| [ #properties ]);
             #block
         )
     }
