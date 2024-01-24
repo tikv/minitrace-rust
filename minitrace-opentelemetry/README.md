@@ -37,21 +37,22 @@ use minitrace::prelude::*;
 use minitrace_opentelemetry::OpenTelemetryReporter;
 use opentelemetry_otlp::{SpanExporter, ExportConfig, Protocol, TonicConfig};
 use opentelemetry::trace::SpanKind;
-use opentelemetry::sdk::Resource;
+use opentelemetry_sdk::Resource;
 use opentelemetry::KeyValue;
 use opentelemetry::InstrumentationLibrary;
+use opentelemetry_otlp::WithExportConfig;
 
 // Initialize reporter
 let reporter = OpenTelemetryReporter::new(
-    SpanExporter::new_tonic(
-        ExportConfig {
-            endpoint: "http://127.0.0.1:4317".to_string(),
-            protocol: Protocol::Grpc,
-            timeout: Duration::from_secs(opentelemetry_otlp::OTEL_EXPORTER_OTLP_TIMEOUT_DEFAULT),
-        },
-        TonicConfig::default(),
-    )
-    .unwrap(),
+    opentelemetry_otlp::new_exporter()
+        .tonic()
+        .with_endpoint("http://127.0.0.1:4317".to_string())
+        .with_protocol(opentelemetry_otlp::Protocol::Grpc)
+        .with_timeout(Duration::from_secs(
+            opentelemetry_otlp::OTEL_EXPORTER_OTLP_TIMEOUT_DEFAULT,
+        ))
+        .build_span_exporter()
+        .expect("initialize oltp exporter"),
     SpanKind::Server,
     Cow::Owned(Resource::new([KeyValue::new("service.name", "asynchronous")])),
     InstrumentationLibrary::new("example-crate", Some(env!("CARGO_PKG_VERSION")), None::<&'static str>, None),
