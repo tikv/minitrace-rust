@@ -325,12 +325,12 @@ fn gen_properties(span: proc_macro2::Span, args: &Args) -> proc_macro2::TokenStr
 fn unescape_format_string(s: &str) -> (String, bool) {
     let unescaped_delete = s.replace("{{", "").replace("}}", "");
     let contains_valid_format_string =
-        unescaped_delete.contains("{") || unescaped_delete.contains("}");
+        unescaped_delete.contains('{') || unescaped_delete.contains('}');
     if contains_valid_format_string {
-        return (s.to_string(), true);
+        (s.to_string(), true)
     } else {
         let unescaped_replace = s.replace("{{", "{").replace("}}", "}");
-        return (unescaped_replace, false);
+        (unescaped_replace, false)
     }
 }
 

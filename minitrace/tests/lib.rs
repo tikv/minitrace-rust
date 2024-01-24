@@ -659,11 +659,13 @@ fn test_elapsed() {
 #[test]
 #[serial]
 fn test_macro_properties() {
+    #[allow(clippy::drop_non_drop)]
     #[trace(short_name = true, properties = { "k1": "v1", "a": "argument a is {a:?}", "b": "{b:?}", "escaped1": "{c:?}{{}}", "escaped2": "{{ \"a\": \"b\"}}" })]
     fn foo(a: i64, b: &Bar, c: Bar) {
         drop(c);
     }
 
+    #[allow(clippy::drop_non_drop)]
     #[trace(short_name = true, properties = { "k1": "v1", "a": "argument a is {a:?}", "b": "{b:?}", "escaped1": "{c:?}{{}}", "escaped2": "{{ \"a\": \"b\"}}" })]
     async fn foo_async(a: i64, b: &Bar, c: Bar) {
         drop(c);

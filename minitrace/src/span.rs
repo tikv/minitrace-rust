@@ -438,7 +438,7 @@ impl SpanInner {
     {
         self.raw_span
             .properties
-            .extend(properties().into_iter().map(|(k, v)| (k.into(), v.into())));
+            .extend(properties().into_iter().map(|(k, v)| (k, v)));
     }
 
     #[inline]
