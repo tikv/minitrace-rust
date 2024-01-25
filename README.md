@@ -17,6 +17,7 @@ minitrace is a tracing library [10~100x faster](#benchmarks) than others:
 
 Features:
 
+- Easy to use
 - [Extremely fast](#benchmarks)
 - [Library-level tracing](#what-is-library-level-tracing)
 - [Compatible with the log crate and its macros](minitrace/examples/log.rs)

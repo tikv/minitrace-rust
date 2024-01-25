@@ -149,7 +149,7 @@ impl Parse for Args {
 /// }
 /// ```
 ///
-/// The code snippets above are equivalent to:
+/// The code snippets above will be expanded to:
 ///
 /// ```
 /// # use minitrace::prelude::*;
