@@ -76,6 +76,7 @@
 //! ```
 //! use minitrace::collector::Config;
 //! use minitrace::collector::ConsoleReporter;
+//! use minitrace::prelude::*;
 //!
 //! fn main() {
 //!     minitrace::set_reporter(ConsoleReporter, Config::default());
@@ -85,6 +86,7 @@
 //!         let _guard = root.set_local_parent();
 //!
 //!         handle_request();
+//!         # break;
 //!     }
 //!
 //!     minitrace::flush();
@@ -322,23 +324,22 @@
 //!
 //! `minitrace` is designed to be fast and lightweight, considering four scenarios:
 //!
-//! - **No Tracing**: `minitrace` is not included as dependency in the executable, while the
-//! libraries has been instrumented. In this case, it will be completely removed from libraries,
-//! causing zero overhead.
+//! - **No Tracing**: If the feature `enable` is not set in the application, `minitrace` will be
+//!   completely optimized away from the final executable binary, achieving zero overhead.
 //!
-//! - **Sample Tracing**: `minitrace` is enabled in the executable, but only a small portion
-//! of the traces are enabled via [`Span::root()`], while the other portion start with placeholders
-//! by [`Span::noop()`]. The overhead in this case is very small - merely an integer
-//! load, comparison, and jump.
+//! - **Sample Tracing**: If `enable` is set in the application, but only a small portion
+//!   of the traces are enabled via [`Span::root()`], while the other portions are started with
+//!   placeholders using [`Span::noop()`]. The overhead in this case is very small - merely an
+//!   integer load, comparison, and jump.
 //!
-//! - **Full Tracing with Tail Sampling**: `minitrace` is enabled in the executable, and all
-//! traces are enabled. However, only a select few abnormal tracing records (e.g., P99) are
-//! reported. Normal traces can be dismissed by using [`Span::cancel()`] to avoid reporting.
-//! This could be useful when you are interested in examining program's tail latency.
+//! - **Full Tracing with Tail Sampling**: If `enable` is set in the application, and all
+//!   traces are enabled, however, only a select few interesting tracing records (e.g., P99) are
+//!   reported, while normal traces are dismissed by using [`Span::cancel()`] to avoid being
+//!   reported, the overhead of collecting traces is still very small. This could be useful when
+//!   you are interested in examining program's tail latency.
 //!
-//! - **Full Tracing**: `minitrace` is enabled in the executable, and all traces are enabled.
-//! All tracing records are reported. `minitrace` performs 10x to 100x faster than other tracing
-//! libraries in this case.
+//! - **Full Tracing**: If `enable` is set in the application, and all traces are reported,
+//!   `minitrace` performs 10x to 100x faster than other tracing libraries in this case.
 //!
 //!
 //! [`Span`]: crate::Span
