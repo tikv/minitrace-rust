@@ -68,11 +68,7 @@ impl Span {
     /// let mut root = Span::root("root", SpanContext::random());
     /// ```
     #[inline]
-    pub fn root(
-        name: impl Into<Cow<'static, str>>,
-        parent: SpanContext,
-        #[cfg(test)] collect: GlobalCollect,
-    ) -> Self {
+    pub fn root(name: impl Into<Cow<'static, str>>, parent: SpanContext) -> Self {
         #[cfg(not(feature = "enable"))]
         {
             Self::noop()
@@ -84,8 +80,7 @@ impl Span {
                 return Self::noop();
             }
 
-            #[cfg(not(test))]
-            let collect = GlobalCollect;
+            let collect = current_collect();
             let collect_id = collect.start_collect();
             let token = CollectTokenItem {
                 trace_id: parent.trace_id,
@@ -94,7 +89,7 @@ impl Span {
                 is_root: true,
             }
             .into();
-            Self::new(token, name, Some(collect_id), collect)
+            Self::new(token, name, Some(collect_id))
         }
     }
 
@@ -118,12 +113,7 @@ impl Span {
         #[cfg(feature = "enable")]
         {
             match &parent.inner {
-                Some(_inner) => Self::enter_with_parents(
-                    name,
-                    [parent],
-                    #[cfg(test)]
-                    _inner.collect.clone(),
-                ),
+                Some(_inner) => Self::enter_with_parents(name, [parent]),
                 None => Span::noop(),
             }
         }
@@ -150,7 +140,6 @@ impl Span {
     pub fn enter_with_parents<'a>(
         name: impl Into<Cow<'static, str>>,
         parents: impl IntoIterator<Item = &'a Span>,
-        #[cfg(test)] collect: GlobalCollect,
     ) -> Self {
         #[cfg(not(feature = "enable"))]
         {
@@ -159,14 +148,12 @@ impl Span {
 
         #[cfg(feature = "enable")]
         {
-            #[cfg(not(test))]
-            let collect = GlobalCollect;
             let token = parents
                 .into_iter()
                 .filter_map(|span| span.inner.as_ref())
                 .flat_map(|inner| inner.issue_collect_token())
                 .collect();
-            Self::new(token, name, None, collect)
+            Self::new(token, name, None)
         }
     }
 
@@ -185,10 +172,7 @@ impl Span {
     /// let child = Span::enter_with_local_parent("child");
     /// ```
     #[inline]
-    pub fn enter_with_local_parent(
-        name: impl Into<Cow<'static, str>>,
-        #[cfg(test)] collect: GlobalCollect,
-    ) -> Self {
+    pub fn enter_with_local_parent(name: impl Into<Cow<'static, str>>) -> Self {
         #[cfg(not(feature = "enable"))]
         {
             Self::noop()
@@ -196,12 +180,8 @@ impl Span {
 
         #[cfg(feature = "enable")]
         {
-            #[cfg(not(test))]
-            let collect = GlobalCollect;
             LOCAL_SPAN_STACK
-                .try_with(move |stack| {
-                    Self::enter_with_stack(name, &mut (*stack).borrow_mut(), collect)
-                })
+                .try_with(move |stack| Self::enter_with_stack(name, &mut (*stack).borrow_mut()))
                 .unwrap_or_default()
         }
     }
@@ -391,11 +371,11 @@ impl Span {
         collect_token: CollectToken,
         name: impl Into<Cow<'static, str>>,
         collect_id: Option<usize>,
-        collect: GlobalCollect,
     ) -> Self {
         let span_id = SpanId::next_id();
         let begin_instant = Instant::now();
         let raw_span = RawSpan::begin_with(span_id, SpanId::default(), begin_instant, name, false);
+        let collect = current_collect();
 
         Self {
             inner: Some(SpanInner {
@@ -410,10 +390,9 @@ impl Span {
     pub(crate) fn enter_with_stack(
         name: impl Into<Cow<'static, str>>,
         stack: &mut LocalSpanStack,
-        collect: GlobalCollect,
     ) -> Self {
         match stack.current_collect_token() {
-            Some(token) => Span::new(token, name, None, collect),
+            Some(token) => Span::new(token, name, None),
             None => Self::noop(),
         }
     }
@@ -547,6 +526,26 @@ impl Drop for LocalParentGuard {
 }
 
 #[cfg(test)]
+thread_local! {
+    static MOCK_COLLECT: RefCell<GlobalCollect> = RefCell::new(GlobalCollect::default());
+}
+
+#[cfg(test)]
+fn current_collect() -> GlobalCollect {
+    MOCK_COLLECT.with(|mock| mock.borrow().clone())
+}
+
+#[cfg(test)]
+fn set_mock_collect(collect: GlobalCollect) {
+    MOCK_COLLECT.with(|mock| *mock.borrow_mut() = collect);
+}
+
+#[cfg(not(test))]
+fn current_collect() -> GlobalCollect {
+    GlobalCollect
+}
+
+#[cfg(test)]
 mod tests {
     use std::sync::atomic::AtomicUsize;
     use std::sync::atomic::Ordering;
@@ -605,12 +604,10 @@ mod tests {
             .return_const(());
         mock.expect_drop_collect().times(0);
 
-        let mock: Arc<MockGlobalCollect> = Arc::new(mock);
-        let _root = Span::root(
-            "root",
-            SpanContext::new(TraceId(12), SpanId::default()),
-            mock,
-        );
+        let mock = Arc::new(mock);
+        set_mock_collect(mock);
+
+        let _root = Span::root("root", SpanContext::new(TraceId(12), SpanId::default()));
     }
 
     #[test]
@@ -632,7 +629,9 @@ mod tests {
         mock.expect_submit_spans().times(0);
 
         let mock = Arc::new(mock);
-        let mut root = Span::root("root", SpanContext::random(), mock);
+        set_mock_collect(mock);
+
+        let mut root = Span::root("root", SpanContext::random());
         root.cancel();
     }
 
@@ -640,9 +639,9 @@ mod tests {
     fn span_with_parent() {
         crate::set_reporter(ConsoleReporter, crate::collector::Config::default());
 
-        let routine = |collect| {
+        let routine = || {
             let parent_ctx = SpanContext::random();
-            let root = Span::root("root", parent_ctx, collect);
+            let root = Span::root("root", parent_ctx);
             let child1 =
                 Span::enter_with_parent("child1", &root).with_properties(|| [("k1", "v1")]);
             let grandchild = Span::enter_with_parent("grandchild", &child1);
@@ -681,7 +680,11 @@ mod tests {
             .return_const(());
         mock.expect_drop_collect().times(0);
 
-        routine(Arc::new(mock));
+        let mock = Arc::new(mock);
+        set_mock_collect(mock);
+
+        routine();
+
         let span_sets = std::mem::take(&mut *span_sets.lock().unwrap());
         assert_eq!(
             tree_str_from_span_sets(span_sets.as_slice()),
@@ -699,19 +702,17 @@ root []
     fn span_with_parents() {
         crate::set_reporter(ConsoleReporter, crate::collector::Config::default());
 
-        let routine = |collect: GlobalCollect| {
+        let routine = || {
             let parent_ctx = SpanContext::random();
-            let parent1 = Span::root("parent1", parent_ctx, collect.clone());
-            let parent2 = Span::root("parent2", parent_ctx, collect.clone());
-            let parent3 = Span::root("parent3", parent_ctx, collect.clone());
-            let parent4 = Span::root("parent4", parent_ctx, collect.clone());
-            let parent5 = Span::root("parent5", parent_ctx, collect.clone());
+            let parent1 = Span::root("parent1", parent_ctx);
+            let parent2 = Span::root("parent2", parent_ctx);
+            let parent3 = Span::root("parent3", parent_ctx);
+            let parent4 = Span::root("parent4", parent_ctx);
+            let parent5 = Span::root("parent5", parent_ctx);
             let child1 = Span::enter_with_parent("child1", &parent5);
-            let child2 = Span::enter_with_parents(
-                "child2",
-                [&parent1, &parent2, &parent3, &parent4, &parent5, &child1],
-                collect,
-            )
+            let child2 = Span::enter_with_parents("child2", [
+                &parent1, &parent2, &parent3, &parent4, &parent5, &child1,
+            ])
             .with_property(|| ("k1", "v1"));
 
             crossbeam::scope(move |scope| {
@@ -757,7 +758,11 @@ root []
             .return_const(());
         mock.expect_drop_collect().times(0);
 
-        routine(Arc::new(mock));
+        let mock = Arc::new(mock);
+        set_mock_collect(mock);
+
+        routine();
+
         let span_sets = std::mem::take(&mut *span_sets.lock().unwrap());
         assert_eq!(
             tree_str_from_span_sets(span_sets.as_slice()),
@@ -791,13 +796,13 @@ parent5 []
     fn span_push_child_spans() {
         crate::set_reporter(ConsoleReporter, crate::collector::Config::default());
 
-        let routine = |collect: GlobalCollect| {
+        let routine = || {
             let parent_ctx = SpanContext::random();
-            let parent1 = Span::root("parent1", parent_ctx, collect.clone());
-            let parent2 = Span::root("parent2", parent_ctx, collect.clone());
-            let parent3 = Span::root("parent3", parent_ctx, collect.clone());
-            let parent4 = Span::root("parent4", parent_ctx, collect.clone());
-            let parent5 = Span::root("parent5", parent_ctx, collect);
+            let parent1 = Span::root("parent1", parent_ctx);
+            let parent2 = Span::root("parent2", parent_ctx);
+            let parent3 = Span::root("parent3", parent_ctx);
+            let parent4 = Span::root("parent4", parent_ctx);
+            let parent5 = Span::root("parent5", parent_ctx);
 
             let stack = Rc::new(RefCell::new(LocalSpanStack::with_capacity(16)));
             let collector = LocalCollector::new(None, stack.clone());
@@ -844,7 +849,11 @@ parent5 []
             .return_const(());
         mock.expect_drop_collect().times(0);
 
-        routine(Arc::new(mock));
+        let mock = Arc::new(mock);
+        set_mock_collect(mock);
+
+        routine();
+
         let span_sets = std::mem::take(&mut *span_sets.lock().unwrap());
         assert_eq!(
             tree_str_from_span_sets(span_sets.as_slice()),
@@ -876,18 +885,17 @@ parent5 []
     fn span_communicate_via_stack() {
         crate::set_reporter(ConsoleReporter, crate::collector::Config::default());
 
-        let routine = |collect: GlobalCollect| {
+        let routine = || {
             let stack = Rc::new(RefCell::new(LocalSpanStack::with_capacity(16)));
 
             {
                 let parent_ctx = SpanContext::random();
-                let root = Span::root("root", parent_ctx, collect.clone());
+                let root = Span::root("root", parent_ctx);
                 let _g = root.attach_into_stack(&stack);
-                let child =
-                    Span::enter_with_stack("child", &mut stack.borrow_mut(), collect.clone());
+                let child = Span::enter_with_stack("child", &mut stack.borrow_mut());
                 {
                     let _g = child.attach_into_stack(&stack);
-                    let _s = Span::enter_with_stack("grandchild", &mut stack.borrow_mut(), collect);
+                    let _s = Span::enter_with_stack("grandchild", &mut stack.borrow_mut());
                 }
                 let _s = LocalSpan::enter_with_stack("local", stack);
             }
@@ -915,7 +923,11 @@ parent5 []
             .return_const(());
         mock.expect_drop_collect().times(0);
 
-        routine(Arc::new(mock));
+        let mock = Arc::new(mock);
+        set_mock_collect(mock);
+
+        routine();
+
         let span_sets = std::mem::take(&mut *span_sets.lock().unwrap());
         assert_eq!(
             tree_str_from_span_sets(span_sets.as_slice()),
