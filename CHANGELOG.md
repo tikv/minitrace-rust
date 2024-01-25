@@ -2,8 +2,11 @@
 
 ## Unreleased
 
+## v0.6.3
+
 - Add `LocalSpans::to_span_records()`.
 - Add `#[trace(properties = { "k1": "v1", "k2": "v2" })]`.
+- Add  `func_name!()`, `full_name!()`, and `file_location!()` to `minitrace::prelude`.
 
 ## v0.6.2
 

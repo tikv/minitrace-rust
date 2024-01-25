@@ -108,7 +108,7 @@ Note that we always prioritize performance over features, so that not all tracin
 **Code base Tested**: minitrace has been tested with high coverage. However, applications utilizing minitrace have not been widely deployed, so that minitrace is currently **NOT** regarded as battle-tested. 
 
 [Docs]: https://docs.rs/minitrace/
-[Getting Started]: minitrace/examples/get_started.rs
+[Getting Started]: https://docs.rs/minitrace/latest/minitrace/#getting-started
 [Examples]: minitrace/examples
 [OpenTelemetry]: https://opentelemetry.io/
 [Jaeger]: https://crates.io/crates/minitrace-jaeger
