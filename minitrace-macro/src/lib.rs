@@ -12,82 +12,96 @@ extern crate proc_macro;
 #[macro_use]
 extern crate proc_macro_error;
 
-use std::collections::HashSet;
+use std::collections::HashMap;
 
+use proc_macro2::Span;
 use quote::quote_spanned;
+use syn::parse::Parse;
+use syn::parse::ParseStream;
+use syn::punctuated::Punctuated;
 use syn::spanned::Spanned;
 use syn::*;
 
 struct Args {
-    name: Name,
+    name: Option<String>,
+    short_name: bool,
     enter_on_poll: bool,
+    properties: Vec<(String, String)>,
 }
 
-enum Name {
-    Plain(String),
-    FullName,
+struct Property {
+    key: String,
+    value: String,
 }
 
-impl Args {
-    fn parse(func_name: String, input: AttributeArgs) -> Args {
-        if input.len() > 2 {
-            abort_call_site!("too many arguments");
-        }
+impl Parse for Property {
+    fn parse(input: ParseStream) -> Result<Self> {
+        let key: LitStr = input.parse()?;
+        input.parse::<Token![:]>()?;
+        let value: LitStr = input.parse()?;
+        Ok(Property {
+            key: key.value(),
+            value: value.value(),
+        })
+    }
+}
 
-        let mut args = HashSet::new();
-        let mut func_name = func_name;
+impl Parse for Args {
+    fn parse(input: ParseStream) -> Result<Self> {
+        let mut name = None;
         let mut short_name = false;
         let mut enter_on_poll = false;
+        let mut properties = Vec::new();
+        let mut seen = HashMap::new();
 
-        for arg in &input {
-            match arg {
-                NestedMeta::Meta(Meta::NameValue(MetaNameValue {
-                    path,
-                    lit: Lit::Str(s),
-                    ..
-                })) if path.is_ident("name") => {
-                    func_name = s.value();
-                    args.insert("name");
+        while !input.is_empty() {
+            let ident: Ident = input.parse()?;
+            if seen.contains_key(&ident.to_string()) {
+                return Err(syn::Error::new(ident.span(), "duplicate argument"));
+            }
+            seen.insert(ident.to_string(), ());
+            input.parse::<Token![=]>()?;
+            match ident.to_string().as_str() {
+                "name" => {
+                    let parsed_name: LitStr = input.parse()?;
+                    name = Some(parsed_name.value());
                 }
-                NestedMeta::Meta(Meta::NameValue(MetaNameValue {
-                    path,
-                    lit: Lit::Bool(b),
-                    ..
-                })) if path.is_ident("short_name") => {
-                    short_name = b.value;
-                    args.insert("short_name");
+                "short_name" => {
+                    let parsed_short_name: LitBool = input.parse()?;
+                    short_name = parsed_short_name.value;
                 }
-                NestedMeta::Meta(Meta::NameValue(MetaNameValue {
-                    path,
-                    lit: Lit::Bool(b),
-                    ..
-                })) if path.is_ident("enter_on_poll") => {
-                    enter_on_poll = b.value;
-                    args.insert("enter_on_poll");
+                "enter_on_poll" => {
+                    let parsed_enter_on_poll: LitBool = input.parse()?;
+                    enter_on_poll = parsed_enter_on_poll.value;
                 }
-                _ => abort_call_site!("invalid argument"),
+                "properties" => {
+                    let content;
+                    let _brace_token = syn::braced!(content in input);
+                    let property_list: Punctuated<Property, Token![,]> =
+                        content.parse_terminated(Property::parse)?;
+                    for property in property_list {
+                        if properties.iter().any(|(k, _)| k == &property.key) {
+                            return Err(syn::Error::new(
+                                Span::call_site(),
+                                "duplicate property key",
+                            ));
+                        }
+                        properties.push((property.key, property.value));
+                    }
+                }
+                _ => return Err(syn::Error::new(Span::call_site(), "unexpected identifier")),
+            }
+            if !input.is_empty() {
+                let _ = input.parse::<Token![,]>();
             }
         }
 
-        let name = if args.contains("name") {
-            if short_name {
-                abort_call_site!("`name` and `short_name` can not be used together");
-            }
-            Name::Plain(func_name)
-        } else if short_name {
-            Name::Plain(func_name)
-        } else {
-            Name::FullName
-        };
-
-        if args.len() != input.len() {
-            abort_call_site!("duplicated arguments");
-        }
-
-        Args {
+        Ok(Args {
             name,
+            short_name,
             enter_on_poll,
-        }
+            properties,
+        })
     }
 }
 
@@ -106,6 +120,8 @@ impl Args {
 /// * `short_name` - Whether to use the function name without path as the span name. Defaults to `false`.
 /// * `enter_on_poll` - Whether to enter the span on poll. If set to `false`, `in_span` will be used.
 ///    Only available for `async fn`. Defaults to `false`.
+/// * `properties` - A list of key-value pairs to be added as properties to the span. The value can be
+///    a format string, where the function arguments are accessible. Defaults to `{}`.
 ///
 /// # Examples
 ///
@@ -113,17 +129,22 @@ impl Args {
 /// use minitrace::prelude::*;
 ///
 /// #[trace]
-/// fn foo() {
+/// fn simple() {
 ///     // ...
 /// }
 ///
-/// #[trace]
-/// async fn bar() {
+/// #[trace(short_name = true)]
+/// async fn simple_async() {
 ///     // ...
 /// }
 ///
 /// #[trace(name = "qux", enter_on_poll = true)]
 /// async fn baz() {
+///     // ...
+/// }
+///
+/// #[trace(properties = { "k1": "v1", "a": "argument `a` is {a:?}" })]
+/// async fn properties(a: u64) {
 ///     // ...
 /// }
 /// ```
@@ -133,16 +154,17 @@ impl Args {
 /// ```
 /// # use minitrace::prelude::*;
 /// # use minitrace::local::LocalSpan;
-/// fn foo() {
-///     let __guard__ = LocalSpan::enter_with_local_parent("example::foo");
+/// fn simple() {
+///     let __guard__ = LocalSpan::enter_with_local_parent("example::simple");
 ///     // ...
 /// }
 ///
-/// async fn bar() {
+/// async fn simple_async() {
+///     let __span__ = Span::enter_with_local_parent("simple_async");
 ///     async {
 ///         // ...
 ///     }
-///     .in_span(Span::enter_with_local_parent("example::bar"))
+///     .in_span(__span__)
 ///     .await
 /// }
 ///
@@ -153,6 +175,23 @@ impl Args {
 ///     .enter_on_poll("qux")
 ///     .await
 /// }
+///
+/// async fn properties(a: u64) {
+///     let __span__ = Span::enter_with_local_parent("example::properties").with_properties(|| {
+///         [
+///             (std::borrow::Cow::from("k1"), std::borrow::Cow::from("v1")),
+///             (
+///                 std::borrow::Cow::from("a"),
+///                 std::borrow::Cow::from(format!("argument `a` is {a:?}")),
+///             ),
+///         ]
+///     });
+///     async {
+///         // ...
+///     }
+///     .in_span(__span__)
+///     .await
+/// }
 /// ```
 #[proc_macro_attribute]
 #[proc_macro_error]
@@ -160,12 +199,10 @@ pub fn trace(
     args: proc_macro::TokenStream,
     item: proc_macro::TokenStream,
 ) -> proc_macro::TokenStream {
+    let args = parse_macro_input!(args as Args);
     let input = syn::parse_macro_input!(item as ItemFn);
-    let args = Args::parse(
-        input.sig.ident.to_string(),
-        syn::parse_macro_input!(args as AttributeArgs),
-    );
 
+    let func_name = input.sig.ident.to_string();
     // check for async_trait-like patterns in the block, and instrument
     // the future instead of the wrapper
     let func_body = if let Some(internal_fun) =
@@ -183,7 +220,8 @@ pub fn trace(
             AsyncTraitKind::Async(async_expr) => {
                 // fallback if we couldn't find the '__async_trait' binding, might be
                 // useful for crates exhibiting the same behaviors as async-trait
-                let instrumented_block = gen_block(&async_expr.block, true, false, args);
+                let instrumented_block =
+                    gen_block(&func_name, &async_expr.block, true, false, &args);
                 let async_attrs = &async_expr.attrs;
                 quote::quote! {
                     Box::pin(#(#async_attrs) * #instrumented_block)
@@ -192,10 +230,11 @@ pub fn trace(
         }
     } else {
         gen_block(
+            &func_name,
             &input.block,
             input.sig.asyncness.is_some(),
             input.sig.asyncness.is_some(),
-            args,
+            &args,
         )
     };
 
@@ -231,14 +270,85 @@ pub fn trace(
     .into()
 }
 
+fn gen_name(span: proc_macro2::Span, func_name: &str, args: &Args) -> proc_macro2::TokenStream {
+    match &args.name {
+        Some(name) if name.is_empty() => {
+            abort_call_site!("`name` can not be empty")
+        }
+        Some(_) if args.short_name => {
+            abort_call_site!("`name` and `short_name` can not be used together")
+        }
+        Some(name) => {
+            quote_spanned!(span=>
+                #name
+            )
+        }
+        None if args.short_name => {
+            quote_spanned!(span=>
+                #func_name
+            )
+        }
+        None => {
+            quote_spanned!(span=>
+                minitrace::full_name!()
+            )
+        }
+    }
+}
+
+fn gen_properties(span: proc_macro2::Span, args: &Args) -> proc_macro2::TokenStream {
+    if args.properties.is_empty() {
+        return quote::quote!();
+    }
+
+    if args.enter_on_poll {
+        abort_call_site!("`enter_on_poll` can not be used with `properties`")
+    }
+
+    let properties = args.properties.iter().map(|(k, v)| {
+        let k = k.as_str();
+        let v = v.as_str();
+
+        let (v, need_format) = unescape_format_string(v);
+
+        if need_format {
+            quote_spanned!(span=>
+                (std::borrow::Cow::from(#k), std::borrow::Cow::from(format!(#v)))
+            )
+        } else {
+            quote_spanned!(span=>
+                (std::borrow::Cow::from(#k), std::borrow::Cow::from(#v))
+            )
+        }
+    });
+    let properties = Punctuated::<_, Token![,]>::from_iter(properties);
+    quote_spanned!(span=>
+        .with_properties(|| [ #properties ])
+    )
+}
+
+fn unescape_format_string(s: &str) -> (String, bool) {
+    let unescaped_delete = s.replace("{{", "").replace("}}", "");
+    let contains_valid_format_string =
+        unescaped_delete.contains('{') || unescaped_delete.contains('}');
+    if contains_valid_format_string {
+        (s.to_string(), true)
+    } else {
+        let unescaped_replace = s.replace("{{", "{").replace("}}", "}");
+        (unescaped_replace, false)
+    }
+}
+
 /// Instrument a block
 fn gen_block(
+    func_name: &str,
     block: &Block,
     async_context: bool,
     async_keyword: bool,
-    args: Args,
+    args: &Args,
 ) -> proc_macro2::TokenStream {
-    let name = gen_name(block.span(), args.name);
+    let name = gen_name(block.span(), func_name, args);
+    let properties = gen_properties(block.span(), args);
 
     // Generate the instrumented function body.
     // If the function is an `async fn`, this will wrap it in an async block.
@@ -253,10 +363,13 @@ fn gen_block(
             )
         } else {
             quote_spanned!(block.span()=>
-                minitrace::future::FutureExt::in_span(
-                    async move { #block },
-                    minitrace::Span::enter_with_local_parent( #name )
-                )
+                {
+                    let __span__ = minitrace::Span::enter_with_local_parent( #name ) #properties;
+                    minitrace::future::FutureExt::in_span(
+                        async move { #block },
+                        __span__,
+                    )
+                }
             )
         };
 
@@ -273,20 +386,9 @@ fn gen_block(
         }
 
         quote_spanned!(block.span()=>
-            let __guard = minitrace::local::LocalSpan::enter_with_local_parent( #name );
+            let __guard__ = minitrace::local::LocalSpan::enter_with_local_parent( #name ) #properties;
             #block
         )
-    }
-}
-
-fn gen_name(span: proc_macro2::Span, name: Name) -> proc_macro2::TokenStream {
-    match name {
-        Name::Plain(name) => quote_spanned!(span=>
-            #name
-        ),
-        Name::FullName => quote_spanned!(span=>
-            minitrace::full_name!()
-        ),
     }
 }
 

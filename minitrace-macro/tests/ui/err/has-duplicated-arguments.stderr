@@ -1,7 +1,5 @@
-error: duplicated arguments
- --> tests/ui/err/has-duplicated-arguments.rs:3:1
+error: duplicate argument
+ --> tests/ui/err/has-duplicated-arguments.rs:3:24
   |
 3 | #[trace(name = "Name", name = "Name")]
-  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  |
-  = note: this error originates in the attribute macro `trace` (in Nightly builds, run with -Z macro-backtrace for more info)
+  |                        ^^^^

@@ -655,3 +655,69 @@ fn test_elapsed() {
 
     minitrace::flush();
 }
+
+#[test]
+#[serial]
+fn test_macro_properties() {
+    #[allow(clippy::drop_non_drop)]
+    #[trace(short_name = true, properties = { "k1": "v1", "a": "argument a is {a:?}", "b": "{b:?}", "escaped1": "{c:?}{{}}", "escaped2": "{{ \"a\": \"b\"}}" })]
+    fn foo(a: i64, b: &Bar, c: Bar) {
+        drop(c);
+    }
+
+    #[allow(clippy::drop_non_drop)]
+    #[trace(short_name = true, properties = { "k1": "v1", "a": "argument a is {a:?}", "b": "{b:?}", "escaped1": "{c:?}{{}}", "escaped2": "{{ \"a\": \"b\"}}" })]
+    async fn foo_async(a: i64, b: &Bar, c: Bar) {
+        drop(c);
+    }
+
+    #[trace(short_name = true, properties = {})]
+    fn bar() {}
+
+    #[trace(short_name = true, properties = {})]
+    async fn bar_async() {}
+
+    #[derive(Debug)]
+    struct Bar;
+
+    let (reporter, collected_spans) = TestReporter::new();
+    minitrace::set_reporter(reporter, Config::default());
+
+    {
+        let root = Span::root("root", SpanContext::random());
+        let _g = root.set_local_parent();
+        foo(1, &Bar, Bar);
+        bar();
+
+        let runtime = Builder::new_multi_thread()
+            .worker_threads(4)
+            .enable_all()
+            .build()
+            .unwrap();
+
+        block_on(
+            runtime.spawn(
+                async {
+                    foo_async(1, &Bar, Bar).await;
+                    bar_async().await;
+                }
+                .in_span(root),
+            ),
+        )
+        .unwrap();
+    }
+
+    minitrace::flush();
+
+    let expected_graph = r#"
+root []
+    bar []
+    bar_async []
+    foo [("k1", "v1"), ("a", "argument a is 1"), ("b", "Bar"), ("escaped1", "Bar{}"), ("escaped2", "{ \"a\": \"b\"}")]
+    foo_async [("k1", "v1"), ("a", "argument a is 1"), ("b", "Bar"), ("escaped1", "Bar{}"), ("escaped2", "{ \"a\": \"b\"}")]
+"#;
+    assert_eq!(
+        tree_str_from_span_records(collected_spans.lock().clone()),
+        expected_graph
+    );
+}

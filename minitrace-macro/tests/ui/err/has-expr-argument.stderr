@@ -1,7 +1,5 @@
-error: invalid argument
- --> tests/ui/err/has-expr-argument.rs:3:1
+error: expected identifier
+ --> tests/ui/err/has-expr-argument.rs:3:9
   |
 3 | #[trace(true)]
-  | ^^^^^^^^^^^^^^
-  |
-  = note: this error originates in the attribute macro `trace` (in Nightly builds, run with -Z macro-backtrace for more info)
+  |         ^^^^
