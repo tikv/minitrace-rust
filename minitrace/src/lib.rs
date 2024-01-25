@@ -10,7 +10,7 @@
 //!
 //! # Getting Started
 //!
-//! ## Libraries
+//! ## In Libraries
 //!
 //! Libraries should include `minitrace` as a dependency without enabling any extra features.
 //!
@@ -55,9 +55,9 @@
 //! }
 //! ```
 //!
-//! ## Executables
+//! ## In Applications
 //!
-//! Executables should include `minitrace` as a dependency with the `enable` feature
+//! Applications should include `minitrace` as a dependency with the `enable` feature
 //! set. To disable `minitrace` statically, simply remove the `enable` feature.
 //!
 //! ```toml
@@ -65,7 +65,7 @@
 //! minitrace = { version = "0.6", features = ["enable"] }
 //! ```
 //!
-//! Executables should initialize a [`Reporter`] implementation early in the program's runtime.
+//! Applications should initialize a [`Reporter`] implementation early in the program's runtime.
 //! Span records generated before the reporter is initialized will be ignored. Before
 //! terminating, [`flush()`] should be called to ensure all collected span records are reported.
 //!
