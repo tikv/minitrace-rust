@@ -26,9 +26,75 @@ Features:
 ## Resources
 
 - [Docs]
-- [Getting Started]
 - [Examples]
 - [FAQ](#faq)
+
+## Getting Started
+
+## In Libraries
+
+Libraries should include `minitrace` as a dependency without enabling any extra features.
+
+```toml
+[dependencies]
+minitrace = "0.6"
+```
+
+Add a `trace` attribute to the function you want to trace. In this example, a `SpanRecord` will be collected every time the function is called, if a tracing context is set up by the caller.
+
+```rust
+#[minitrace::trace]
+pub fn send_request(req: HttpRequest) -> Result<(), Error> {
+    // ...
+}
+```
+
+Libraries are able to set up an individual tracing context, regardless of whether the caller has set up a tracing context or not. This can be achieved by using `Span::root()` to start a new trace and `Span::set_local_parent()` to set up a local context for the current thread.
+
+The `full_name!()` macro can detect the function's full name, which is used as the name of the root span.
+
+```rust
+use minitrace::prelude::*;
+
+pub fn send_request(req: HttpRequest) -> Result<(), Error> {
+    let root = Span::root(full_name!(), SpanContext::random());
+    let _guard = root.set_local_parent();
+
+    // ...
+}
+```
+
+## In Applications
+
+Applications should include `minitrace` as a dependency with the `enable` feature set. To disable `minitrace` statically, simply remove the `enable` feature.
+
+```toml
+[dependencies]
+minitrace = { version = "0.6", features = ["enable"] }
+```
+
+Applications should initialize a `Reporter` implementation early in the program's runtime. Span records generated before the reporter is initialized will be ignored. Before terminating, `flush()` should be called to ensure all collected span records are reported.
+
+When the root span is dropped, all of its children spans and itself will be reported at once. Since that, it's recommended to create root spans for short tasks, such as handling a request, just like the example below. Otherwise, an endingless trace will never be reported.
+
+```rust
+use minitrace::collector::Config;
+use minitrace::collector::ConsoleReporter;
+use minitrace::prelude::*;
+
+fn main() {
+    minitrace::set_reporter(ConsoleReporter, Config::default());
+
+    loop {
+        let root = Span::root("worker-loop", SpanContext::random());
+        let _guard = root.set_local_parent();
+
+        handle_request();
+    }
+
+    minitrace::flush();
+}
+```
 
 ## Benchmarks
 
@@ -108,7 +174,6 @@ Note that we always prioritize performance over features, so that not all tracin
 **Code base Tested**: minitrace has been tested with high coverage. However, applications utilizing minitrace have not been widely deployed, so that minitrace is currently **NOT** regarded as battle-tested. 
 
 [Docs]: https://docs.rs/minitrace/
-[Getting Started]: minitrace/examples/get_started.rs
 [Examples]: minitrace/examples
 [OpenTelemetry]: https://opentelemetry.io/
 [Jaeger]: https://crates.io/crates/minitrace-jaeger

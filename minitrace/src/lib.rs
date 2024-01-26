@@ -10,7 +10,7 @@
 //!
 //! # Getting Started
 //!
-//! ## Libraries
+//! ## In Libraries
 //!
 //! Libraries should include `minitrace` as a dependency without enabling any extra features.
 //!
@@ -19,28 +19,27 @@
 //! minitrace = "0.6"
 //! ```
 //!
-//! Libraries can attach their spans to the caller's span (if caller has set [local parent](#local-span))
-//! via the API boundary.
+//! Add a [`trace`] attribute to the function you want to trace. In this example, a
+//! [`SpanRecord`] will be collected every time the function is called, if a tracing context
+//! is set up by the caller.
 //!
 //! ```
-//! use minitrace::prelude::*;
-//! # struct QueryResult;
+//! # struct HttpRequest;
 //! # struct Error;
-//!
-//! struct Connection {
+//! #[minitrace::trace]
+//! pub fn send_request(req: HttpRequest) -> Result<(), Error> {
 //!     // ...
-//! }
-//!
-//! impl Connection {
-//!     #[trace]
-//!     pub fn query(sql: &str) -> Result<QueryResult, Error> {
-//!         // ...
-//!         # Ok(QueryResult)
-//!     }
+//!     # Ok(())
 //! }
 //! ```
 //!
-//! Libraries can also create a new trace individually to record their work.
+//! Libraries are able to set up an individual tracing context, regardless of whether
+//! the caller has set up a tracing context or not. This can be achieved by using
+//! [`Span::root()`] to start a new trace and [`Span::set_local_parent()`] to set up a
+//! local context for the current thread.
+//!
+//! The [`full_name!()`] macro can detect the function's full name, which is used as
+//! the name of the root span.
 //!
 //! ```
 //! use minitrace::prelude::*;
@@ -48,7 +47,7 @@
 //! # struct Error;
 //!
 //! pub fn send_request(req: HttpRequest) -> Result<(), Error> {
-//!     let root = Span::root("send_request", SpanContext::random());
+//!     let root = Span::root(full_name!(), SpanContext::random());
 //!     let _guard = root.set_local_parent();
 //!
 //!     // ...
@@ -56,31 +55,43 @@
 //! }
 //! ```
 //!
-//! ## Executables
+//! ## In Applications
 //!
-//! Executables should include `minitrace` as a dependency with the `enable` feature
-//! set. To disable `minitrace` statically, simply don't set the `enable` feature.
+//! Applications should include `minitrace` as a dependency with the `enable` feature
+//! set. To disable `minitrace` statically, simply remove the `enable` feature.
 //!
 //! ```toml
 //! [dependencies]
 //! minitrace = { version = "0.6", features = ["enable"] }
 //! ```
 //!
-//! Executables should initialize a reporter implementation early in the program's runtime.
-//! Span records generated before the implementation is initialized will be ignored. Before
-//! terminating, the reporter should be flushed to ensure all span records are reported.
+//! Applications should initialize a [`Reporter`] implementation early in the program's runtime.
+//! Span records generated before the reporter is initialized will be ignored. Before
+//! terminating, [`flush()`] should be called to ensure all collected span records are reported.
+//!
+//! When the root span is dropped, all of its children spans and itself will be reported at once.
+//! Since that, it's recommended to create root spans for short tasks, such as handling a request,
+//! just like the example below. Otherwise, an endingless trace will never be reported.
 //!
 //! ```
 //! use minitrace::collector::Config;
 //! use minitrace::collector::ConsoleReporter;
+//! use minitrace::prelude::*;
 //!
 //! fn main() {
 //!     minitrace::set_reporter(ConsoleReporter, Config::default());
 //!
-//!     // ...
+//!     loop {
+//!         let root = Span::root("worker-loop", SpanContext::random());
+//!         let _guard = root.set_local_parent();
+//!
+//!         handle_request();
+//!         # break;
+//!     }
 //!
 //!     minitrace::flush();
 //! }
+//! # fn handle_request() {}
 //! ```
 //!
 //! # Key Concepts
@@ -287,7 +298,7 @@
 //! such as Jaeger.
 //!
 //! Executables should initialize a reporter implementation early in the program's
-//! runtime. Span records generated before the implementation is initialized will be ignored.
+//! runtime. Span records generated before the reporter is initialized will be ignored.
 //!
 //! For an easy start, `minitrace` offers a [`ConsoleReporter`] that prints span
 //! records to stderr. For more advanced use, crates like `minitrace-jaeger`, `minitrace-datadog`,
@@ -313,23 +324,22 @@
 //!
 //! `minitrace` is designed to be fast and lightweight, considering four scenarios:
 //!
-//! - **No Tracing**: `minitrace` is not included as dependency in the executable, while the
-//! libraries has been instrumented. In this case, it will be completely removed from libraries,
-//! causing zero overhead.
+//! - **No Tracing**: If the feature `enable` is not set in the application, `minitrace` will be
+//!   completely optimized away from the final executable binary, achieving zero overhead.
 //!
-//! - **Sample Tracing**: `minitrace` is enabled in the executable, but only a small portion
-//! of the traces are enabled via [`Span::root()`], while the other portion start with placeholders
-//! by [`Span::noop()`]. The overhead in this case is very small - merely an integer
-//! load, comparison, and jump.
+//! - **Sample Tracing**: If `enable` is set in the application, but only a small portion
+//!   of the traces are enabled via [`Span::root()`], while the other portions are started with
+//!   placeholders using [`Span::noop()`]. The overhead in this case is very small - merely an
+//!   integer load, comparison, and jump.
 //!
-//! - **Full Tracing with Tail Sampling**: `minitrace` is enabled in the executable, and all
-//! traces are enabled. However, only a select few abnormal tracing records (e.g., P99) are
-//! reported. Normal traces can be dismissed by using [`Span::cancel()`] to avoid reporting.
-//! This could be useful when you are interested in examining program's tail latency.
+//! - **Full Tracing with Tail Sampling**: If `enable` is set in the application, and all
+//!   traces are enabled, however, only a select few interesting tracing records (e.g., P99) are
+//!   reported, while normal traces are dismissed by using [`Span::cancel()`] to avoid being
+//!   reported, the overhead of collecting traces is still very small. This could be useful when
+//!   you are interested in examining program's tail latency.
 //!
-//! - **Full Tracing**: `minitrace` is enabled in the executable, and all traces are enabled.
-//! All tracing records are reported. `minitrace` performs 10x to 100x faster than other tracing
-//! libraries in this case.
+//! - **Full Tracing**: If `enable` is set in the application, and all traces are reported,
+//!   `minitrace` performs 10x to 100x faster than other tracing libraries in this case.
 //!
 //!
 //! [`Span`]: crate::Span
@@ -385,6 +395,12 @@ pub mod prelude {
     pub use crate::collector::TraceId;
     #[doc(no_inline)]
     pub use crate::event::Event;
+    #[doc(no_inline)]
+    pub use crate::file_location;
+    #[doc(no_inline)]
+    pub use crate::full_name;
+    #[doc(no_inline)]
+    pub use crate::func_name;
     #[doc(no_inline)]
     pub use crate::future::FutureExt as _;
     #[doc(no_inline)]

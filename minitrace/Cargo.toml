@@ -1,6 +1,6 @@
 [package]
 name = "minitrace"
-version = "0.6.2"
+version = "0.6.3"
 authors = ["The TiKV Project Authors"]
 license = "Apache-2.0"
 edition = "2021"
@@ -17,7 +17,7 @@ enable = []
 
 [dependencies]
 futures = "0.3"
-minitrace-macro = { version = "0.6.2", path = "../minitrace-macro" }
+minitrace-macro = { version = "0.6.3", path = "../minitrace-macro" }
 minstant = "0.1"
 parking_lot = "0.12"
 pin-project = "1"
@@ -37,9 +37,9 @@ futures-timer = "3"
 log = "0.4"
 logcall = "0.1.4"
 minitrace = { path = ".", features = ["enable"] }
-minitrace-datadog = { version = "0.6.2", path = "../minitrace-datadog" }
-minitrace-jaeger = { version = "0.6.2", path = "../minitrace-jaeger" }
-minitrace-opentelemetry = { version = "0.6.2", path = "../minitrace-opentelemetry" }
+minitrace-datadog = { version = "0.6.3", path = "../minitrace-datadog" }
+minitrace-jaeger = { version = "0.6.3", path = "../minitrace-jaeger" }
+minitrace-opentelemetry = { version = "0.6.3", path = "../minitrace-opentelemetry" }
 mockall = "0.11"
 once_cell = "1"
 opentelemetry = { version = "0.21", features = ["trace"] }
