@@ -40,7 +40,7 @@ Libraries should include `minitrace` as a dependency without enabling any extra 
 minitrace = "0.6"
 ```
 
-Add a `trace` attribute to the function you want to trace. In this example, a `SpanRecord` will be collected everytime the function is alled, if a tracing context is set up by the caller.
+Add a `trace` attribute to the function you want to trace. In this example, a `SpanRecord` will be collected every time the function is called, if a tracing context is set up by the caller.
 
 ```rust
 #[minitrace::trace]
@@ -51,7 +51,7 @@ pub fn send_request(req: HttpRequest) -> Result<(), Error> {
 
 Libraries are able to set up an individual tracing context, regardless of whether the caller has set up a tracing context or not. This can be achieved by using `Span::root()` to start a new trace and `Span::set_local_parent()` to set up a local context for the current thread.
 
-The `full_name!()` macro can auto detect the function's full name, which is usedas the name of the root span.
+The `full_name!()` macro can detect the function's full name, which is used as the name of the root span.
 
 ```rust
 use minitrace::prelude::*;

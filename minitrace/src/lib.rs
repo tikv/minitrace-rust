@@ -20,8 +20,8 @@
 //! ```
 //!
 //! Add a [`trace`] attribute to the function you want to trace. In this example, a
-//! [`SpanRecord`] will be collected everytime the function is called, if a tracing context is
-//! set up by the caller.
+//! [`SpanRecord`] will be collected every time the function is called, if a tracing context
+//! is set up by the caller.
 //!
 //! ```
 //! # struct HttpRequest;
@@ -38,8 +38,8 @@
 //! [`Span::root()`] to start a new trace and [`Span::set_local_parent()`] to set up a
 //! local context for the current thread.
 //!
-//! The [`full_name!()`] macro can auto detect the function's full name, which is used
-//! as the name of the root span.
+//! The [`full_name!()`] macro can detect the function's full name, which is used as
+//! the name of the root span.
 //!
 //! ```
 //! use minitrace::prelude::*;
