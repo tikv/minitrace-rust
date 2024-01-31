@@ -88,10 +88,11 @@ impl Reporter for DatadogReporter {
         }
 
         if let Err(err) = self.try_report(spans) {
-            eprintln!("report to datadog failed: {}", err);
+            log::error!("report to datadog failed: {}", err);
         }
     }
 }
+
 #[derive(Serialize)]
 struct DatadogSpan<'a> {
     name: &'a str,
