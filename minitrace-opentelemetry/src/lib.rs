@@ -123,7 +123,7 @@ impl Reporter for OpenTelemetryReporter {
         }
 
         if let Err(err) = self.try_report(spans) {
-            eprintln!("report to opentelemetry failed: {}", err);
+            log::error!("report to opentelemetry failed: {}", err);
         }
     }
 }
