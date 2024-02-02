@@ -104,8 +104,19 @@ impl SpanQueue {
     }
 
     #[inline]
-    pub fn current_span_id(&self) -> Option<SpanId> {
+    pub fn current_parent_id(&self) -> Option<SpanId> {
         self.next_parent_id
+    }
+
+    #[inline]
+    pub fn current_parent_handle(&self) -> Option<SpanHandle> {
+        self.next_parent_id.and_then(|id| {
+            let index = self.span_queue.iter().position(|span| span.id == id);
+
+            debug_assert!(index.is_some());
+
+            Some(SpanHandle { index: index? })
+        })
     }
 
     #[cfg(test)]
@@ -237,81 +248,81 @@ span1 []
     fn last_span_id() {
         let mut queue = SpanQueue::with_capacity(16);
 
-        assert_eq!(queue.current_span_id(), None);
+        assert_eq!(queue.current_parent_id(), None);
         {
             let span1 = queue.start_span("span1").unwrap();
             assert_eq!(
-                queue.current_span_id().unwrap(),
+                queue.current_parent_id().unwrap(),
                 queue.get_raw_span(&span1).id
             );
             queue.finish_span(span1);
-            assert_eq!(queue.current_span_id(), None);
+            assert_eq!(queue.current_parent_id(), None);
         }
         {
             let span2 = queue.start_span("span2").unwrap();
             assert_eq!(
-                queue.current_span_id().unwrap(),
+                queue.current_parent_id().unwrap(),
                 queue.get_raw_span(&span2).id
             );
             {
                 let span3 = queue.start_span("span3").unwrap();
                 assert_eq!(
-                    queue.current_span_id().unwrap(),
+                    queue.current_parent_id().unwrap(),
                     queue.get_raw_span(&span3).id
                 );
                 queue.finish_span(span3);
                 assert_eq!(
-                    queue.current_span_id().unwrap(),
+                    queue.current_parent_id().unwrap(),
                     queue.get_raw_span(&span2).id
                 );
             }
             {
                 let span4 = queue.start_span("span4").unwrap();
                 assert_eq!(
-                    queue.current_span_id().unwrap(),
+                    queue.current_parent_id().unwrap(),
                     queue.get_raw_span(&span4).id
                 );
                 {
                     let span5 = queue.start_span("span5").unwrap();
                     assert_eq!(
-                        queue.current_span_id().unwrap(),
+                        queue.current_parent_id().unwrap(),
                         queue.get_raw_span(&span5).id
                     );
                     {
                         let span6 = queue.start_span("span6").unwrap();
                         assert_eq!(
-                            queue.current_span_id().unwrap(),
+                            queue.current_parent_id().unwrap(),
                             queue.get_raw_span(&span6).id
                         );
                         queue.finish_span(span6);
                         assert_eq!(
-                            queue.current_span_id().unwrap(),
+                            queue.current_parent_id().unwrap(),
                             queue.get_raw_span(&span5).id
                         );
                     }
                     queue.finish_span(span5);
                     assert_eq!(
-                        queue.current_span_id().unwrap(),
+                        queue.current_parent_id().unwrap(),
                         queue.get_raw_span(&span4).id
                     );
                 }
                 queue.finish_span(span4);
                 assert_eq!(
-                    queue.current_span_id().unwrap(),
+                    queue.current_parent_id().unwrap(),
                     queue.get_raw_span(&span2).id
                 );
             }
             queue.finish_span(span2);
-            assert_eq!(queue.current_span_id(), None);
+            assert_eq!(queue.current_parent_id(), None);
         }
         {
             let span7 = queue.start_span("span7").unwrap();
             assert_eq!(
-                queue.current_span_id().unwrap(),
+                queue.current_parent_id().unwrap(),
                 queue.get_raw_span(&span7).id
             );
             queue.finish_span(span7);
-            assert_eq!(queue.current_span_id(), None);
+            assert_eq!(queue.current_parent_id(), None);
         }
         assert_eq!(
             tree_str_from_raw_spans(queue.take_queue()),

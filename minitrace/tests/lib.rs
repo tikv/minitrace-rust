@@ -658,6 +658,34 @@ fn test_elapsed() {
 
 #[test]
 #[serial]
+fn test_add_property() {
+    let (reporter, collected_spans) = TestReporter::new();
+    minitrace::set_reporter(reporter, Config::default());
+
+    {
+        let root = Span::root("root", SpanContext::random());
+        let _g = root.set_local_parent();
+        LocalSpan::add_property(|| ("noop", "noop"));
+        LocalSpan::add_properties(|| [("noop", "noop")]);
+        let _span = LocalSpan::enter_with_local_parent("span");
+        LocalSpan::add_property(|| ("k1", "v1"));
+        LocalSpan::add_properties(|| [("k2", "v2"), ("k3", "v3")]);
+    }
+
+    minitrace::flush();
+
+    let expected_graph = r#"
+root []
+    span [("k1", "v1"), ("k2", "v2"), ("k3", "v3")]
+"#;
+    assert_eq!(
+        tree_str_from_span_records(collected_spans.lock().clone()),
+        expected_graph
+    );
+}
+
+#[test]
+#[serial]
 fn test_macro_properties() {
     #[allow(clippy::drop_non_drop)]
     #[trace(short_name = true, properties = { "k1": "v1", "a": "argument a is {a:?}", "b": "{b:?}", "escaped1": "{c:?}{{}}", "escaped2": "{{ \"a\": \"b\"}}" })]

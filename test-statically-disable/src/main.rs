@@ -40,6 +40,9 @@ fn main() {
 
     let _span2 = LocalSpan::enter_with_local_parent("span2");
 
+    LocalSpan::add_property(|| ("k", "v"));
+    LocalSpan::add_properties(|| [("k", "v")]);
+
     let local_collector = LocalCollector::start();
     let _ = LocalSpan::enter_with_local_parent("span3");
     let local_spans = local_collector.collect();
