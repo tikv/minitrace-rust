@@ -1,0 +1,14 @@
+[package]
+name = "minitrace-futures"
+version = "0.6.3"
+edition = "2021"
+license = "Apache-2.0"
+description = "Utilities for instrumenting `futures` with minitrace-rust"
+homepage = "https://github.com/tikv/minitrace-rust"
+repository = "https://github.com/tikv/minitrace-rust"
+documentation = "https://docs.rs/minitrace-futures"
+readme = "README.md"
+categories = ["development-tools::debugging"]
+keywords = ["tracing", "span", "datadog", "jaeger", "opentelemetry"]
+
+[dependencies]
