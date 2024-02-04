@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Add `LocalSpan::add_property` and `LocalSpan::add_properties`.
+
 ## v0.6.3
 
 - Add `LocalSpans::to_span_records()`.

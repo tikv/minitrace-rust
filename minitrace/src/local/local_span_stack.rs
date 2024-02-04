@@ -121,7 +121,7 @@ impl LocalSpanStack {
     }
 
     #[inline]
-    fn current_span_line(&mut self) -> Option<&mut SpanLine> {
+    pub fn current_span_line(&mut self) -> Option<&mut SpanLine> {
         self.span_lines.last_mut()
     }
 }

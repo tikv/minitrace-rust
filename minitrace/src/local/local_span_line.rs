@@ -77,11 +77,24 @@ impl SpanLine {
                 .iter()
                 .map(|item| CollectTokenItem {
                     trace_id: item.trace_id,
-                    parent_id: self.span_queue.current_span_id().unwrap_or(item.parent_id),
+                    parent_id: self
+                        .span_queue
+                        .current_parent_id()
+                        .unwrap_or(item.parent_id),
                     collect_id: item.collect_id,
                     is_root: false,
                 })
                 .collect()
+        })
+    }
+
+    #[inline]
+    pub fn current_parent_handle(&self) -> Option<LocalSpanHandle> {
+        let span_handle = self.span_queue.current_parent_handle()?;
+        let span_line_epoch = self.epoch;
+        Some(LocalSpanHandle {
+            span_handle,
+            span_line_epoch,
         })
     }
 
@@ -158,13 +171,13 @@ span1 []
         assert_eq!(current_token.as_slice(), &[
             CollectTokenItem {
                 trace_id: TraceId(1234),
-                parent_id: span_line.span_queue.current_span_id().unwrap(),
+                parent_id: span_line.span_queue.current_parent_id().unwrap(),
                 collect_id: 42,
                 is_root: false,
             },
             CollectTokenItem {
                 trace_id: TraceId(1235),
-                parent_id: span_line.span_queue.current_span_id().unwrap(),
+                parent_id: span_line.span_queue.current_parent_id().unwrap(),
                 collect_id: 43,
                 is_root: false,
             }
