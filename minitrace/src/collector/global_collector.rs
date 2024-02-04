@@ -91,16 +91,25 @@ pub(crate) fn reporter_ready() -> bool {
 pub fn flush() {
     #[cfg(feature = "enable")]
     {
-        // Spawns a new thread to ensure the reporter operates outside the tokio runtime to prevent panic.
-        std::thread::Builder::new()
-            .name("minitrace-flush".to_string())
-            .spawn(move || {
-                let mut global_collector = GLOBAL_COLLECTOR.lock();
-                global_collector.handle_commands(true);
-            })
-            .unwrap()
-            .join()
-            .unwrap();
+        #[cfg(feature = "single-thread")]
+        {
+            let mut global_collector = GLOBAL_COLLECTOR.lock();
+            global_collector.handle_commands(true);
+        }
+
+        #[cfg(not(feature = "single-thread"))]
+        {
+            // Spawns a new thread to ensure the reporter operates outside the tokio runtime to prevent panic.
+            std::thread::Builder::new()
+                .name("minitrace-flush".to_string())
+                .spawn(move || {
+                    let mut global_collector = GLOBAL_COLLECTOR.lock();
+                    global_collector.handle_commands(true);
+                })
+                .unwrap()
+                .join()
+                .unwrap();
+        }
     }
 }
 
@@ -204,18 +213,21 @@ impl GlobalCollector {
             )
         }
 
-        std::thread::Builder::new()
-            .name("minitrace-global-collector".to_string())
-            .spawn(move || {
-                loop {
-                    let begin_instant = std::time::Instant::now();
-                    GLOBAL_COLLECTOR.lock().handle_commands(false);
-                    std::thread::sleep(
-                        COLLECT_LOOP_INTERVAL.saturating_sub(begin_instant.elapsed()),
-                    );
-                }
-            })
-            .unwrap();
+        #[cfg(not(feature = "single-thread"))]
+        {
+            std::thread::Builder::new()
+                .name("minitrace-global-collector".to_string())
+                .spawn(move || {
+                    loop {
+                        let begin_instant = std::time::Instant::now();
+                        GLOBAL_COLLECTOR.lock().handle_commands(false);
+                        std::thread::sleep(
+                            COLLECT_LOOP_INTERVAL.saturating_sub(begin_instant.elapsed()),
+                        );
+                    }
+                })
+                .unwrap();
+        }
 
         GlobalCollector {
             config: Config::default().max_spans_per_trace(Some(0)),
