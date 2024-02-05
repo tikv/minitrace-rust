@@ -9,6 +9,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use minstant::Anchor;
+use minstant::Instant;
 use once_cell::sync::Lazy;
 use parking_lot::Mutex;
 
@@ -91,13 +92,13 @@ pub(crate) fn reporter_ready() -> bool {
 pub fn flush() {
     #[cfg(feature = "enable")]
     {
-        #[cfg(feature = "single-thread")]
+        #[cfg(target_family = "wasm")]
         {
             let mut global_collector = GLOBAL_COLLECTOR.lock();
             global_collector.handle_commands(true);
         }
 
-        #[cfg(not(feature = "single-thread"))]
+        #[cfg(not(target_family = "wasm"))]
         {
             // Spawns a new thread to ensure the reporter operates outside the tokio runtime to prevent panic.
             std::thread::Builder::new()
@@ -193,7 +194,7 @@ pub(crate) struct GlobalCollector {
 
     active_collectors: HashMap<usize, (Vec<SpanCollection>, usize)>,
     committed_records: Vec<SpanRecord>,
-    last_report: std::time::Instant,
+    last_report: Instant,
 
     // Vectors to be reused by collection loops. They must be empty outside of the `handle_commands` loop.
     start_collects: Vec<StartCollect>,
@@ -213,13 +214,13 @@ impl GlobalCollector {
             )
         }
 
-        #[cfg(not(feature = "single-thread"))]
+        #[cfg(not(target_family = "wasm"))]
         {
             std::thread::Builder::new()
                 .name("minitrace-global-collector".to_string())
                 .spawn(move || {
                     loop {
-                        let begin_instant = std::time::Instant::now();
+                        let begin_instant = Instant::now();
                         GLOBAL_COLLECTOR.lock().handle_commands(false);
                         std::thread::sleep(
                             COLLECT_LOOP_INTERVAL.saturating_sub(begin_instant.elapsed()),
@@ -235,7 +236,7 @@ impl GlobalCollector {
 
             active_collectors: HashMap::new(),
             committed_records: Vec::new(),
-            last_report: std::time::Instant::now(),
+            last_report: Instant::now(),
 
             start_collects: Vec::new(),
             drop_collects: Vec::new(),
@@ -424,7 +425,7 @@ impl GlobalCollector {
                 .as_mut()
                 .unwrap()
                 .report(committed_records.drain(..).as_slice());
-            self.last_report = std::time::Instant::now();
+            self.last_report = Instant::now();
         }
     }
 }

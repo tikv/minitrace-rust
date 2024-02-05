@@ -14,7 +14,6 @@ keywords = ["tracing", "span", "datadog", "jaeger", "opentelemetry"]
 
 [features]
 enable = []
-single-thread = []
 
 [dependencies]
 futures = "0.3"

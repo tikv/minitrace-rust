@@ -366,7 +366,7 @@
 #![cfg_attr(not(feature = "enable"), allow(unused_mut))]
 #![cfg_attr(not(feature = "enable"), allow(unused_imports))]
 #![cfg_attr(not(feature = "enable"), allow(unused_variables))]
-#![cfg_attr(feature = "single-thread", allow(dead_code))]
+#![cfg_attr(target_family = "wasm", allow(dead_code))]
 
 pub mod collector;
 mod event;
