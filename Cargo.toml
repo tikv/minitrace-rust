@@ -6,6 +6,7 @@ members = [
     "minitrace-jaeger",
     "minitrace-datadog",
     "minitrace-opentelemetry",
+    "minitrace-futures",
     "test-statically-disable",
 ]
 
