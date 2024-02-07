@@ -3,6 +3,7 @@
 ## Unreleased
 
 - Add `LocalSpan::add_property` and `LocalSpan::add_properties`.
+- Add `Config::report_before_root_finish`.
 
 ## v0.6.3
 

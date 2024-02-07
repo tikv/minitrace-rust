@@ -188,11 +188,18 @@ enum SpanCollection {
     },
 }
 
+#[derive(Default)]
+struct ActiveCollector {
+    span_collections: Vec<SpanCollection>,
+    span_count: usize,
+    dangling_events: HashMap<SpanId, Vec<EventRecord>>,
+}
+
 pub(crate) struct GlobalCollector {
     config: Config,
     reporter: Option<Box<dyn Reporter>>,
 
-    active_collectors: HashMap<usize, (Vec<SpanCollection>, usize)>,
+    active_collectors: HashMap<usize, ActiveCollector>,
     committed_records: Vec<SpanRecord>,
     last_report: Instant,
 
@@ -201,7 +208,6 @@ pub(crate) struct GlobalCollector {
     drop_collects: Vec<DropCollect>,
     commit_collects: Vec<CommitCollect>,
     submit_spans: Vec<SubmitSpans>,
-    dangling_events: HashMap<SpanId, Vec<EventRecord>>,
 }
 
 impl GlobalCollector {
@@ -242,7 +248,6 @@ impl GlobalCollector {
             drop_collects: Vec::new(),
             commit_collects: Vec::new(),
             submit_spans: Vec::new(),
-            dangling_events: HashMap::new(),
         }
     }
 
@@ -251,7 +256,6 @@ impl GlobalCollector {
         debug_assert!(self.drop_collects.is_empty());
         debug_assert!(self.commit_collects.is_empty());
         debug_assert!(self.submit_spans.is_empty());
-        debug_assert!(self.dangling_events.is_empty());
 
         let start_collects = &mut self.start_collects;
         let drop_collects = &mut self.drop_collects;
@@ -290,7 +294,8 @@ impl GlobalCollector {
         }
 
         for StartCollect { collect_id } in self.start_collects.drain(..) {
-            self.active_collectors.insert(collect_id, (Vec::new(), 0));
+            self.active_collectors
+                .insert(collect_id, ActiveCollector::default());
         }
 
         for DropCollect { collect_id } in self.drop_collects.drain(..) {
@@ -306,114 +311,66 @@ impl GlobalCollector {
 
             if collect_token.len() == 1 {
                 let item = collect_token[0];
-                if let Some((buf, span_count)) = self.active_collectors.get_mut(&item.collect_id) {
-                    if *span_count < self.config.max_spans_per_trace.unwrap_or(usize::MAX)
+                if let Some(active_collector) = self.active_collectors.get_mut(&item.collect_id) {
+                    if active_collector.span_count
+                        < self.config.max_spans_per_trace.unwrap_or(usize::MAX)
                         || item.is_root
                     {
-                        *span_count += spans.len();
-                        buf.push(SpanCollection::Owned {
-                            spans,
-                            trace_id: item.trace_id,
-                            parent_id: item.parent_id,
-                        });
+                        active_collector.span_count += spans.len();
+                        active_collector
+                            .span_collections
+                            .push(SpanCollection::Owned {
+                                spans,
+                                trace_id: item.trace_id,
+                                parent_id: item.parent_id,
+                            });
                     }
                 }
             } else {
                 let spans = Arc::new(spans);
                 for item in collect_token.iter() {
-                    if let Some((buf, span_count)) =
-                        self.active_collectors.get_mut(&item.collect_id)
+                    if let Some(active_collector) = self.active_collectors.get_mut(&item.collect_id)
                     {
                         // Multiple items in a collect token are built from `Span::enter_from_parents`,
                         // so relative span cannot be a root span.
-                        if *span_count < self.config.max_spans_per_trace.unwrap_or(usize::MAX) {
-                            *span_count += spans.len();
-                            buf.push(SpanCollection::Shared {
-                                spans: spans.clone(),
-                                trace_id: item.trace_id,
-                                parent_id: item.parent_id,
-                            });
+                        if active_collector.span_count
+                            < self.config.max_spans_per_trace.unwrap_or(usize::MAX)
+                        {
+                            active_collector.span_count += spans.len();
+                            active_collector
+                                .span_collections
+                                .push(SpanCollection::Shared {
+                                    spans: spans.clone(),
+                                    trace_id: item.trace_id,
+                                    parent_id: item.parent_id,
+                                });
                         }
                     }
                 }
             }
         }
 
+        let anchor = Anchor::new();
+
         for CommitCollect { collect_id } in commit_collects.drain(..) {
-            if let Some((span_collections, _)) = self.active_collectors.remove(&collect_id) {
-                debug_assert!(self.dangling_events.is_empty());
-                let dangling_events = &mut self.dangling_events;
+            if let Some(mut active_collector) = self.active_collectors.remove(&collect_id) {
+                postprocess_span_collection(
+                    active_collector.span_collections,
+                    &anchor,
+                    committed_records,
+                    &mut active_collector.dangling_events,
+                );
+            }
+        }
 
-                let anchor: Anchor = Anchor::new();
-                let committed_len = committed_records.len();
-
-                for span_collection in span_collections {
-                    match span_collection {
-                        SpanCollection::Owned {
-                            spans,
-                            trace_id,
-                            parent_id,
-                        } => match spans {
-                            SpanSet::Span(raw_span) => amend_span(
-                                &raw_span,
-                                trace_id,
-                                parent_id,
-                                committed_records,
-                                dangling_events,
-                                &anchor,
-                            ),
-                            SpanSet::LocalSpansInner(local_spans) => amend_local_span(
-                                &local_spans,
-                                trace_id,
-                                parent_id,
-                                committed_records,
-                                dangling_events,
-                                &anchor,
-                            ),
-                            SpanSet::SharedLocalSpans(local_spans) => amend_local_span(
-                                &local_spans,
-                                trace_id,
-                                parent_id,
-                                committed_records,
-                                dangling_events,
-                                &anchor,
-                            ),
-                        },
-                        SpanCollection::Shared {
-                            spans,
-                            trace_id,
-                            parent_id,
-                        } => match &*spans {
-                            SpanSet::Span(raw_span) => amend_span(
-                                raw_span,
-                                trace_id,
-                                parent_id,
-                                committed_records,
-                                dangling_events,
-                                &anchor,
-                            ),
-                            SpanSet::LocalSpansInner(local_spans) => amend_local_span(
-                                local_spans,
-                                trace_id,
-                                parent_id,
-                                committed_records,
-                                dangling_events,
-                                &anchor,
-                            ),
-                            SpanSet::SharedLocalSpans(local_spans) => amend_local_span(
-                                local_spans,
-                                trace_id,
-                                parent_id,
-                                committed_records,
-                                dangling_events,
-                                &anchor,
-                            ),
-                        },
-                    }
-                }
-
-                mount_events(&mut committed_records[committed_len..], dangling_events);
-                dangling_events.clear();
+        if self.config.report_before_root_finish {
+            for active_collector in self.active_collectors.values_mut() {
+                postprocess_span_collection(
+                    active_collector.span_collections.drain(..),
+                    &anchor,
+                    committed_records,
+                    &mut active_collector.dangling_events,
+                );
             }
         }
 
@@ -446,6 +403,82 @@ impl LocalSpansInner {
         mount_events(&mut records, &mut dangling_events);
         records
     }
+}
+
+fn postprocess_span_collection(
+    span_collections: impl IntoIterator<Item = SpanCollection>,
+    anchor: &Anchor,
+    committed_records: &mut Vec<SpanRecord>,
+    dangling_events: &mut HashMap<SpanId, Vec<EventRecord>>,
+) {
+    let committed_len = committed_records.len();
+
+    for span_collection in span_collections {
+        match span_collection {
+            SpanCollection::Owned {
+                spans,
+                trace_id,
+                parent_id,
+            } => match spans {
+                SpanSet::Span(raw_span) => amend_span(
+                    &raw_span,
+                    trace_id,
+                    parent_id,
+                    committed_records,
+                    dangling_events,
+                    anchor,
+                ),
+                SpanSet::LocalSpansInner(local_spans) => amend_local_span(
+                    &local_spans,
+                    trace_id,
+                    parent_id,
+                    committed_records,
+                    dangling_events,
+                    anchor,
+                ),
+                SpanSet::SharedLocalSpans(local_spans) => amend_local_span(
+                    &local_spans,
+                    trace_id,
+                    parent_id,
+                    committed_records,
+                    dangling_events,
+                    anchor,
+                ),
+            },
+            SpanCollection::Shared {
+                spans,
+                trace_id,
+                parent_id,
+            } => match &*spans {
+                SpanSet::Span(raw_span) => amend_span(
+                    raw_span,
+                    trace_id,
+                    parent_id,
+                    committed_records,
+                    dangling_events,
+                    anchor,
+                ),
+                SpanSet::LocalSpansInner(local_spans) => amend_local_span(
+                    local_spans,
+                    trace_id,
+                    parent_id,
+                    committed_records,
+                    dangling_events,
+                    anchor,
+                ),
+                SpanSet::SharedLocalSpans(local_spans) => amend_local_span(
+                    local_spans,
+                    trace_id,
+                    parent_id,
+                    committed_records,
+                    dangling_events,
+                    anchor,
+                ),
+            },
+        }
+    }
+
+    mount_events(&mut committed_records[committed_len..], dangling_events);
 }
 
 fn amend_local_span(

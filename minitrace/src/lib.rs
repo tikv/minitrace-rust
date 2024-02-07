@@ -71,7 +71,8 @@
 //!
 //! When the root span is dropped, all of its children spans and itself will be reported at once.
 //! Since that, it's recommended to create root spans for short tasks, such as handling a request,
-//! just like the example below. Otherwise, an endingless trace will never be reported.
+//! just like the example below. Otherwise, an endingless trace will never be reported. To override
+//! this behavior, set the `report_before_root_finish` option to `true` in the [`Config`].
 //!
 //! ```
 //! use minitrace::collector::Config;
