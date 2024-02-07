@@ -20,7 +20,8 @@ fn main() {
         Config::default()
             .batch_report_interval(Duration::from_secs(1))
             .max_spans_per_trace(Some(100))
-            .batch_report_max_spans(Some(200)),
+            .batch_report_max_spans(Some(200))
+            .report_before_root_finish(true),
     );
 
     let mut root = Span::root("root", SpanContext::new(TraceId(0), SpanId(0)))
