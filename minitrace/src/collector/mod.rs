@@ -268,6 +268,7 @@ pub struct Config {
     pub(crate) max_spans_per_trace: Option<usize>,
     pub(crate) batch_report_interval: Duration,
     pub(crate) batch_report_max_spans: Option<usize>,
+    pub(crate) report_before_root_finish: bool,
 }
 
 impl Config {
@@ -346,6 +347,25 @@ impl Config {
             ..self
         }
     }
+
+    /// Whether to report the spans before the root span finishes.
+    ///
+    /// The default value is `false`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use minitrace::collector::Config;
+    ///
+    /// let config = Config::default().report_before_root_finish(true);
+    /// minitrace::set_reporter(minitrace::collector::ConsoleReporter, config);
+    /// ```
+    pub fn report_before_root_finish(self, report_before_root_finish: bool) -> Self {
+        Self {
+            report_before_root_finish,
+            ..self
+        }
+    }
 }
 
 impl Default for Config {
@@ -354,6 +374,7 @@ impl Default for Config {
             max_spans_per_trace: None,
             batch_report_interval: Duration::from_millis(500),
             batch_report_max_spans: None,
+            report_before_root_finish: false,
         }
     }
 }
