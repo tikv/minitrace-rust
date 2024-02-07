@@ -27,15 +27,15 @@ pub trait StreamExt: futures::Stream + Sized {
     /// use async_stream::stream;
     /// use futures::StreamExt;
     /// use minitrace::prelude::*;
-    /// use minitrace_futures::*;
+    /// use minitrace_futures::StreamExt as _;
     ///
-    /// let root = Span::root("Root", SpanContext::random());
+    /// let root = Span::root("root", SpanContext::random());
     /// let s = stream! {
     ///     for i in 0..2 {
     ///         yield i;
     ///     }
     /// }
-    /// .in_span(Span::enter_with_parent("Task", &root));
+    /// .in_span(Span::enter_with_parent("task", &root));
     ///
     /// tokio::pin!(s);
     ///
@@ -43,7 +43,6 @@ pub trait StreamExt: futures::Stream + Sized {
     /// assert_eq!(s.next().await.unwrap(), 1);
     /// assert_eq!(s.next().await, None);
     /// // span ends here.
-    ///
     /// # }
     /// ```
     fn in_span(self, span: Span) -> InSpan<Self> {
@@ -72,17 +71,16 @@ pub trait SinkExt<Item>: futures::Sink<Item> + Sized {
     /// use futures::sink;
     /// use futures::sink::SinkExt;
     /// use minitrace::prelude::*;
-    /// use minitrace_futures::*;
+    /// use minitrace_futures::SinkExt as _;
     ///
-    /// let root = Span::root("Root", SpanContext::random());
+    /// let root = Span::root("root", SpanContext::random());
     ///
-    /// let mut drain = sink::drain().in_span(Span::enter_with_parent("Task", &root));
+    /// let mut drain = sink::drain().in_span(Span::enter_with_parent("task", &root));
     ///
     /// drain.send(1).await.unwrap();
     /// drain.send(2).await.unwrap();
     /// drain.close().await.unwrap();
     /// // span ends here.
-    ///
     /// # }
     /// ```
     fn in_span(self, span: Span) -> InSpan<Self> {
