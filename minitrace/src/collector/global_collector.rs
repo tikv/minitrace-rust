@@ -426,7 +426,7 @@ fn postprocess_span_collection(
                     parent_id,
                     committed_records,
                     dangling_events,
-                    &anchor,
+                    anchor,
                 ),
                 SpanSet::LocalSpansInner(local_spans) => amend_local_span(
                     &local_spans,
@@ -434,7 +434,7 @@ fn postprocess_span_collection(
                     parent_id,
                     committed_records,
                     dangling_events,
-                    &anchor,
+                    anchor,
                 ),
                 SpanSet::SharedLocalSpans(local_spans) => amend_local_span(
                     &local_spans,
@@ -442,7 +442,7 @@ fn postprocess_span_collection(
                     parent_id,
                     committed_records,
                     dangling_events,
-                    &anchor,
+                    anchor,
                 ),
             },
             SpanCollection::Shared {
@@ -456,7 +456,7 @@ fn postprocess_span_collection(
                     parent_id,
                     committed_records,
                     dangling_events,
-                    &anchor,
+                    anchor,
                 ),
                 SpanSet::LocalSpansInner(local_spans) => amend_local_span(
                     local_spans,
@@ -464,7 +464,7 @@ fn postprocess_span_collection(
                     parent_id,
                     committed_records,
                     dangling_events,
-                    &anchor,
+                    anchor,
                 ),
                 SpanSet::SharedLocalSpans(local_spans) => amend_local_span(
                     local_spans,
@@ -472,7 +472,7 @@ fn postprocess_span_collection(
                     parent_id,
                     committed_records,
                     dangling_events,
-                    &anchor,
+                    anchor,
                 ),
             },
         }
