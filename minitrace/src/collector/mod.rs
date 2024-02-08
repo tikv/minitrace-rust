@@ -238,7 +238,7 @@ impl SpanContext {
     }
 
     /// Encodes the `SpanContext` as a [W3C Trace Context](https://www.w3.org/TR/trace-context/)
-    /// `traceparent` header string with the sampled flag set to false.
+    /// `traceparent` header string with a sampled flag.
     ///
     /// # Examples
     ///
