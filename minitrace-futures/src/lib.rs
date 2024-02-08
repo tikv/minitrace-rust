@@ -1,3 +1,5 @@
+// Copyright 2024 TiKV Project Authors. Licensed under Apache-2.0.
+
 #![doc = include_str!("../README.md")]
 
 use std::pin::Pin;
@@ -9,14 +11,8 @@ use futures::Stream;
 use minitrace::Span;
 use pin_project_lite::pin_project;
 
-// There is no boundary in order to support types that
-// implement both stream and sink.
-impl<T> Instrumented for T {}
-
-/// Instrument [`futures::Stream`]s and [`futures::Sink`]s.
-pub trait Instrumented: Sized {
-    /// For [`Stream`]s :
-    ///
+/// An extension trait for [`futures::Stream`] that provides tracing instrument adapters.
+pub trait StreamExt: futures::Stream + Sized {
     /// Binds a [`Span`] to the [`Stream`] that continues to record until the stream is **finished**.
     ///
     /// In addition, it sets the span as the local parent at every poll so that [`minitrace::local::LocalSpan`]
@@ -31,15 +27,15 @@ pub trait Instrumented: Sized {
     /// use async_stream::stream;
     /// use futures::StreamExt;
     /// use minitrace::prelude::*;
-    /// use minitrace_futures::*;
+    /// use minitrace_futures::StreamExt as _;
     ///
-    /// let root = Span::root("Root", SpanContext::random());
+    /// let root = Span::root("root", SpanContext::random());
     /// let s = stream! {
     ///     for i in 0..2 {
     ///         yield i;
     ///     }
     /// }
-    /// .in_span(Span::enter_with_parent("Task", &root));
+    /// .in_span(Span::enter_with_parent("task", &root));
     ///
     /// tokio::pin!(s);
     ///
@@ -47,12 +43,20 @@ pub trait Instrumented: Sized {
     /// assert_eq!(s.next().await.unwrap(), 1);
     /// assert_eq!(s.next().await, None);
     /// // span ends here.
-    ///
     /// # }
     /// ```
-    ///
-    /// For [`Sink`]s :
-    ///
+    fn in_span(self, span: Span) -> InSpan<Self> {
+        InSpan {
+            inner: self,
+            span: Some(span),
+        }
+    }
+}
+
+impl<T> StreamExt for T where T: futures::Stream {}
+
+/// An extension trait for [`futures::Sink`] that provides tracing instrument adapters.
+pub trait SinkExt<Item>: futures::Sink<Item> + Sized {
     /// Binds a [`Span`] to the [`Sink`] that continues to record until the sink is **closed**.
     ///
     /// In addition, it sets the span as the local parent at every poll so that [`minitrace::local::LocalSpan`]
@@ -67,17 +71,16 @@ pub trait Instrumented: Sized {
     /// use futures::sink;
     /// use futures::sink::SinkExt;
     /// use minitrace::prelude::*;
-    /// use minitrace_futures::*;
+    /// use minitrace_futures::SinkExt as _;
     ///
-    /// let root = Span::root("Root", SpanContext::random());
+    /// let root = Span::root("root", SpanContext::random());
     ///
-    /// let mut drain = sink::drain().in_span(Span::enter_with_parent("Task", &root));
+    /// let mut drain = sink::drain().in_span(Span::enter_with_parent("task", &root));
     ///
     /// drain.send(1).await.unwrap();
     /// drain.send(2).await.unwrap();
     /// drain.close().await.unwrap();
     /// // span ends here.
-    ///
     /// # }
     /// ```
     fn in_span(self, span: Span) -> InSpan<Self> {
@@ -88,7 +91,10 @@ pub trait Instrumented: Sized {
     }
 }
 
+impl<T, Item> SinkExt<Item> for T where T: futures::Sink<Item> {}
+
 pin_project! {
+    /// Adapter for [`StreamExt::in_span()`](StreamExt::in_span) and [`SinkExt::in_span()`](SinkExt::in_span).
     pub struct InSpan<T> {
         #[pin]
         inner: T,

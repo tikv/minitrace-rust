@@ -1,19 +1,20 @@
 [package]
 name = "minitrace-futures"
-version = "0.6.3"
-edition = "2021"
+version = "0.6.4"
+authors = ["The TiKV Project Authors"]
 license = "Apache-2.0"
-description = "Utilities for instrumenting `futures` with minitrace-rust"
+edition = "2021"
+description = "Utilities for tracing `futures` with minitrace-rust"
 homepage = "https://github.com/tikv/minitrace-rust"
 repository = "https://github.com/tikv/minitrace-rust"
 documentation = "https://docs.rs/minitrace-futures"
 readme = "README.md"
 categories = ["development-tools::debugging"]
-keywords = ["tracing", "span", "datadog", "jaeger", "opentelemetry"]
+keywords = ["tracing", "span", "futures", "jaeger", "opentelemetry"]
 
 [dependencies]
 futures = "0.3"
-minitrace = { version = "0.6.3", path = "../minitrace" }
+minitrace = { version = "0.6.4", path = "../minitrace" }
 pin-project-lite = "0.2.13"
 
 [dev-dependencies]
