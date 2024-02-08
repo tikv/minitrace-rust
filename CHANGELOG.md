@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## v0.6.4
+
 - Add `LocalSpan::add_property` and `LocalSpan::add_properties`.
 - Add `Config::report_before_root_finish`.
 - Add new crate `minitrace-futures`.
