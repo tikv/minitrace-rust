@@ -193,13 +193,9 @@ impl Drop for LocalSpan {
 
 #[cfg(test)]
 mod tests {
-    use std::cell::RefCell;
-    use std::rc::Rc;
-
     use super::*;
     use crate::collector::CollectTokenItem;
     use crate::collector::SpanId;
-    use crate::local::local_span_stack::LocalSpanStack;
     use crate::local::LocalCollector;
     use crate::prelude::TraceId;
     use crate::util::tree::tree_str_from_raw_spans;

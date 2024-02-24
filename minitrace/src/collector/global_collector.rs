@@ -507,7 +507,7 @@ fn amend_local_span(
             continue;
         }
 
-        let end_time_unix_ns = if span.end_instant == span.begin_instant {
+        let end_time_unix_ns = if span.end_instant == Instant::ZERO {
             local_spans.end_time.as_unix_nanos(anchor)
         } else {
             span.end_instant.as_unix_nanos(anchor)

@@ -36,7 +36,7 @@ impl RawSpan {
             name: name.into(),
             properties: Properties::default(),
             is_event,
-            end_instant: begin_instant,
+            end_instant: Instant::ZERO,
         }
     }
 

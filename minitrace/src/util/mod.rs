@@ -8,7 +8,6 @@ pub mod tree;
 
 use std::borrow::Cow;
 use std::cell::RefCell;
-use std::iter::FromIterator;
 
 use once_cell::sync::Lazy;
 

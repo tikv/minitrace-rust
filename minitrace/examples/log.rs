@@ -6,7 +6,6 @@ use log::info;
 use minitrace::collector::Config;
 use minitrace::collector::ConsoleReporter;
 use minitrace::prelude::*;
-use minitrace::Event;
 
 #[logcall::logcall("debug")]
 #[trace]
