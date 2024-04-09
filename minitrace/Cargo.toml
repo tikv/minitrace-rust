@@ -16,7 +16,6 @@ keywords = ["tracing", "span", "datadog", "jaeger", "opentelemetry"]
 enable = []
 
 [dependencies]
-futures = "0.3"
 minitrace-macro = { version = "0.6.4", path = "../minitrace-macro" }
 minstant = "0.1.7"
 parking_lot = "0.12"
