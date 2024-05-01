@@ -48,7 +48,7 @@ rand = "0.8"
 rustracing = "0.6"
 serial_test = "2"
 test-harness = "0.1.1"
-tokio = { version = "1", features = ["rt", "time", "macros"] }
+tokio = { version = "1", features = ["rt", "time", "macros", "rt-multi-thread"] }
 tracing = "0.1"
 tracing-core = "0.1"
 tracing-opentelemetry = "0.18"
