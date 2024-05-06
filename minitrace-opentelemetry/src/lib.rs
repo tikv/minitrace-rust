@@ -22,7 +22,8 @@ use opentelemetry::StringValue;
 use opentelemetry::Value;
 use opentelemetry_sdk::export::trace::SpanData;
 use opentelemetry_sdk::export::trace::SpanExporter;
-use opentelemetry_sdk::trace::EvictedQueue;
+use opentelemetry_sdk::trace::SpanEvents;
+use opentelemetry_sdk::trace::SpanLinks;
 use opentelemetry_sdk::Resource;
 
 /// [OpenTelemetry](https://github.com/open-telemetry/opentelemetry-rust) reporter for `minitrace`.
@@ -70,7 +71,7 @@ impl OpenTelemetryReporter {
                     + Duration::from_nanos(span.begin_time_unix_ns + span.duration_ns),
                 attributes: Self::convert_properties(&span.properties),
                 events: Self::convert_events(&span.events),
-                links: EvictedQueue::new(0),
+                links: SpanLinks::default(),
                 status: Status::default(),
                 span_kind: self.span_kind.clone(),
                 resource: self.resource.clone(),
@@ -90,9 +91,9 @@ impl OpenTelemetryReporter {
         map
     }
 
-    fn convert_events(events: &[EventRecord]) -> EvictedQueue<Event> {
-        let mut queue = EvictedQueue::new(u32::MAX);
-        queue.extend(events.iter().map(|event| {
+    fn convert_events(events: &[EventRecord]) -> SpanEvents {
+        let mut queue = SpanEvents::default();
+        queue.events.extend(events.iter().map(|event| {
             Event::new(
                 event.name.clone(),
                 UNIX_EPOCH + Duration::from_nanos(event.timestamp_unix_ns),
