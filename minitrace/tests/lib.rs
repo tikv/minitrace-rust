@@ -154,15 +154,20 @@ fn multiple_threads_single_span() {
         let root = Span::root("root", SpanContext::random());
         let _g = root.set_local_parent();
 
+        let mut handles = vec![];
+
         for _ in 0..4 {
             let child_span = Span::enter_with_local_parent("cross-thread");
-            scope.spawn(move |_| {
+            let h = scope.spawn(move |_| {
                 let _g = child_span.set_local_parent();
                 four_spans();
             });
+            handles.push(h);
         }
 
         four_spans();
+
+        handles.into_iter().for_each(|h| h.join().unwrap());
     })
     .unwrap();
 
@@ -212,11 +217,13 @@ fn multiple_threads_multiple_spans() {
         let root2 = Span::root("root2", SpanContext::new(TraceId(13), SpanId::default()));
         let local_collector = LocalCollector::start();
 
+        let mut handles = vec![];
+
         for _ in 0..4 {
             let merged = Span::enter_with_parents("merged", vec![&root1, &root2]);
             let _g = merged.set_local_parent();
             let _local = LocalSpan::enter_with_local_parent("local");
-            scope.spawn(move |_| {
+            let h = scope.spawn(move |_| {
                 let local_collector = LocalCollector::start();
 
                 four_spans();
@@ -224,9 +231,13 @@ fn multiple_threads_multiple_spans() {
                 let local_spans = local_collector.collect();
                 merged.push_child_spans(local_spans);
             });
+
+            handles.push(h);
         }
 
         four_spans();
+
+        handles.into_iter().for_each(|h| h.join().unwrap());
 
         let local_spans = local_collector.collect();
         root1.push_child_spans(local_spans.clone());
