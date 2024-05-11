@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## v0.6.5
+
+- Update to opentelemetry 0.22, opentelemetry_sdk 0.22.1, and opentelemetry-otlp: 0.15.
+
 ## v0.6.4
 
 - Add `LocalSpan::add_property` and `LocalSpan::add_properties`.
