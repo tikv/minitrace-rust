@@ -75,12 +75,9 @@ impl ReportAll {
                 Cow::Owned(opentelemetry_sdk::Resource::new([
                     opentelemetry::KeyValue::new("service.name", "synchronous(opentelemetry)"),
                 ])),
-                opentelemetry::InstrumentationLibrary::new(
-                    "example-crate",
-                    Some(env!("CARGO_PKG_VERSION")),
-                    None::<&'static str>,
-                    None,
-                ),
+                opentelemetry::InstrumentationLibrary::builder("example-crate")
+                    .with_version(env!("CARGO_PKG_VERSION"))
+                    .build(),
             ),
         }
     }
