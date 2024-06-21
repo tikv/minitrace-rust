@@ -15,7 +15,7 @@ keywords = ["tracing", "span", "datadog", "jaeger", "opentelemetry"]
 [dependencies]
 log = "0.4"
 minitrace = { version = "0.6.6", path = "../minitrace" }
-thrift_codec = "0.2"
+thrift_codec = "0.3"
 
 [dev-dependencies]
 futures = "0.3"
