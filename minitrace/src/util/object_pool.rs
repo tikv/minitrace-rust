@@ -8,7 +8,7 @@ use std::ops::DerefMut;
 use parking_lot::Mutex;
 
 thread_local! {
-    static REUSABLE: Cell<bool> = Cell::new(false);
+    static REUSABLE: Cell<bool> = const { Cell::new(false) };
 }
 
 pub fn enable_reuse_in_current_thread() {
