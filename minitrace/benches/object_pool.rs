@@ -12,6 +12,7 @@ fn bench_alloc_vec(c: &mut Criterion) {
     for cap in &[1, 10, 100, 1000, 10000, 100000] {
         let vec_pool: Pool<Vec<usize>> = Pool::new(Vec::new, Vec::clear);
         let mut puller = vec_pool.puller(512);
+        minitrace::util::object_pool::enable_reuse_in_current_thread();
         bgroup.bench_function(format!("object-pool/{}", cap), |b| {
             b.iter_batched(
                 || (),

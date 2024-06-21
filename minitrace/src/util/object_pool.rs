@@ -1,12 +1,28 @@
 // Copyright 2022 TiKV Project Authors. Licensed under Apache-2.0.
 
+use std::cell::Cell;
 use std::mem::ManuallyDrop;
 use std::ops::Deref;
 use std::ops::DerefMut;
 
 use parking_lot::Mutex;
 
+thread_local! {
+    static REUSABLE: Cell<bool> = Cell::new(false);
+}
+
+pub fn enable_reuse_in_current_thread() {
+    REUSABLE.with(|r| r.set(true));
+}
+
+fn is_reusable() -> bool {
+    REUSABLE.with(|r| r.get())
+}
+
 pub struct Pool<T> {
+    // The objects in the pool ready to be reused.
+    // The mutex should only be visited in the global collector, which is guaranteed by `is_reusable`,
+    // so it should not have synchronization overhead.
     objects: Mutex<Vec<T>>,
     init: fn() -> T,
     reset: fn(&mut T),
@@ -46,8 +62,10 @@ impl<T> Pool<T> {
 
     #[inline]
     pub fn recycle(&self, mut obj: T) {
-        (self.reset)(&mut obj);
-        self.objects.lock().push(obj)
+        if is_reusable() {
+            (self.reset)(&mut obj);
+            self.objects.lock().push(obj)
+        }
     }
 }
 
