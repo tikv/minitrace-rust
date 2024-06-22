@@ -266,19 +266,20 @@ impl SpanContext {
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub struct Config {
     pub(crate) max_spans_per_trace: Option<usize>,
-    pub(crate) batch_report_interval: Duration,
-    pub(crate) batch_report_max_spans: Option<usize>,
-    pub(crate) background_collect_interval: Duration,
+    pub(crate) report_interval: Duration,
     pub(crate) report_before_root_finish: bool,
 }
 
 impl Config {
-    /// A soft limit for the total number of spans and events for a trace, usually used
-    /// to avoid out-of-memory.
+    /// Sets a soft limit for the total number of spans and events in a trace, typically
+    /// used to prevent out-of-memory issues.
+    ///
+    /// The default value is `None`.
     ///
     /// # Note
     ///
-    /// Root span will always be collected. The eventually collected spans may exceed the limit.
+    /// The root span will always be collected, so the actual number of collected spans
+    /// may exceed the specified limit.
     ///
     /// # Examples
     ///
@@ -295,75 +296,44 @@ impl Config {
         }
     }
 
-    /// The time duration between two batch reports.
-    ///
-    /// The default value is 500 milliseconds.
-    ///
-    /// A batch report will be initiated by the earliest of these events:
-    ///
-    /// - When the specified time duration between two batch reports is met.
-    /// - When the number of spans in a batch hits its limit.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use std::time::Duration;
-    ///
-    /// use minitrace::collector::Config;
-    ///
-    /// let config = Config::default().batch_report_interval(Duration::from_secs(1));
-    /// minitrace::set_reporter(minitrace::collector::ConsoleReporter, config);
-    /// ```
-    pub fn batch_report_interval(self, batch_report_interval: Duration) -> Self {
-        Self {
-            batch_report_interval,
-            ..self
-        }
+    /// Sets the time duration between two batch reports.
+    #[deprecated(
+        since = "0.6.7",
+        note = "Please use `report_interval` instead. This method is now a no-op."
+    )]
+    pub fn batch_report_interval(self, _batch_report_interval: Duration) -> Self {
+        self
     }
 
-    /// The soft limit for the maximum number of spans in a batch report.
-    ///
-    /// A batch report will be initiated by the earliest of these events:
-    ///
-    /// - When the specified time duration between two batch reports is met.
-    /// - When the number of spans in a batch hits its limit.
-    ///
-    /// # Note
-    ///
-    /// The eventually spans being reported may exceed the limit.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use std::time::Duration;
-    ///
-    /// use minitrace::collector::Config;
-    ///
-    /// let config = Config::default().batch_report_max_spans(Some(200));
-    /// minitrace::set_reporter(minitrace::collector::ConsoleReporter, config);
-    /// ```
-    pub fn batch_report_max_spans(self, batch_report_max_spans: Option<usize>) -> Self {
-        Self {
-            batch_report_max_spans,
-            ..self
-        }
+    /// Sets the soft limit for the maximum number of spans in a batch report.
+    #[deprecated(
+        since = "0.6.7",
+        note = "Please use `report_interval` instead. This method is now a no-op."
+    )]
+    pub fn batch_report_max_spans(self, _batch_report_max_spans: Option<usize>) -> Self {
+        self
     }
 
-    /// The time duration between two background collects. Decrease to reduce the probability
-    /// of losing spans due to channel full.
+    /// Sets the time duration between two reports. The reporter will be invoked when the specified
+    /// duration elapses, even if no spans have been collected. This allows for batching in the
+    /// reporter.
     ///
-    /// Unless you are under very high pressure, and have vitnessed spans being lost,
-    /// you should not need to change this value.
+    /// In some scenarios, particularly under high load, you may notice spans being lost. This is
+    /// likely due to the channel being full during the reporting interval. To mitigate this issue,
+    /// consider reducing the report interval, potentially down to zero, to prevent losing spans.
     ///
     /// The default value is 10 milliseconds.
-    pub fn background_collector_interval(self, background_collect_interval: Duration) -> Self {
+    pub fn report_interval(self, report_interval: Duration) -> Self {
         Self {
-            background_collect_interval,
+            report_interval,
             ..self
         }
     }
 
-    /// Whether to report the spans before the root span finishes.
+    /// Configures whether to report spans before the root span finishes.
+    ///
+    /// If set to `true`, some spans may be reported before they are canceled, making it
+    /// difficult to cancel all spans in a trace.
     ///
     /// The default value is `false`.
     ///
@@ -387,9 +357,7 @@ impl Default for Config {
     fn default() -> Self {
         Self {
             max_spans_per_trace: None,
-            batch_report_interval: Duration::from_millis(500),
-            batch_report_max_spans: None,
-            background_collect_interval: Duration::from_millis(10),
+            report_interval: Duration::from_millis(10),
             report_before_root_finish: false,
         }
     }

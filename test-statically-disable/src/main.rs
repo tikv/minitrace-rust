@@ -2,9 +2,11 @@
 
 // The libraries may have tracing instrument embedded in the code for tracing purposes. However,
 // if the executable does not enable minitrace, it will be statically disabled. This results in
-// zero overhead to the libraries, achieved through conditional compilation with the "enable" feature.
+// zero overhead to the libraries, achieved through conditional compilation with the "enable"
+// feature.
 //
-// The following test is designed to confirm that minitrace compiles when it's statically disabled in the executable.
+// The following test is designed to confirm that minitrace compiles when it's statically disabled
+// in the executable.
 
 use std::time::Duration;
 
@@ -18,9 +20,8 @@ fn main() {
     minitrace::set_reporter(
         ConsoleReporter,
         Config::default()
-            .batch_report_interval(Duration::from_secs(1))
             .max_spans_per_trace(Some(100))
-            .batch_report_max_spans(Some(200))
+            .report_interval(Duration::from_secs(1))
             .report_before_root_finish(true),
     );
 

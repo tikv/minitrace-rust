@@ -16,11 +16,12 @@ use crate::util::RawSpans;
 
 /// A collector to collect [`LocalSpan`].
 ///
-/// `LocalCollector` allows to collect `LocalSpan` manually without a local parent. The collected `LocalSpan` can later be
-/// attached to a parent.
+/// `LocalCollector` allows to collect `LocalSpan` manually without a local parent. The collected
+/// `LocalSpan` can later be attached to a parent.
 ///
-/// Generally, [`Span`] and `LocalSpan` are sufficient. However, use `LocalCollector` when the span might initiate before its
-/// parent span. This is particularly useful for tracing prior tasks that may be obstructing the current request.
+/// Generally, [`Span`] and `LocalSpan` are sufficient. However, use `LocalCollector` when the span
+/// might initiate before its parent span. This is particularly useful for tracing prior tasks that
+/// may be obstructing the current request.
 ///
 /// # Examples
 ///

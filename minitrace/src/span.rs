@@ -58,7 +58,8 @@ impl Span {
 
     /// Create a new trace and return its root span.
     ///
-    /// Once dropped, the root span automatically submits all associated child spans to the reporter.
+    /// Once dropped, the root span automatically submits all associated child spans to the
+    /// reporter.
     ///
     /// # Examples
     ///
@@ -122,10 +123,12 @@ impl Span {
     /// Create a new child span associated with multiple parent spans.
     ///
     /// This function is particularly useful when a single operation amalgamates multiple requests.
-    /// It enables the creation of a unique child span that is interconnected with all the parent spans
-    /// related to the requests, thereby obviating the need to generate individual child spans for each parent span.
+    /// It enables the creation of a unique child span that is interconnected with all the parent
+    /// spans related to the requests, thereby obviating the need to generate individual child
+    /// spans for each parent span.
     ///
-    /// The newly created child span, and its children, will have a replica for each trace of parent spans.
+    /// The newly created child span, and its children, will have a replica for each trace of parent
+    /// spans.
     ///
     /// # Examples
     ///
@@ -190,8 +193,9 @@ impl Span {
     ///
     /// This method is used to establish a `Span` as the local parent within the current scope.
     ///
-    /// A local parent is necessary for creating a [`LocalSpan`] using [`LocalSpan::enter_with_local_parent()`].
-    /// If no local parent is set, `enter_with_local_parent()` will not perform any action.
+    /// A local parent is necessary for creating a [`LocalSpan`] using
+    /// [`LocalSpan::enter_with_local_parent()`]. If no local parent is set,
+    /// `enter_with_local_parent()` will not perform any action.
     ///
     /// # Examples
     ///
@@ -270,9 +274,9 @@ impl Span {
 
     /// Attach a collection of [`LocalSpan`] instances as child spans to the current span.
     ///
-    /// This method allows you to associate previously collected `LocalSpan` instances with the current span.
-    /// This is particularly useful when the `LocalSpan` instances were initiated before their parent span,
-    /// and were collected manually using a [`LocalCollector`].
+    /// This method allows you to associate previously collected `LocalSpan` instances with the
+    /// current span. This is particularly useful when the `LocalSpan` instances were initiated
+    /// before their parent span, and were collected manually using a [`LocalCollector`].
     ///
     /// # Examples
     ///

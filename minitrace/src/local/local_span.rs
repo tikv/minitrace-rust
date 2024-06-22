@@ -24,8 +24,8 @@ struct LocalSpanInner {
 }
 
 impl LocalSpan {
-    /// Create a new child span associated with the current local span in the current thread, and then
-    /// it will become the new local parent.
+    /// Create a new child span associated with the current local span in the current thread, and
+    /// then it will become the new local parent.
     ///
     /// If no local span is active, this function is no-op.
     ///

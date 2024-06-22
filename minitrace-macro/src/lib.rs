@@ -3,9 +3,9 @@
 //! An attribute macro designed to eliminate boilerplate code for [`minitrace`](https://crates.io/crates/minitrace).
 
 #![recursion_limit = "256"]
-// Instrumenting the async fn is not as straight forward as expected because `async_trait` rewrites `async fn`
-// into a normal fn which returns `Box<impl Future>`, and this stops the macro from distinguishing `async fn` from `fn`.
-// The following code reused the `async_trait` probes from [tokio-tracing](https://github.com/tokio-rs/tracing/blob/6a61897a5e834988ad9ac709e28c93c4dbf29116/tracing-attributes/src/expand.rs).
+// Instrumenting the async fn is not as straight forward as expected because `async_trait` rewrites
+// `async fn` into a normal fn which returns `Box<impl Future>`, and this stops the macro from
+// distinguishing `async fn` from `fn`. The following code reused the `async_trait` probes from [tokio-tracing](https://github.com/tokio-rs/tracing/blob/6a61897a5e834988ad9ac709e28c93c4dbf29116/tracing-attributes/src/expand.rs).
 
 extern crate proc_macro;
 
@@ -107,21 +107,23 @@ impl Parse for Args {
 
 /// An attribute macro designed to eliminate boilerplate code.
 ///
-/// This macro automatically creates a span for the annotated function. The span name defaults to the function
-/// name but can be customized by passing a string literal as an argument using the `name` parameter.
+/// This macro automatically creates a span for the annotated function. The span name defaults to
+/// the function name but can be customized by passing a string literal as an argument using the
+/// `name` parameter.
 ///
 /// The `#[trace]` attribute requires a local parent context to function correctly. Ensure that
-/// the function annotated with `#[trace]` is called within __a local context of a `Span`__, which is
-/// established by invoking the `Span::set_local_parent()` method.
+/// the function annotated with `#[trace]` is called within __a local context of a `Span`__, which
+/// is established by invoking the `Span::set_local_parent()` method.
 ///
 /// ## Arguments
 ///
 /// * `name` - The name of the span. Defaults to the full path of the function.
-/// * `short_name` - Whether to use the function name without path as the span name. Defaults to `false`.
-/// * `enter_on_poll` - Whether to enter the span on poll. If set to `false`, `in_span` will be used.
-///    Only available for `async fn`. Defaults to `false`.
-/// * `properties` - A list of key-value pairs to be added as properties to the span. The value can be
-///    a format string, where the function arguments are accessible. Defaults to `{}`.
+/// * `short_name` - Whether to use the function name without path as the span name. Defaults to
+///   `false`.
+/// * `enter_on_poll` - Whether to enter the span on poll. If set to `false`, `in_span` will be
+///   used. Only available for `async fn`. Defaults to `false`.
+/// * `properties` - A list of key-value pairs to be added as properties to the span. The value can
+///   be a format string, where the function arguments are accessible. Defaults to `{}`.
 ///
 /// # Examples
 ///
