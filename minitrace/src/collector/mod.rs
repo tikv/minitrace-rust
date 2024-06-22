@@ -268,6 +268,7 @@ pub struct Config {
     pub(crate) max_spans_per_trace: Option<usize>,
     pub(crate) batch_report_interval: Duration,
     pub(crate) batch_report_max_spans: Option<usize>,
+    pub(crate) background_collect_interval: Duration,
     pub(crate) report_before_root_finish: bool,
 }
 
@@ -348,6 +349,20 @@ impl Config {
         }
     }
 
+    /// The time duration between two background collects. Decrease to reduce the probability
+    /// of losing spans due to channel full.
+    ///
+    /// Unless you are under very high pressure, and have vitnessed spans being lost,
+    /// you should not need to change this value.
+    ///
+    /// The default value is 10 milliseconds.
+    pub fn background_collector_interval(self, background_collect_interval: Duration) -> Self {
+        Self {
+            background_collect_interval,
+            ..self
+        }
+    }
+
     /// Whether to report the spans before the root span finishes.
     ///
     /// The default value is `false`.
@@ -374,6 +389,7 @@ impl Default for Config {
             max_spans_per_trace: None,
             batch_report_interval: Duration::from_millis(500),
             batch_report_max_spans: None,
+            background_collect_interval: Duration::from_millis(10),
             report_before_root_finish: false,
         }
     }

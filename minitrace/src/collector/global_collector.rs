@@ -6,21 +6,20 @@ use std::sync::atomic::AtomicBool;
 use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
-use std::time::Duration;
 
 use minstant::Anchor;
 use minstant::Instant;
 use once_cell::sync::Lazy;
 use parking_lot::Mutex;
 
-use super::EventRecord;
-use super::SpanContext;
 use crate::collector::command::CollectCommand;
 use crate::collector::command::CommitCollect;
 use crate::collector::command::DropCollect;
 use crate::collector::command::StartCollect;
 use crate::collector::command::SubmitSpans;
 use crate::collector::Config;
+use crate::collector::EventRecord;
+use crate::collector::SpanContext;
 use crate::collector::SpanId;
 use crate::collector::SpanRecord;
 use crate::collector::SpanSet;
@@ -33,17 +32,14 @@ use crate::util::spsc::Sender;
 use crate::util::spsc::{self};
 use crate::util::CollectToken;
 
-const COLLECT_LOOP_INTERVAL: Duration = Duration::from_millis(50);
-
 static NEXT_COLLECT_ID: AtomicUsize = AtomicUsize::new(0);
-static GLOBAL_COLLECTOR: Lazy<Mutex<GlobalCollector>> =
-    Lazy::new(|| Mutex::new(GlobalCollector::start()));
+static GLOBAL_COLLECTOR: Mutex<Option<GlobalCollector>> = Mutex::new(None);
 static SPSC_RXS: Lazy<Mutex<Vec<Receiver<CollectCommand>>>> = Lazy::new(|| Mutex::new(Vec::new()));
 static REPORTER_READY: AtomicBool = AtomicBool::new(false);
 
 thread_local! {
     static COMMAND_SENDER: UnsafeCell<Sender<CollectCommand>> = {
-        let (tx, rx) = spsc::bounded(10240);
+        let (tx, rx) = spsc::bounded(102400);
         register_receiver(rx);
         UnsafeCell::new(tx)
     };
@@ -78,9 +74,7 @@ fn force_send_command(cmd: CollectCommand) {
 pub fn set_reporter(reporter: impl Reporter, config: Config) {
     #[cfg(feature = "enable")]
     {
-        let mut global_collector = GLOBAL_COLLECTOR.lock();
-        global_collector.config = config;
-        global_collector.reporter = Some(Box::new(reporter));
+        GlobalCollector::start(reporter, config);
         REPORTER_READY.store(true, Ordering::Relaxed);
     }
 }
@@ -105,8 +99,11 @@ pub fn flush() {
             std::thread::Builder::new()
                 .name("minitrace-flush".to_string())
                 .spawn(move || {
-                    let mut global_collector = GLOBAL_COLLECTOR.lock();
-                    global_collector.handle_commands(true);
+                    GLOBAL_COLLECTOR
+                        .lock()
+                        .as_mut()
+                        .unwrap()
+                        .handle_commands(true);
                 })
                 .unwrap()
                 .join()
@@ -213,33 +210,10 @@ pub(crate) struct GlobalCollector {
 
 impl GlobalCollector {
     #[allow(unreachable_code)]
-    fn start() -> Self {
-        #[cfg(not(feature = "enable"))]
-        {
-            unreachable!(
-                "Global collector should not be invoked because feature \"enable\" is not set."
-            )
-        }
-
-        #[cfg(not(target_family = "wasm"))]
-        {
-            std::thread::Builder::new()
-                .name("minitrace-global-collector".to_string())
-                .spawn(move || {
-                    loop {
-                        let begin_instant = Instant::now();
-                        GLOBAL_COLLECTOR.lock().handle_commands(false);
-                        std::thread::sleep(
-                            COLLECT_LOOP_INTERVAL.saturating_sub(begin_instant.elapsed()),
-                        );
-                    }
-                })
-                .unwrap();
-        }
-
-        GlobalCollector {
-            config: Config::default().max_spans_per_trace(Some(0)),
-            reporter: None,
+    fn start(reporter: impl Reporter, config: Config) {
+        let global_collector = GlobalCollector {
+            config,
+            reporter: Some(Box::new(reporter)),
 
             active_collectors: HashMap::new(),
             committed_records: Vec::new(),
@@ -249,6 +223,28 @@ impl GlobalCollector {
             drop_collects: Vec::new(),
             commit_collects: Vec::new(),
             submit_spans: Vec::new(),
+        };
+
+        *GLOBAL_COLLECTOR.lock() = Some(global_collector);
+
+        #[cfg(not(target_family = "wasm"))]
+        {
+            std::thread::Builder::new()
+                .name("minitrace-global-collector".to_string())
+                .spawn(move || {
+                    loop {
+                        let begin_instant = Instant::now();
+                        if let Some(global_collector) = GLOBAL_COLLECTOR.lock().as_mut() {
+                            global_collector.handle_commands(false);
+                        }
+                        std::thread::sleep(
+                            config
+                                .background_collect_interval
+                                .saturating_sub(begin_instant.elapsed()),
+                        );
+                    }
+                })
+                .unwrap();
         }
     }
 
