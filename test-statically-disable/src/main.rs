@@ -21,7 +21,7 @@ fn main() {
         ConsoleReporter,
         Config::default()
             .max_spans_per_trace(Some(100))
-            .report_interval(Duration::from_secs(1))
+            .report_interval(Duration::from_millis(10))
             .report_before_root_finish(true),
     );
 
