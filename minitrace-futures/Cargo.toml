@@ -1,6 +1,6 @@
 [package]
 name = "minitrace-futures"
-version = "0.6.6"
+version = "0.6.7"
 authors = ["The TiKV Project Authors"]
 license = "Apache-2.0"
 edition = "2021"
@@ -14,7 +14,7 @@ keywords = ["tracing", "span", "futures", "jaeger", "opentelemetry"]
 
 [dependencies]
 futures = "0.3"
-minitrace = { version = "0.6.6", path = "../minitrace" }
+minitrace = { version = "0.6.7", path = "../minitrace" }
 pin-project-lite = "0.2.13"
 
 [dev-dependencies]

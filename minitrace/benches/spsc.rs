@@ -57,6 +57,29 @@ fn spsc_comparison(c: &mut Criterion) {
                 total_time
             })
         });
+        bgroup.bench_function(format!("flume/{}", len), |b| {
+            b.iter_custom(|iters| {
+                let mut total_time = Duration::default();
+                for _ in 0..iters {
+                    let (tx, rx) = flume::bounded(10240);
+
+                    let start = Instant::now();
+
+                    std::thread::spawn(move || {
+                        for i in 0..len {
+                            while tx.send(i).is_err() {}
+                        }
+                    });
+
+                    for _ in 0..len {
+                        while rx.recv().is_err() {}
+                    }
+
+                    total_time += start.elapsed();
+                }
+                total_time
+            })
+        });
         bgroup.bench_function(format!("minitrace/{}", len), |b| {
             b.iter_custom(|iters| {
                 let mut total_time = Duration::default();
@@ -147,6 +170,23 @@ fn spsc_send_only_comparison(c: &mut Criterion) {
 
                     for i in 0..len {
                         tx.push(i).unwrap();
+                    }
+
+                    total_time += start.elapsed();
+                }
+                total_time
+            })
+        });
+        bgroup.bench_function(format!("flume/{}", len), |b| {
+            b.iter_custom(|iters| {
+                let mut total_time = Duration::default();
+                for _ in 0..iters {
+                    let (tx, _rx) = flume::bounded(10240);
+
+                    let start = Instant::now();
+
+                    for i in 0..len {
+                        tx.send(i).unwrap();
                     }
 
                     total_time += start.elapsed();

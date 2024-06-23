@@ -144,11 +144,12 @@
 //!
 //! Sometimes, passing a `Span` through a function to create a child `Span` can be inconvenient.
 //! We can employ a thread-local approach to avoid an explicit argument passing in the function.
-//! In minitrace, [`Span::set_local_parent()`] and [`Span::enter_with_local_parent()`] serve this purpose.
+//! In minitrace, [`Span::set_local_parent()`] and [`Span::enter_with_local_parent()`] serve this
+//! purpose.
 //!
-//! [`Span::set_local_parent()`] method sets __a local context of the `Span`__ for the current thread.
-//! [`Span::enter_with_local_parent()`] accesses the parent `Span` from the local context and creates
-//! a child `Span` with it.
+//! [`Span::set_local_parent()`] method sets __a local context of the `Span`__ for the current
+//! thread. [`Span::enter_with_local_parent()`] accesses the parent `Span` from the local context
+//! and creates a child `Span` with it.
 //!
 //! ```
 //! use minitrace::prelude::*;
@@ -224,7 +225,8 @@
 //!
 //! ## Event
 //!
-//! [`Event`] represents a single point in time where something occurred during the execution of a program.
+//! [`Event`] represents a single point in time where something occurred during the execution of a
+//! program.
 //!
 //! An `Event` can be seen as a log record attached to a span.
 //! ```
@@ -253,8 +255,8 @@
 //!
 //! The attribute-macro [`trace`] helps to reduce boilerplate.
 //!
-//! Note: For successful tracing a function using the [`trace`] macro, the function call should occur
-//! within __a local context of a `Span`__.
+//! Note: For successful tracing a function using the [`trace`] macro, the function call should
+//! occur within __a local context of a `Span`__.
 //!
 //! For more detailed usage instructions, please refer to [`trace`].
 //!
@@ -306,7 +308,9 @@
 //! and `minitrace-opentelemetry` are available.
 //!
 //! By default, the reporter is triggered every 500 milliseconds. The reporter can also be
-//! triggered manually by calling [`flush()`]. See [`Config`] for customizing the reporting behavior.
+//! triggered manually by calling [`flush()`]. See [`Config`] for customizing the reporting
+//! behavior.
+//!
 //! ```
 //! use std::time::Duration;
 //!
@@ -328,16 +332,16 @@
 //! - **No Tracing**: If the feature `enable` is not set in the application, `minitrace` will be
 //!   completely optimized away from the final executable binary, achieving zero overhead.
 //!
-//! - **Sample Tracing**: If `enable` is set in the application, but only a small portion
-//!   of the traces are enabled via [`Span::root()`], while the other portions are started with
+//! - **Sample Tracing**: If `enable` is set in the application, but only a small portion of the
+//!   traces are enabled via [`Span::root()`], while the other portions are started with
 //!   placeholders using [`Span::noop()`]. The overhead in this case is very small - merely an
 //!   integer load, comparison, and jump.
 //!
-//! - **Full Tracing with Tail Sampling**: If `enable` is set in the application, and all
-//!   traces are enabled, however, only a select few interesting tracing records (e.g., P99) are
-//!   reported, while normal traces are dismissed by using [`Span::cancel()`] to avoid being
-//!   reported, the overhead of collecting traces is still very small. This could be useful when
-//!   you are interested in examining program's tail latency.
+//! - **Full Tracing with Tail Sampling**: If `enable` is set in the application, and all traces are
+//!   enabled, however, only a select few interesting tracing records (e.g., P99) are reported,
+//!   while normal traces are dismissed by using [`Span::cancel()`] to avoid being reported, the
+//!   overhead of collecting traces is still very small. This could be useful when you are
+//!   interested in examining program's tail latency.
 //!
 //! - **Full Tracing**: If `enable` is set in the application, and all traces are reported,
 //!   `minitrace` performs 10x to 100x faster than other tracing libraries in this case.

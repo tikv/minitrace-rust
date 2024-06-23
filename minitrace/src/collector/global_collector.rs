@@ -6,21 +6,19 @@ use std::sync::atomic::AtomicBool;
 use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
-use std::time::Duration;
 
 use minstant::Anchor;
 use minstant::Instant;
-use once_cell::sync::Lazy;
 use parking_lot::Mutex;
 
-use super::EventRecord;
-use super::SpanContext;
 use crate::collector::command::CollectCommand;
 use crate::collector::command::CommitCollect;
 use crate::collector::command::DropCollect;
 use crate::collector::command::StartCollect;
 use crate::collector::command::SubmitSpans;
 use crate::collector::Config;
+use crate::collector::EventRecord;
+use crate::collector::SpanContext;
 use crate::collector::SpanId;
 use crate::collector::SpanRecord;
 use crate::collector::SpanSet;
@@ -33,12 +31,9 @@ use crate::util::spsc::Sender;
 use crate::util::spsc::{self};
 use crate::util::CollectToken;
 
-const COLLECT_LOOP_INTERVAL: Duration = Duration::from_millis(50);
-
 static NEXT_COLLECT_ID: AtomicUsize = AtomicUsize::new(0);
-static GLOBAL_COLLECTOR: Lazy<Mutex<GlobalCollector>> =
-    Lazy::new(|| Mutex::new(GlobalCollector::start()));
-static SPSC_RXS: Lazy<Mutex<Vec<Receiver<CollectCommand>>>> = Lazy::new(|| Mutex::new(Vec::new()));
+static GLOBAL_COLLECTOR: Mutex<Option<GlobalCollector>> = Mutex::new(None);
+static SPSC_RXS: Mutex<Vec<Receiver<CollectCommand>>> = Mutex::new(Vec::new());
 static REPORTER_READY: AtomicBool = AtomicBool::new(false);
 
 thread_local! {
@@ -78,9 +73,7 @@ fn force_send_command(cmd: CollectCommand) {
 pub fn set_reporter(reporter: impl Reporter, config: Config) {
     #[cfg(feature = "enable")]
     {
-        let mut global_collector = GLOBAL_COLLECTOR.lock();
-        global_collector.config = config;
-        global_collector.reporter = Some(Box::new(reporter));
+        GlobalCollector::start(reporter, config);
         REPORTER_READY.store(true, Ordering::Relaxed);
     }
 }
@@ -101,12 +94,14 @@ pub fn flush() {
 
         #[cfg(not(target_family = "wasm"))]
         {
-            // Spawns a new thread to ensure the reporter operates outside the tokio runtime to prevent panic.
+            // Spawns a new thread to ensure the reporter operates outside the tokio runtime to
+            // prevent panic.
             std::thread::Builder::new()
                 .name("minitrace-flush".to_string())
                 .spawn(move || {
-                    let mut global_collector = GLOBAL_COLLECTOR.lock();
-                    global_collector.handle_commands(true);
+                    if let Some(global_collector) = GLOBAL_COLLECTOR.lock().as_mut() {
+                        global_collector.handle_commands();
+                    }
                 })
                 .unwrap()
                 .join()
@@ -144,11 +139,12 @@ impl GlobalCollect {
 
     // Note that: relationships are not built completely for now so a further job is needed.
     //
-    // Every `SpanSet` has its own root spans whose `raw_span.parent_id`s are equal to `SpanId::default()`.
+    // Every `SpanSet` has its own root spans whose `raw_span.parent_id`s are equal to
+    // `SpanId::default()`.
     //
     // Every root span can have multiple parents where mainly comes from `Span::enter_with_parents`.
-    // Those parents are recorded into `CollectToken` which has several `CollectTokenItem`s. Look into
-    // a `CollectTokenItem`, `parent_ids` can be found.
+    // Those parents are recorded into `CollectToken` which has several `CollectTokenItem`s. Look
+    // into a `CollectTokenItem`, `parent_ids` can be found.
     //
     // For example, we have a `SpanSet::LocalSpansInner` and a `CollectToken` as follow:
     //
@@ -162,7 +158,8 @@ impl GlobalCollect {
     //     |  70  |  default  | ... | <- root span         +------------+------------+
     //     +------+-----------+-----+
     //
-    // There is a many-to-many mapping. Span#15 has parents Span#7, Span#321 and Span#413, so does Span#70.
+    // There is a many-to-many mapping. Span#15 has parents Span#7, Span#321 and Span#413, so does
+    // Span#70.
     //
     // So the expected further job mentioned above is:
     // * Copy `SpanSet` to the same number of copies as `CollectTokenItem`s, one `SpanSet` to one
@@ -201,25 +198,33 @@ pub(crate) struct GlobalCollector {
     reporter: Option<Box<dyn Reporter>>,
 
     active_collectors: HashMap<usize, ActiveCollector>,
-    committed_records: Vec<SpanRecord>,
-    last_report: Instant,
 
-    // Vectors to be reused by collection loops. They must be empty outside of the `handle_commands` loop.
+    // Vectors to be reused by collection loops. They must be empty outside of the
+    // `handle_commands` loop.
     start_collects: Vec<StartCollect>,
     drop_collects: Vec<DropCollect>,
     commit_collects: Vec<CommitCollect>,
     submit_spans: Vec<SubmitSpans>,
+    committed_records: Vec<SpanRecord>,
 }
 
 impl GlobalCollector {
     #[allow(unreachable_code)]
-    fn start() -> Self {
-        #[cfg(not(feature = "enable"))]
-        {
-            unreachable!(
-                "Global collector should not be invoked because feature \"enable\" is not set."
-            )
-        }
+    fn start(reporter: impl Reporter, config: Config) {
+        let global_collector = GlobalCollector {
+            config,
+            reporter: Some(Box::new(reporter)),
+
+            active_collectors: HashMap::new(),
+            committed_records: Vec::new(),
+
+            start_collects: Vec::new(),
+            drop_collects: Vec::new(),
+            commit_collects: Vec::new(),
+            submit_spans: Vec::new(),
+        };
+
+        *GLOBAL_COLLECTOR.lock() = Some(global_collector);
 
         #[cfg(not(target_family = "wasm"))]
         {
@@ -228,37 +233,26 @@ impl GlobalCollector {
                 .spawn(move || {
                     loop {
                         let begin_instant = Instant::now();
-                        GLOBAL_COLLECTOR.lock().handle_commands(false);
+                        GLOBAL_COLLECTOR.lock().as_mut().unwrap().handle_commands();
                         std::thread::sleep(
-                            COLLECT_LOOP_INTERVAL.saturating_sub(begin_instant.elapsed()),
+                            config
+                                .report_interval
+                                .saturating_sub(begin_instant.elapsed()),
                         );
                     }
                 })
                 .unwrap();
         }
-
-        GlobalCollector {
-            config: Config::default().max_spans_per_trace(Some(0)),
-            reporter: None,
-
-            active_collectors: HashMap::new(),
-            committed_records: Vec::new(),
-            last_report: Instant::now(),
-
-            start_collects: Vec::new(),
-            drop_collects: Vec::new(),
-            commit_collects: Vec::new(),
-            submit_spans: Vec::new(),
-        }
     }
 
-    fn handle_commands(&mut self, flush: bool) {
+    fn handle_commands(&mut self) {
         object_pool::enable_reuse_in_current_thread();
 
         debug_assert!(self.start_collects.is_empty());
         debug_assert!(self.drop_collects.is_empty());
         debug_assert!(self.commit_collects.is_empty());
         debug_assert!(self.submit_spans.is_empty());
+        debug_assert!(self.committed_records.is_empty());
 
         let start_collects = &mut self.start_collects;
         let drop_collects = &mut self.drop_collects;
@@ -287,7 +281,8 @@ impl GlobalCollector {
             });
         }
 
-        // If the reporter is not set, global collectior only clears the channel and then dismiss all messages.
+        // If the reporter is not set, global collectior only clears the channel and then dismiss
+        // all messages.
         if self.reporter.is_none() {
             start_collects.clear();
             drop_collects.clear();
@@ -334,8 +329,9 @@ impl GlobalCollector {
                 for item in collect_token.iter() {
                     if let Some(active_collector) = self.active_collectors.get_mut(&item.collect_id)
                     {
-                        // Multiple items in a collect token are built from `Span::enter_from_parents`,
-                        // so relative span cannot be a root span.
+                        // Multiple items in a collect token are built from
+                        // `Span::enter_from_parents`, so relative span
+                        // cannot be a root span.
                         if active_collector.span_count
                             < self.config.max_spans_per_trace.unwrap_or(usize::MAX)
                         {
@@ -377,16 +373,8 @@ impl GlobalCollector {
             }
         }
 
-        if self.last_report.elapsed() > self.config.batch_report_interval
-            || committed_records.len() > self.config.batch_report_max_spans.unwrap_or(usize::MAX)
-            || flush
-        {
-            self.reporter
-                .as_mut()
-                .unwrap()
-                .report(committed_records.drain(..).as_slice());
-            self.last_report = Instant::now();
-        }
+        self.reporter.as_mut().unwrap().report(committed_records);
+        committed_records.clear();
     }
 }
 

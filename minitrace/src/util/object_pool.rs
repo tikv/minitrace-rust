@@ -21,8 +21,8 @@ fn is_reusable() -> bool {
 
 pub struct Pool<T> {
     // The objects in the pool ready to be reused.
-    // The mutex should only be visited in the global collector, which is guaranteed by `is_reusable`,
-    // so it should not have synchronization overhead.
+    // The mutex should only be visited in the global collector, which is guaranteed by
+    // `is_reusable`, so it should not have synchronization overhead.
     objects: Mutex<Vec<T>>,
     init: fn() -> T,
     reset: fn(&mut T),

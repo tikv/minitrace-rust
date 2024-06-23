@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+## v0.6.7
+
+- Add `Config::report_interval`: The background collector working interval.
+- Deprecate `Config::batch_report_interval` and `Config::batch_report_max_spans`.
+- Fix a performance issue in object-pool which was causing lock racing.
+
+## v0.6.6
+
+- Update to opentelemetry, opentelemetry_sdk, and opentelemetry-otlp.
+
 ## v0.6.5
 
 - Update to opentelemetry 0.22, opentelemetry_sdk 0.22.1, and opentelemetry-otlp: 0.15.
