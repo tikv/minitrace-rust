@@ -1,15 +1,32 @@
 [workspace]
-resolver = "2"
 members = [
-    "minitrace",
-    "minitrace-macro",
-    "minitrace-jaeger",
-    "minitrace-datadog",
-    "minitrace-opentelemetry",
-    "minitrace-futures",
-    "test-statically-disable",
+  "minitrace",
+  "minitrace-macro",
+  "minitrace-jaeger",
+  "minitrace-datadog",
+  "minitrace-opentelemetry",
+  "minitrace-futures",
+  "test-statically-disable",
 ]
+resolver = "2"
+
+[workspace.package]
+authors = ["The TiKV Project Authors"]
+categories = ["development-tools::debugging"]
+edition = "2021"
+homepage = "https://github.com/tikv/minitrace-rust"
+license = "Apache-2.0"
+repository = "https://github.com/tikv/minitrace-rust"
+version = "0.6.7"
+
+[workspace.dependencies]
+minitrace = { path = "minitrace" }
+minitrace-datadog = { path = "minitrace-datadog" }
+minitrace-futures = { path = "minitrace-futures" }
+minitrace-jaeger = { path = "minitrace-jaeger" }
+minitrace-macro = { path = "minitrace-macro" }
+minitrace-opentelemetry = { path = "minitrace-opentelemetry" }
 
 [profile.bench]
-opt-level = 3
 lto = true
+opt-level = 3
