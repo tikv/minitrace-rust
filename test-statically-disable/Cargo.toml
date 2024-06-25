@@ -1,11 +1,15 @@
 [package]
 name = "test-statically-disable"
-version = "0.0.1"
-authors = ["The TiKV Project Authors"]
-license = "Apache-2.0"
-edition = "2021"
-readme = "README.md"
 publish = false
+readme = "README.md"
+
+authors = { workspace = true }
+categories = { workspace = true }
+edition = { workspace = true }
+homepage = { workspace = true }
+license = { workspace = true }
+repository = { workspace = true }
+version = { workspace = true }
 
 [dependencies]
-minitrace = { path = "../minitrace" }
+minitrace = { workspace = true }
