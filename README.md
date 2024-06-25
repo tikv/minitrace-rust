@@ -1,6 +1,6 @@
 <div align="center">
 
-  ![minitrace: Extremely fast tracing library for Rust](etc/img/head-img-640.svg)
+  ![minitrace: Extremely fast tracing library for Rust](https://raw.githubusercontent.com/tikv/minitrace-rust/master/etc/img/head-img-640.svg)
 
   [![Crates.io](https://img.shields.io/crates/v/minitrace.svg?style=flat-square&logo=rust)](https://crates.io/crates/minitrace)
   [![Documentation](https://img.shields.io/docsrs/minitrace?style=flat-square&logo=rust)](https://docs.rs/minitrace/)
@@ -13,7 +13,7 @@
 
 minitrace is a tracing library [10~100x faster](#benchmarks) than others:
 
-![benchmark](etc/img/head-benchmark.svg)
+![benchmark](https://raw.githubusercontent.com/tikv/minitrace-rust/master/etc/img/head-benchmark.svg)
 
 Features:
 
