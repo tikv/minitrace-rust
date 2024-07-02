@@ -128,6 +128,7 @@ Feel free to open a PR and add your projects here:
 - [Conductor](https://github.com/the-guild-org/conductor): Open-source GraphQL Gateway
 - [Apache OpenDAL](https://github.com/apache/opendal): A data access layer for various storage
 - [Databend](https://github.com/datafuselabs/databend): Cost-Effective alternative to Snowflake
+- [foyer](https://github.com/mrcroxx/foyer): Hybrid in-memory and disk cache in Rust
 
 ## FAQ
 
