@@ -1,3 +1,18 @@
+> [!WARNING]
+> `minitrace` has been renamed to [`fastrace`](https://github.com/fastracelabs/fastrace). Please follow the migration guide to update your code. **This repository is no longer maintained.**
+
+Edit your `Cargo.toml` and find and replace `minitrace` with `fastrace` in the source code:
+
+```diff
+# Cargo.toml
+
+[dependencies]
+- minitrace = "0.6"
++ fastrace = "0.6"
+```
+
+<hr>
+
 <div align="center">
 
   ![minitrace: Extremely fast tracing library for Rust](https://raw.githubusercontent.com/tikv/minitrace-rust/master/etc/img/head-img-640.svg)
