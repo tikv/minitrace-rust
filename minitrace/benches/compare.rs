@@ -2,16 +2,51 @@
 
 use criterion::criterion_group;
 use criterion::criterion_main;
+use criterion::BenchmarkId;
 use criterion::Criterion;
+use tracing::span;
+use tracing::Event;
+use tracing::Id;
+use tracing::Metadata;
+use tracing_core::span::Current;
 
-fn init_opentelemetry() {
-    use tracing_subscriber::prelude::*;
+/// A collector that is enabled but otherwise does nothing.
+struct EnabledSubscriber;
 
-    let opentelemetry = tracing_opentelemetry::layer();
-    tracing_subscriber::registry()
-        .with(opentelemetry)
-        .try_init()
-        .unwrap();
+impl tracing::Subscriber for EnabledSubscriber {
+    fn new_span(&self, span: &span::Attributes<'_>) -> Id {
+        let _ = span;
+        Id::from_u64(0xDEAD_FACE)
+    }
+
+    fn event(&self, event: &Event<'_>) {
+        let _ = event;
+    }
+
+    fn record(&self, span: &Id, values: &span::Record<'_>) {
+        let _ = (span, values);
+    }
+
+    fn record_follows_from(&self, span: &Id, follows: &Id) {
+        let _ = (span, follows);
+    }
+
+    fn enabled(&self, metadata: &Metadata<'_>) -> bool {
+        let _ = metadata;
+        true
+    }
+
+    fn enter(&self, span: &Id) {
+        let _ = span;
+    }
+
+    fn exit(&self, span: &Id) {
+        let _ = span;
+    }
+
+    fn current_span(&self) -> Current {
+        Current::none()
+    }
 }
 
 fn init_minitrace() {
@@ -24,8 +59,8 @@ fn init_minitrace() {
     minitrace::set_reporter(DummyReporter, minitrace::collector::Config::default());
 }
 
-fn opentelemetry_harness(n: usize) {
-    fn dummy_opentelementry(n: usize) {
+fn tracing_harness(n: usize) {
+    fn dummy_span(n: usize) {
         for _ in 0..n {
             let child = tracing::span!(tracing::Level::TRACE, "child");
             let _enter = child.enter();
@@ -35,7 +70,7 @@ fn opentelemetry_harness(n: usize) {
     let root = tracing::span!(tracing::Level::TRACE, "parent");
     let _enter = root.enter();
 
-    dummy_opentelementry(n);
+    dummy_span(n);
 }
 
 fn rustracing_harness(n: usize) {
@@ -72,24 +107,36 @@ fn minitrace_harness(n: usize) {
 }
 
 fn tracing_comparison(c: &mut Criterion) {
-    init_opentelemetry();
-    init_minitrace();
+    use tracing_subscriber::prelude::*;
 
-    let mut bgroup = c.benchmark_group("compare");
+    let mut group = c.benchmark_group("Comparison");
 
     for n in &[1, 10, 100, 1000] {
-        bgroup.bench_function(format!("Tokio Tracing/{n}"), |b| {
-            b.iter(|| opentelemetry_harness(*n))
-        });
-        bgroup.bench_function(format!("Rustracing/{n}"), |b| {
-            b.iter(|| rustracing_harness(*n))
-        });
-        bgroup.bench_function(format!("minitrace/{n}"), |b| {
+        init_minitrace();
+        group.bench_function(BenchmarkId::new("minitrace-noop", n), |b| {
             b.iter(|| minitrace_harness(*n))
+        });
+
+        let subscriber = EnabledSubscriber;
+        tracing::subscriber::with_default(subscriber, || {
+            group.bench_with_input(BenchmarkId::new("tokio/tracing-noop", n), n, |b, n| {
+                b.iter(|| tracing_harness(*n))
+            });
+        });
+
+        let subscriber = tracing_subscriber::registry().with(tracing_opentelemetry::layer());
+        tracing::subscriber::with_default(subscriber, || {
+            group.bench_with_input(BenchmarkId::new("tokio/tracing-otel", n), n, |b, n| {
+                b.iter(|| tracing_harness(*n))
+            });
+        });
+
+        group.bench_function(BenchmarkId::new("rusttracing", n), |b| {
+            b.iter(|| rustracing_harness(*n))
         });
     }
 
-    bgroup.finish();
+    group.finish();
 }
 
 criterion_group!(benches, tracing_comparison);
